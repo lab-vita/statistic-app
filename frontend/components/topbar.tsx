@@ -1,11 +1,10 @@
 "use client";
 
 import { Period, PeriodType, getDefaultPeriod, shiftPeriod, formatPeriodLabel } from "@/lib/periods";
-import { toDateStr } from "@/lib/api";
+import { toDateStr, Operator, OPERATOR_COLORS, getInitials } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, RefreshCw, ChevronDown } from "lucide-react";
 import { Section } from "@/components/sidebar";
-import { Operator, OPERATOR_COLORS, getInitials } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 
 const PERIODS: { type: PeriodType; label: string }[] = [
@@ -18,6 +17,7 @@ const PERIODS: { type: PeriodType; label: string }[] = [
 ];
 
 const SECTION_LABELS: Record<Section, string> = {
+  home:         "Главная",
   calls:        "Звонки",
   appointments: "Записи",
 };
@@ -33,13 +33,9 @@ interface TopbarProps {
   onCustomToChange?: (v: string) => void;
   onRefresh: () => void;
   refreshing: boolean;
-  // Фильтр по людям
   operators?: Operator[];
   selectedOperator?: string | null;
   onSelectOperator?: (id: string | null) => void;
-  // Антифрод-вкладка (только для записей)
-  appointmentsTab?: "overview" | "antifraud";
-  onAppointmentsTabChange?: (tab: "overview" | "antifraud") => void;
 }
 
 export function Topbar({
@@ -47,7 +43,6 @@ export function Topbar({
   customFrom, customTo, onCustomFromChange, onCustomToChange,
   onRefresh, refreshing,
   operators = [], selectedOperator, onSelectOperator,
-  appointmentsTab, onAppointmentsTabChange,
 }: TopbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -56,7 +51,6 @@ export function Topbar({
   yesterday.setDate(yesterday.getDate() - 1);
   const isMaxDate = toDateStr(period.dateTo) >= toDateStr(yesterday);
 
-  // Закрываем дропдаун при клике вне
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -75,38 +69,11 @@ export function Topbar({
   return (
     <header className="h-14 border-b border-border flex items-center px-5 gap-4 flex-shrink-0 bg-background">
 
-      {/* Заголовок раздела + подзаголовок-фильтр */}
+      {/* Заголовок + фильтр по оператору */}
       <div className="flex items-center gap-2 min-w-0">
         <span className="font-semibold text-sm">{SECTION_LABELS[section]}</span>
 
-        {/* Вкладки внутри записей */}
-        {section === "appointments" && onAppointmentsTabChange && (
-          <div className="flex items-center gap-1 ml-2 rounded-md border border-border bg-muted/30 p-0.5">
-            <button
-              onClick={() => onAppointmentsTabChange("overview")}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                appointmentsTab === "overview"
-                  ? "bg-background border border-border text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Обзор
-            </button>
-            <button
-              onClick={() => onAppointmentsTabChange("antifraud")}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                appointmentsTab === "antifraud"
-                  ? "bg-background border border-border text-red-500"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Антифрод
-            </button>
-          </div>
-        )}
-
-        {/* Фильтр по оператору/администратору */}
-        {onSelectOperator && operators.length > 0 && appointmentsTab !== "antifraud" && (
+        {onSelectOperator && operators.length > 0 && (
           <div className="relative ml-1" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(v => !v)}
@@ -139,7 +106,6 @@ export function Topbar({
                 </button>
                 {operators.map((op, i) => {
                   const colors = OPERATOR_COLORS[i % 4];
-                  const initials = getInitials(op.name);
                   const parts = op.name.split(" ");
                   const short = parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
                   return (
@@ -154,7 +120,7 @@ export function Topbar({
                         className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
                         style={{ background: colors.bg, color: colors.text }}
                       >
-                        {initials}
+                        {getInitials(op.name)}
                       </div>
                       {short}
                     </button>
@@ -185,7 +151,7 @@ export function Topbar({
         </div>
       </div>
 
-      {/* Правая часть — навигация по дате + обновление */}
+      {/* Правая часть */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {period.type === "custom" ? (
           <div className="flex items-center gap-1.5">
