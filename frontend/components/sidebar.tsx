@@ -19,13 +19,11 @@ const SECTIONS = [
 export function Sidebar({ section, onSelectSection }: SidebarProps) {
   return (
     <aside className="w-[180px] flex-shrink-0 border-r border-border bg-muted/20 flex flex-col">
-      {/* Лого */}
       <div className="h-14 flex flex-col justify-center px-4 border-b border-border">
         <span className="font-semibold text-sm tracking-tight">Лабвита</span>
         <span className="text-[11px] text-muted-foreground">аналитика</span>
       </div>
 
-      {/* Навигация */}
       <nav className="flex-1 px-2 py-3 space-y-0.5">
         {SECTIONS.map(({ id, label, icon: Icon }) => (
           <button
@@ -43,7 +41,6 @@ export function Sidebar({ section, onSelectSection }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Тема */}
       <div className="border-t border-border px-4 py-3 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">Тема</span>
         <ThemeToggle />
