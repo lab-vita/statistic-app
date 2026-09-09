@@ -3,7 +3,7 @@
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LayoutDashboard, Phone, Calendar } from "lucide-react";
 
-export type Section = "calls" | "appointments";
+export type Section = "home" | "calls" | "appointments";
 
 interface SidebarProps {
   section: Section;
@@ -11,6 +11,7 @@ interface SidebarProps {
 }
 
 const SECTIONS = [
+  { id: "home"         as Section, label: "Главная", icon: LayoutDashboard },
   { id: "calls"        as Section, label: "Звонки",  icon: Phone           },
   { id: "appointments" as Section, label: "Записи",  icon: Calendar        },
 ];
