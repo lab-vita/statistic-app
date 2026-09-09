@@ -13,49 +13,41 @@ import { OperatorsTable } from "@/components/operators-table";
 import { AppointmentCards } from "@/components/appointments-cards";
 import { AppointmentsTable } from "@/components/appointments-table";
 import { AppointmentsDailyChart } from "@/components/appointments-daily-chart";
-import { SuspiciousList } from "@/components/suspicious-list";
 import {
   fetchStats, fetchHourly, fetchDaily, fetchHeatmap, fetchComparison,
   fetchOperators, collectCalls,
-  fetchAppointmentStats, fetchAppointmentDaily, fetchSuspicious,
+  fetchAppointmentStats, fetchAppointmentDaily,
   collectAppointments,
   toDateStr, addDays,
   Operator, StatsResponse, HourlyResponse, DailyResponse,
   HeatmapResponse, ComparisonResponse, ComparisonMetric,
-  AppointmentStatsResponse, AppointmentDailyResponse, SuspiciousResponse,
+  AppointmentStatsResponse, AppointmentDailyResponse,
 } from "@/lib/api";
 import { Period, PeriodType, getDefaultPeriod } from "@/lib/periods";
 
 export default function DashboardPage() {
-  // Навигация
-  const [section, setSection]               = useState<Section>("home");
-  const [appointmentsTab, setAppointmentsTab] = useState<"overview" | "antifraud">("overview");
-  const [operators, setOperators]           = useState<Operator[]>([]);
-  const [selectedOp, setSelectedOp]         = useState<string | null>(null);
+  const [section, setSection]       = useState<Section>("home");
+  const [operators, setOperators]   = useState<Operator[]>([]);
+  const [selectedOp, setSelectedOp] = useState<string | null>(null);
 
-  // Период
-  const [period, setPeriod]                 = useState<Period>(getDefaultPeriod("day"));
-  const [interval, setIntervalVal]          = useState(60);
-  const [customFrom, setCustomFrom]         = useState(toDateStr(addDays(new Date(), -7)));
-  const [customTo, setCustomTo]             = useState(toDateStr(addDays(new Date(), -1)));
+  const [period, setPeriod]         = useState<Period>(getDefaultPeriod("day"));
+  const [interval, setIntervalVal]  = useState(60);
+  const [customFrom, setCustomFrom] = useState(toDateStr(addDays(new Date(), -7)));
+  const [customTo, setCustomTo]     = useState(toDateStr(addDays(new Date(), -1)));
 
-  // Данные — звонки
-  const [stats, setStats]                   = useState<StatsResponse | null>(null);
-  const [hourly, setHourly]                 = useState<HourlyResponse | null>(null);
-  const [daily, setDaily]                   = useState<DailyResponse | null>(null);
-  const [heatmap, setHeatmap]               = useState<HeatmapResponse | null>(null);
-  const [comparison, setComparison]         = useState<ComparisonResponse | null>(null);
-  const [compMetric, setCompMetric]         = useState<ComparisonMetric>("total");
+  const [stats, setStats]           = useState<StatsResponse | null>(null);
+  const [hourly, setHourly]         = useState<HourlyResponse | null>(null);
+  const [daily, setDaily]           = useState<DailyResponse | null>(null);
+  const [heatmap, setHeatmap]       = useState<HeatmapResponse | null>(null);
+  const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
+  const [compMetric, setCompMetric] = useState<ComparisonMetric>("total");
 
-  // Данные — записи
-  const [apptStats, setApptStats]           = useState<AppointmentStatsResponse | null>(null);
-  const [apptDaily, setApptDaily]           = useState<AppointmentDailyResponse | null>(null);
-  const [suspicious, setSuspicious]         = useState<SuspiciousResponse | null>(null);
+  const [apptStats, setApptStats]   = useState<AppointmentStatsResponse | null>(null);
+  const [apptDaily, setApptDaily]   = useState<AppointmentDailyResponse | null>(null);
 
-  // UI
-  const [loading, setLoading]               = useState(false);
-  const [refreshing, setRefreshing]         = useState(false);
-  const [error, setError]                   = useState<string | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError]           = useState<string | null>(null);
 
   const dateFrom = period.type === "custom" ? customFrom : toDateStr(period.dateFrom);
   const dateTo   = period.type === "custom" ? customTo   : toDateStr(period.dateTo);
@@ -68,7 +60,7 @@ export default function DashboardPage() {
   const opSurname = opName ? opName.split(" ")[0] : undefined;
 
   const load = useCallback(async () => {
-    if (section === "home") return; // Главная грузит данные сама
+    if (section === "home") return;
     setLoading(true);
     setError(null);
     try {
@@ -92,23 +84,18 @@ export default function DashboardPage() {
         }
 
       } else if (section === "appointments") {
-        if (appointmentsTab === "antifraud") {
-          const s = await fetchSuspicious(dateFrom, dateTo);
-          setSuspicious(s);
-        } else {
-          const [as_, ad] = await Promise.all([
-            fetchAppointmentStats(dateFrom, dateTo, opSurname),
-            fetchAppointmentDaily(dateFrom, dateTo, opSurname),
-          ]);
-          setApptStats(as_); setApptDaily(ad);
-        }
+        const [as_, ad] = await Promise.all([
+          fetchAppointmentStats(dateFrom, dateTo, opSurname),
+          fetchAppointmentDaily(dateFrom, dateTo, opSurname),
+        ]);
+        setApptStats(as_); setApptDaily(ad);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, period.type, interval, selectedOp, compMetric, section, opSurname, appointmentsTab]);
+  }, [dateFrom, dateTo, period.type, interval, selectedOp, compMetric, section, opSurname]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -134,7 +121,6 @@ export default function DashboardPage() {
     setSection(s);
     setSelectedOp(null);
     setError(null);
-    setAppointmentsTab("overview");
   }
 
   const callsTotal   = stats?.operators["total"];
@@ -158,13 +144,9 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <Sidebar
-        section={section}
-        onSelectSection={handleSelectSection}
-      />
+      <Sidebar section={section} onSelectSection={handleSelectSection} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Топбар скрыт на главной — там своя шапка */}
         {section !== "home" && (
           <Topbar
             section={section}
@@ -180,8 +162,6 @@ export default function DashboardPage() {
             operators={operators}
             selectedOperator={selectedOp}
             onSelectOperator={setSelectedOp}
-            appointmentsTab={appointmentsTab}
-            onAppointmentsTabChange={setAppointmentsTab}
           />
         )}
 
@@ -192,12 +172,10 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ── ГЛАВНАЯ ── */}
           {section === "home" && (
             <HomeDashboard onNavigate={handleSelectSection} />
           )}
 
-          {/* ── ЗВОНКИ ── */}
           {section === "calls" && (
             <>
               {loading ? <Skeleton /> : displayCalls ? (
@@ -207,7 +185,6 @@ export default function DashboardPage() {
                   Нет данных за выбранный период
                 </div>
               )}
-
               {!loading && hourly && (
                 <HourlyChart data={hourly.slots} interval={interval} onIntervalChange={setIntervalVal} />
               )}
@@ -229,8 +206,7 @@ export default function DashboardPage() {
             </>
           )}
 
-          {/* ── ЗАПИСИ ── */}
-          {section === "appointments" && appointmentsTab === "overview" && (
+          {section === "appointments" && (
             <>
               {loading ? <Skeleton /> : apptStats ? (
                 <AppointmentCards stats={apptStats.total} />
@@ -239,27 +215,12 @@ export default function DashboardPage() {
                   Нет данных за выбранный период
                 </div>
               )}
-
               {!loading && apptDaily && apptDaily.days.length > 0 && (
                 <AppointmentsDailyChart data={apptDaily.days} />
               )}
               {!loading && !selectedOp && apptStats && (
-                <AppointmentsTable
-                  byAdmin={apptStats.by_admin}
-                  total={apptStats.total}
-                />
+                <AppointmentsTable byAdmin={apptStats.by_admin} total={apptStats.total} />
               )}
-            </>
-          )}
-
-          {/* ── АНТИФРОД ── */}
-          {section === "appointments" && appointmentsTab === "antifraud" && (
-            <>
-              {loading ? (
-                <div className="h-40 rounded-xl border border-border bg-card animate-pulse" />
-              ) : suspicious ? (
-                <SuspiciousList items={suspicious.items} />
-              ) : null}
             </>
           )}
         </main>
