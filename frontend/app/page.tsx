@@ -15,49 +15,51 @@ import { AppointmentsTable } from "@/components/appointments-table";
 import { AppointmentsDailyChart } from "@/components/appointments-daily-chart";
 import {
   fetchStats, fetchHourly, fetchDaily, fetchHeatmap, fetchComparison,
-  fetchOperators, collectCalls,
+  fetchOperators, fetchAdmins, collectCalls,
   fetchAppointmentStats, fetchAppointmentDaily,
   collectAppointments,
   toDateStr, addDays,
-  Operator, StatsResponse, HourlyResponse, DailyResponse,
+  Operator, Admin,
+  StatsResponse, HourlyResponse, DailyResponse,
   HeatmapResponse, ComparisonResponse, ComparisonMetric,
   AppointmentStatsResponse, AppointmentDailyResponse,
 } from "@/lib/api";
 import { Period, PeriodType, getDefaultPeriod } from "@/lib/periods";
 
 export default function DashboardPage() {
-  const [section, setSection]       = useState<Section>("home");
-  const [operators, setOperators]   = useState<Operator[]>([]);
-  const [selectedOp, setSelectedOp] = useState<string | null>(null);
+  const [section, setSection]         = useState<Section>("home");
+  const [operators, setOperators]     = useState<Operator[]>([]);
+  const [admins, setAdmins]           = useState<Admin[]>([]);
+  const [selectedOp, setSelectedOp]   = useState<string | null>(null);
+  const [selectedAdmin, setSelectedAdmin] = useState<string | null>(null);
 
-  const [period, setPeriod]         = useState<Period>(getDefaultPeriod("day"));
-  const [interval, setIntervalVal]  = useState(60);
-  const [customFrom, setCustomFrom] = useState(toDateStr(addDays(new Date(), -7)));
-  const [customTo, setCustomTo]     = useState(toDateStr(addDays(new Date(), -1)));
+  const [period, setPeriod]           = useState<Period>(getDefaultPeriod("day"));
+  const [interval, setIntervalVal]    = useState(60);
+  const [customFrom, setCustomFrom]   = useState(toDateStr(addDays(new Date(), -7)));
+  const [customTo, setCustomTo]       = useState(toDateStr(addDays(new Date(), -1)));
 
-  const [stats, setStats]           = useState<StatsResponse | null>(null);
-  const [hourly, setHourly]         = useState<HourlyResponse | null>(null);
-  const [daily, setDaily]           = useState<DailyResponse | null>(null);
-  const [heatmap, setHeatmap]       = useState<HeatmapResponse | null>(null);
-  const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
-  const [compMetric, setCompMetric] = useState<ComparisonMetric>("total");
+  const [stats, setStats]             = useState<StatsResponse | null>(null);
+  const [hourly, setHourly]           = useState<HourlyResponse | null>(null);
+  const [daily, setDaily]             = useState<DailyResponse | null>(null);
+  const [heatmap, setHeatmap]         = useState<HeatmapResponse | null>(null);
+  const [comparison, setComparison]   = useState<ComparisonResponse | null>(null);
+  const [compMetric, setCompMetric]   = useState<ComparisonMetric>("total");
 
-  const [apptStats, setApptStats]   = useState<AppointmentStatsResponse | null>(null);
-  const [apptDaily, setApptDaily]   = useState<AppointmentDailyResponse | null>(null);
+  const [apptStats, setApptStats]     = useState<AppointmentStatsResponse | null>(null);
+  const [apptDaily, setApptDaily]     = useState<AppointmentDailyResponse | null>(null);
 
-  const [loading, setLoading]       = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+  const [loading, setLoading]         = useState(false);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [error, setError]             = useState<string | null>(null);
 
   const dateFrom = period.type === "custom" ? customFrom : toDateStr(period.dateFrom);
   const dateTo   = period.type === "custom" ? customTo   : toDateStr(period.dateTo);
 
+  // Загружаем операторов и администраторов один раз
   useEffect(() => {
     fetchOperators().then(r => setOperators(r.operators)).catch(() => {});
+    fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
   }, []);
-
-  const opName    = selectedOp ? operators.find(o => o.id === selectedOp)?.name : undefined;
-  const opSurname = opName ? opName.split(" ")[0] : undefined;
 
   const load = useCallback(async () => {
     if (section === "home") return;
@@ -85,8 +87,8 @@ export default function DashboardPage() {
 
       } else if (section === "appointments") {
         const [as_, ad] = await Promise.all([
-          fetchAppointmentStats(dateFrom, dateTo, opSurname),
-          fetchAppointmentDaily(dateFrom, dateTo, opSurname),
+          fetchAppointmentStats(dateFrom, dateTo, selectedAdmin ?? undefined),
+          fetchAppointmentDaily(dateFrom, dateTo, selectedAdmin ?? undefined),
         ]);
         setApptStats(as_); setApptDaily(ad);
       }
@@ -95,7 +97,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, period.type, interval, selectedOp, compMetric, section, opSurname]);
+  }, [dateFrom, dateTo, period.type, interval, selectedOp, selectedAdmin, compMetric, section]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -120,6 +122,7 @@ export default function DashboardPage() {
   function handleSelectSection(s: Section) {
     setSection(s);
     setSelectedOp(null);
+    setSelectedAdmin(null);
     setError(null);
   }
 
@@ -162,6 +165,9 @@ export default function DashboardPage() {
             operators={operators}
             selectedOperator={selectedOp}
             onSelectOperator={setSelectedOp}
+            admins={admins}
+            selectedAdmin={selectedAdmin}
+            onSelectAdmin={setSelectedAdmin}
           />
         )}
 
@@ -218,7 +224,7 @@ export default function DashboardPage() {
               {!loading && apptDaily && apptDaily.days.length > 0 && (
                 <AppointmentsDailyChart data={apptDaily.days} />
               )}
-              {!loading && !selectedOp && apptStats && (
+              {!loading && !selectedAdmin && apptStats && (
                 <AppointmentsTable byAdmin={apptStats.by_admin} total={apptStats.total} />
               )}
             </>
