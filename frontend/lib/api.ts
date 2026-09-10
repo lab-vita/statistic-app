@@ -191,7 +191,6 @@ export interface AdminAppointmentStats {
   noshow_pct:       number;
   new_pct:          number;
   cancel_pct:       number;
-  // Дельты
   total_delta_pct:            number | null;
   total_delta_dir:            DeltaDir;
   visits_delta_pct:           number | null;
@@ -254,4 +253,83 @@ export async function collectAppointments(dateFrom: string, dateTo: string) {
   );
   if (!res.ok) throw new Error("Ошибка сбора данных МедОДС");
   return res.json();
+}
+
+// ─── Отчёты ──────────────────────────────────────────────────
+
+export type Granularity = "day" | "week" | "month";
+
+export interface ReportRow {
+  period:        string;
+  total:         number;
+  incoming?:     number;
+  outgoing?:     number;
+  missed?:       number;
+  visits?:       number;
+  noshow?:       number;
+  cancels?:      number;
+  new_patients?: number;
+  visit_pct?:    number;
+}
+
+export interface ReportOperatorRow {
+  operator_id:   string;
+  name:          string;
+  incoming:      number;
+  outgoing:      number;
+  missed:        number;
+  total:         number;
+  [key: string]: any;
+}
+
+export interface ReportAdminRow {
+  name:          string;
+  group:         string;
+  group_label:   string;
+  total:         number;
+  visits:        number;
+  noshow:        number;
+  new_patients:  number;
+  visit_pct:     number;
+  [key: string]: any;
+}
+
+export interface CallsReportResponse {
+  date_from:   string;
+  date_to:     string;
+  prev_from:   string;
+  prev_to:     string;
+  granularity: Granularity;
+  rows:        ReportRow[];
+  summary:     Record<string, any>;
+  by_operator: ReportOperatorRow[];
+}
+
+export interface AppointmentsReportResponse {
+  date_from:   string;
+  date_to:     string;
+  prev_from:   string;
+  prev_to:     string;
+  granularity: Granularity;
+  rows:        ReportRow[];
+  summary:     Record<string, any>;
+  by_admin:    ReportAdminRow[];
+}
+
+export function fetchCallsReport(
+  dateFrom: string, dateTo: string,
+  granularity: Granularity,
+  operatorId?: string,
+): Promise<CallsReportResponse> {
+  const q = operatorId ? `&operator_id=${operatorId}` : "";
+  return apiFetch(`/api/reports/calls?date_from=${dateFrom}&date_to=${dateTo}&granularity=${granularity}${q}`);
+}
+
+export function fetchAppointmentsReport(
+  dateFrom: string, dateTo: string,
+  granularity: Granularity,
+  adminSurname?: string,
+): Promise<AppointmentsReportResponse> {
+  const q = adminSurname ? `&admin_surname=${encodeURIComponent(adminSurname)}` : "";
+  return apiFetch(`/api/reports/appointments?date_from=${dateFrom}&date_to=${dateTo}&granularity=${granularity}${q}`);
 }
