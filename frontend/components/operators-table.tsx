@@ -4,21 +4,24 @@ interface OperatorsTableProps {
   operators: Record<string, OperatorStats>;
 }
 
+// Жданова — профосмотры, не красим её метрики
+const PROFOSMOTR_IDS = new Set(["544"]);
+
+const headers = [
+  "Оператор",
+  "Входящие",
+  "Исходящие",
+  "Пропущенные",
+  "Всего",
+  "Ср. разговор",
+  "Ср. ожидание",
+  "Перезвонили",
+  "Время реакции",
+];
+
 export function OperatorsTable({ operators }: OperatorsTableProps) {
   const rows  = Object.entries(operators).filter(([key]) => key !== "total");
   const total = operators["total"];
-
-  const headers = [
-    "Оператор",
-    "Входящие",
-    "Исходящие",
-    "Пропущенные",
-    "Всего",
-    "Ср. разговор",
-    "Ср. ожидание",
-    "Перезвонили",
-    "Время реакции",
-  ];
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -38,32 +41,51 @@ export function OperatorsTable({ operators }: OperatorsTableProps) {
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map(([id, op]) => {
+              const isProfosmotr = PROFOSMOTR_IDS.has(id);
               const missedPct = op.incoming > 0
                 ? Math.round((op.missed / op.incoming) * 100) : 0;
+
               return (
                 <tr key={id} className="hover:bg-muted/40 transition-colors">
-                  <td className="px-5 py-3.5 font-medium whitespace-nowrap">{op.name}</td>
+                  <td className="px-5 py-3.5 font-medium whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      {op.name}
+                      {isProfosmotr && (
+                        <span className="text-[10px] text-muted-foreground font-normal">
+                          Профосмотры
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-5 py-3.5 text-right font-mono text-emerald-500 font-medium">{op.incoming}</td>
                   <td className="px-5 py-3.5 text-right font-mono text-blue-500 font-medium">{op.outgoing}</td>
                   <td className="px-5 py-3.5 text-right font-mono">
-                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-                      missedPct > 10 ? "bg-red-500/10 text-red-500" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {op.missed} <span className="opacity-60">({missedPct}%)</span>
-                    </span>
+                    {isProfosmotr ? (
+                      <span className="text-muted-foreground">{op.missed}</span>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+                        missedPct > 10 ? "bg-red-500/10 text-red-500" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {op.missed} <span className="opacity-60">({missedPct}%)</span>
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3.5 text-right font-mono font-medium">{op.total}</td>
                   <td className="px-5 py-3.5 text-right font-mono text-muted-foreground">{formatDuration(op.avg_duration)}</td>
                   <td className="px-5 py-3.5 text-right font-mono text-yellow-500">{formatDuration(op.avg_wait_time)}</td>
                   <td className="px-5 py-3.5 text-right font-mono">
-                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-                      op.callback_pct >= 80 ? "bg-emerald-500/10 text-emerald-500"
-                      : op.callback_pct >= 50 ? "bg-yellow-500/10 text-yellow-500"
-                      : "bg-red-500/10 text-red-500"
-                    }`}>
-                      {op.callback_count}/{op.missed_total}
-                      <span className="opacity-60">({op.callback_pct}%)</span>
-                    </span>
+                    {isProfosmotr ? (
+                      <span className="text-muted-foreground">{op.callback_count}/{op.missed_total}</span>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+                        op.callback_pct >= 80 ? "bg-emerald-500/10 text-emerald-500"
+                        : op.callback_pct >= 50 ? "bg-yellow-500/10 text-yellow-500"
+                        : "bg-red-500/10 text-red-500"
+                      }`}>
+                        {op.callback_count}/{op.missed_total}
+                        <span className="opacity-60">({op.callback_pct}%)</span>
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3.5 text-right font-mono text-muted-foreground">
                     {formatDuration(op.avg_reaction_sec)}
