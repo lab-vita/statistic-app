@@ -1,7 +1,7 @@
 "use client";
 
 import { Period, PeriodType, getDefaultPeriod, shiftPeriod, formatPeriodLabel } from "@/lib/periods";
-import { toDateStr, Operator, OPERATOR_COLORS, getInitials } from "@/lib/api";
+import { toDateStr, Operator, Admin } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, RefreshCw, ChevronDown } from "lucide-react";
 import { Section } from "@/components/sidebar";
@@ -33,16 +33,29 @@ interface TopbarProps {
   onCustomToChange?: (v: string) => void;
   onRefresh: () => void;
   refreshing: boolean;
+  // Фильтр — операторы (звонки)
   operators?: Operator[];
   selectedOperator?: string | null;
   onSelectOperator?: (id: string | null) => void;
+  // Фильтр — администраторы (записи)
+  admins?: Admin[];
+  selectedAdmin?: string | null;
+  onSelectAdmin?: (surname: string | null) => void;
 }
+
+const GROUP_ORDER = ["callcenter", "admin", "other"] as const;
+const GROUP_LABELS: Record<string, string> = {
+  callcenter: "Колл-центр",
+  admin:      "Администраторы",
+  other:      "Прочие",
+};
 
 export function Topbar({
   section, period, onChange, onTypeChange,
   customFrom, customTo, onCustomFromChange, onCustomToChange,
   onRefresh, refreshing,
   operators = [], selectedOperator, onSelectOperator,
+  admins = [], selectedAdmin, onSelectAdmin,
 }: TopbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -61,71 +74,109 @@ export function Topbar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const selectedOp = operators.find(o => o.id === selectedOperator);
-  const opLabel = selectedOp
-    ? (() => { const parts = selectedOp.name.split(" "); return parts[0] + (parts[1] ? " " + parts[1][0] + "." : ""); })()
-    : "Все";
+  // Определяем текущий лейбл фильтра
+  const filterLabel = (() => {
+    if (section === "calls") {
+      if (!selectedOperator) return "Все операторы";
+      return operators.find(o => o.id === selectedOperator)?.name.split(" ")[0] ?? "Все";
+    }
+    if (section === "appointments") {
+      if (!selectedAdmin) return "Все";
+      return selectedAdmin;
+    }
+    return null;
+  })();
+
+  const showFilter =
+    (section === "calls" && onSelectOperator && operators.length > 0) ||
+    (section === "appointments" && onSelectAdmin && admins.length > 0);
+
+  // Группируем администраторов
+  const adminsByGroup = GROUP_ORDER.reduce((acc, g) => {
+    acc[g] = admins.filter(a => a.group === g);
+    return acc;
+  }, {} as Record<string, Admin[]>);
 
   return (
     <header className="h-14 border-b border-border flex items-center px-5 gap-4 flex-shrink-0 bg-background">
 
-      {/* Заголовок + фильтр по оператору */}
+      {/* Заголовок + фильтр */}
       <div className="flex items-center gap-2 min-w-0">
         <span className="font-semibold text-sm">{SECTION_LABELS[section]}</span>
 
-        {onSelectOperator && operators.length > 0 && (
+        {showFilter && (
           <div className="relative ml-1" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(v => !v)}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              {selectedOperator && selectedOp && (
-                <div
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-semibold flex-shrink-0"
-                  style={{
-                    background: OPERATOR_COLORS[(operators.indexOf(selectedOp)) % 4].bg,
-                    color: OPERATOR_COLORS[(operators.indexOf(selectedOp)) % 4].text,
-                  }}
-                >
-                  {getInitials(selectedOp.name)}
-                </div>
-              )}
-              <span>{opLabel}</span>
+              <span>{filterLabel}</span>
               <ChevronDown className="h-3 w-3" />
             </button>
 
             {dropdownOpen && (
-              <div className="absolute left-0 top-full mt-1 z-50 min-w-[160px] rounded-lg border border-border bg-background shadow-md py-1">
-                <button
-                  onClick={() => { onSelectOperator(null); setDropdownOpen(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors text-left ${
-                    !selectedOperator ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                  }`}
-                >
-                  Все
-                </button>
-                {operators.map((op, i) => {
-                  const colors = OPERATOR_COLORS[i % 4];
-                  const parts = op.name.split(" ");
-                  const short = parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
-                  return (
+              <div className="absolute left-0 top-full mt-1 z-50 min-w-[180px] rounded-lg border border-border bg-background shadow-md py-1 max-h-80 overflow-y-auto">
+
+                {/* Звонки — список операторов */}
+                {section === "calls" && onSelectOperator && (
+                  <>
                     <button
-                      key={op.id}
-                      onClick={() => { onSelectOperator(op.id); setDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors text-left ${
-                        selectedOperator === op.id ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                      onClick={() => { onSelectOperator(null); setDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                        !selectedOperator ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
                       }`}
                     >
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
-                        style={{ background: colors.bg, color: colors.text }}
-                      >
-                        {getInitials(op.name)}
-                      </div>
-                      {short}
+                      Все операторы
                     </button>
-                  );
-                })}
+                    {operators.map(op => (
+                      <button
+                        key={op.id}
+                        onClick={() => { onSelectOperator(op.id); setDropdownOpen(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                          selectedOperator === op.id ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                        }`}
+                      >
+                        {op.name}
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {/* Записи — администраторы по группам */}
+                {section === "appointments" && onSelectAdmin && (
+                  <>
+                    <button
+                      onClick={() => { onSelectAdmin(null); setDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                        !selectedAdmin ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      Все
+                    </button>
+                    {GROUP_ORDER.map(group => {
+                      const items = adminsByGroup[group];
+                      if (!items?.length) return null;
+                      return (
+                        <div key={group}>
+                          <div className="px-3 pt-2 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                            {GROUP_LABELS[group]}
+                          </div>
+                          {items.map(admin => (
+                            <button
+                              key={admin.surname}
+                              onClick={() => { onSelectAdmin(admin.surname); setDropdownOpen(false); }}
+                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                                selectedAdmin === admin.surname ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                              }`}
+                            >
+                              {admin.surname}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             )}
           </div>
