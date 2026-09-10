@@ -15,7 +15,6 @@ export interface OperatorStats {
   callback_pct: number;
   avg_reaction_sec: number;
   role?: string;
-  // Дельты vs предыдущий период
   incoming_delta_pct:     number | null;
   incoming_delta_dir:     DeltaDir;
   outgoing_delta_pct:     number | null;
@@ -190,11 +189,32 @@ export interface AdminAppointmentStats {
   callcenter_total: number;
   visit_pct:        number;
   noshow_pct:       number;
+  new_pct:          number;
+  cancel_pct:       number;
+  // Дельты
+  total_delta_pct:            number | null;
+  total_delta_dir:            DeltaDir;
+  visits_delta_pct:           number | null;
+  visits_delta_dir:           DeltaDir;
+  noshow_delta_pct:           number | null;
+  noshow_delta_dir:           DeltaDir;
+  new_patients_delta_pct:     number | null;
+  new_patients_delta_dir:     DeltaDir;
+  callcenter_total_delta_pct: number | null;
+  callcenter_total_delta_dir: DeltaDir;
+  visit_pct_delta_pct:        number | null;
+  visit_pct_delta_dir:        DeltaDir;
+  noshow_pct_delta_pct:       number | null;
+  noshow_pct_delta_dir:       DeltaDir;
+  cancel_pct_delta_pct:       number | null;
+  cancel_pct_delta_dir:       DeltaDir;
 }
 
 export interface AppointmentStatsResponse {
   date_from: string;
   date_to:   string;
+  prev_from: string;
+  prev_to:   string;
   total:     AdminAppointmentStats;
   by_admin:  Record<string, AdminAppointmentStats>;
 }
