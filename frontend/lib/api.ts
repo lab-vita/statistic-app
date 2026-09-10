@@ -12,6 +12,7 @@ export interface OperatorStats {
   callback_count: number;
   callback_pct: number;
   avg_reaction_sec: number;
+  role?: string; // "callcenter" | "profosmotr"
 }
 
 export interface StatsResponse {
@@ -54,6 +55,12 @@ export interface Operator {
   name: string;
 }
 
+export interface Admin {
+  surname: string;
+  group: "callcenter" | "admin" | "other";
+  label: string;
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Ошибка загрузки данных");
@@ -78,6 +85,10 @@ export function fetchDaily(dateFrom: string, dateTo: string, operatorId?: string
 
 export function fetchOperators(): Promise<{ operators: Operator[] }> {
   return apiFetch("/api/calls/operators");
+}
+
+export function fetchAdmins(): Promise<{ admins: Admin[] }> {
+  return apiFetch("/api/appointments/admins");
 }
 
 export async function collectCalls(dateFrom: string, dateTo: string) {
@@ -105,17 +116,6 @@ export function addDays(d: Date, n: number): Date {
   r.setDate(r.getDate() + n);
   return r;
 }
-
-export function getInitials(name: string): string {
-  return name.split(" ").slice(0, 2).map(w => w[0]).join("");
-}
-
-export const OPERATOR_COLORS: Record<number, { bg: string; text: string }> = {
-  0: { bg: "rgba(34,197,94,.15)",  text: "#22c55e" },
-  1: { bg: "rgba(59,130,246,.15)", text: "#3b82f6" },
-  2: { bg: "rgba(168,85,247,.15)", text: "#a855f7" },
-  3: { bg: "rgba(234,179,8,.15)",  text: "#eab308" },
-};
 
 export interface HeatmapCell {
   weekday: number;
@@ -157,10 +157,13 @@ export function fetchComparison(dateFrom: string, dateTo: string, metric: Compar
   return apiFetch(`/api/calls/comparison?date_from=${dateFrom}&date_to=${dateTo}&metric=${metric}`);
 }
 
-// ─── МедОДС — Записи на приём ────────────────────────────────
+// ─── МедОДС ──────────────────────────────────────────────────
 
 export interface AdminAppointmentStats {
   name: string;
+  group: "callcenter" | "admin" | "other";
+  group_label: string;
+  is_callcenter: boolean;
   total: number;
   visits: number;
   noshow: number;
@@ -170,7 +173,6 @@ export interface AdminAppointmentStats {
   callcenter_total: number;
   visit_pct: number;
   noshow_pct: number;
-  is_callcenter: boolean;
 }
 
 export interface AppointmentStatsResponse {
@@ -194,22 +196,6 @@ export interface AppointmentDailyResponse {
   days: AppointmentDailyItem[];
 }
 
-export interface SuspiciousItem {
-  medods_id: number;
-  date: string;
-  time: string;
-  client: string;
-  admin: string;
-  status: string;
-  reasons: string[];
-}
-
-export interface SuspiciousResponse {
-  date_from: string;
-  date_to: string;
-  items: SuspiciousItem[];
-}
-
 export function fetchAppointmentStats(
   dateFrom: string, dateTo: string, adminSurname?: string
 ): Promise<AppointmentStatsResponse> {
@@ -222,12 +208,6 @@ export function fetchAppointmentDaily(
 ): Promise<AppointmentDailyResponse> {
   const q = adminSurname ? `&admin_surname=${encodeURIComponent(adminSurname)}` : "";
   return apiFetch(`/api/appointments/daily?date_from=${dateFrom}&date_to=${dateTo}${q}`);
-}
-
-export function fetchSuspicious(
-  dateFrom: string, dateTo: string
-): Promise<SuspiciousResponse> {
-  return apiFetch(`/api/appointments/suspicious?date_from=${dateFrom}&date_to=${dateTo}`);
 }
 
 export async function collectAppointments(dateFrom: string, dateTo: string) {
