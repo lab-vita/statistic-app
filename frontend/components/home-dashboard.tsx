@@ -2,19 +2,16 @@
 
 import { useEffect, useState } from "react";
 import {
-  fetchStats, fetchHourly, fetchSuspicious, fetchAppointmentStats,
+  fetchStats, fetchHourly, fetchAppointmentStats,
   toDateStr, formatDuration,
-  StatsResponse, HourlyResponse, AppointmentStatsResponse, SuspiciousResponse,
+  StatsResponse, HourlyResponse, AppointmentStatsResponse,
 } from "@/lib/api";
 import { Section } from "@/components/sidebar";
 import {
   Phone, PhoneIncoming, PhoneMissed, Clock,
-  CalendarCheck, CalendarX, UserPlus, AlertTriangle,
-  ArrowRight, TrendingUp,
+  CalendarCheck, CalendarX, UserPlus, ArrowRight, TrendingUp,
 } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface HomeDashboardProps {
   onNavigate: (s: Section) => void;
@@ -23,11 +20,10 @@ interface HomeDashboardProps {
 export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
   const today = toDateStr(new Date());
 
-  const [calls, setCalls]         = useState<StatsResponse | null>(null);
-  const [hourly, setHourly]       = useState<HourlyResponse | null>(null);
-  const [appts, setAppts]         = useState<AppointmentStatsResponse | null>(null);
-  const [suspicious, setSuspicious] = useState<SuspiciousResponse | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [calls, setCalls]   = useState<StatsResponse | null>(null);
+  const [hourly, setHourly] = useState<HourlyResponse | null>(null);
+  const [appts, setAppts]   = useState<AppointmentStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
@@ -35,23 +31,17 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
       fetchStats(today, today),
       fetchHourly(today, today, 60),
       fetchAppointmentStats(today, today),
-      fetchSuspicious(today, today),
-    ]).then(([c, h, a, s]) => {
+    ]).then(([c, h, a]) => {
       if (c.status === "fulfilled") setCalls(c.value);
       if (h.status === "fulfilled") setHourly(h.value);
       if (a.status === "fulfilled") setAppts(a.value);
-      if (s.status === "fulfilled") setSuspicious(s.value);
     }).finally(() => setLoading(false));
   }, [today]);
 
   const callTotal = calls?.operators["total"];
   const apptTotal = appts?.total;
-  const suspCount = suspicious?.items.length ?? 0;
   const missedPct = callTotal && callTotal.incoming > 0
     ? Math.round(callTotal.missed / callTotal.incoming * 100)
-    : 0;
-  const noCallbackCount = callTotal
-    ? callTotal.missed_total - callTotal.callback_count
     : 0;
 
   const dateLabel = new Date().toLocaleDateString("ru-RU", {
@@ -64,50 +54,14 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
   return (
     <div className="space-y-5">
-      {/* Заголовок */}
       <div>
         <h1 className="text-base font-semibold">Сводка за сегодня</h1>
         <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
       </div>
 
-      {/* Алерты */}
-      {!loading && (noCallbackCount > 0 || suspCount > 0) && (
-        <div className="space-y-2">
-          {noCallbackCount > 0 && (
-            <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
-              <PhoneMissed className="h-4 w-4 text-amber-500 flex-shrink-0" />
-              <span className="text-xs text-amber-700 dark:text-amber-400 flex-1">
-                <span className="font-medium">{noCallbackCount}</span> пропущенных звонков без перезвона сегодня
-              </span>
-              <button
-                onClick={() => onNavigate("calls")}
-                className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:underline"
-              >
-                Подробнее <ArrowRight className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-          {suspCount > 0 && (
-            <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-2.5">
-              <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
-              <span className="text-xs text-red-700 dark:text-red-400 flex-1">
-                <span className="font-medium">{suspCount}</span> подозрительных {suspCount === 1 ? "запись" : suspCount < 5 ? "записи" : "записей"} в антифроде
-              </span>
-              <button
-                onClick={() => onNavigate("appointments")}
-                className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:underline"
-              >
-                Подробнее <ArrowRight className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Две колонки: Звонки и Записи */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-        {/* ── Блок Звонки ── */}
+        {/* Звонки */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -167,7 +121,7 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
           )}
         </div>
 
-        {/* ── Блок Записи ── */}
+        {/* Записи */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -265,11 +219,10 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                   background: "var(--card)",
                   color: "var(--foreground)",
                 }}
-                labelFormatter={v => v}
               />
-              <Bar dataKey="incoming"  fill="#22c55e" opacity={0.85} radius={[2,2,0,0]} name="Входящие" />
-              <Bar dataKey="outgoing"  fill="#3b82f6" opacity={0.85} radius={[2,2,0,0]} name="Исходящие" />
-              <Bar dataKey="missed"    fill="#ef4444" opacity={0.85} radius={[2,2,0,0]} name="Пропущенные" />
+              <Bar dataKey="incoming" fill="#22c55e" opacity={0.85} radius={[2,2,0,0]} name="Входящие" />
+              <Bar dataKey="outgoing" fill="#3b82f6" opacity={0.85} radius={[2,2,0,0]} name="Исходящие" />
+              <Bar dataKey="missed"   fill="#ef4444" opacity={0.85} radius={[2,2,0,0]} name="Пропущенные" />
             </BarChart>
           </ResponsiveContainer>
         ) : (
