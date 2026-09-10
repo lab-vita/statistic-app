@@ -59,11 +59,11 @@ def _operator_stats(calls: list) -> dict:
     result = {}
 
     for uid, name in settings.LABVITA_OPERATORS.items():
-        op          = [c for c in calls if c.portal_user_id == uid]
-        durations   = [c.call_duration for c in op if c.call_duration > 0]
-        wait_times  = [c.call_duration for c in op if c.is_missed and c.call_duration > 0]
-        op_callbacks = [r for r in all_callbacks if r["missed"].portal_user_id == uid]
-        cb          = _callback_stats(op_callbacks)
+        op         = [c for c in calls if c.portal_user_id == uid]
+        durations  = [c.call_duration for c in op if c.call_duration > 0]
+        wait_times = [c.call_duration for c in op if c.is_missed and c.call_duration > 0]
+        op_cb      = [r for r in all_callbacks if r["missed"].portal_user_id == uid]
+        cb         = _callback_stats(op_cb)
 
         result[uid] = {
             "name":          name,
@@ -92,10 +92,51 @@ def _operator_stats(calls: list) -> dict:
     return result
 
 
+def _delta(current: int | float, prev: int | float) -> dict:
+    """Считает дельту в % относительно предыдущего периода."""
+    if not prev:
+        return {"delta_pct": None, "delta_dir": None}
+    pct = round((current - prev) / prev * 100)
+    return {
+        "delta_pct": abs(pct),
+        "delta_dir": "up" if pct > 0 else "down" if pct < 0 else "flat",
+    }
+
+
+def _add_deltas(current: dict, prev: dict) -> dict:
+    """Добавляет дельты к статистике оператора."""
+    result = dict(current)
+    for key in ("incoming", "outgoing", "missed", "total", "avg_duration", "callback_pct"):
+        d = _delta(current.get(key, 0), prev.get(key, 0))
+        result[f"{key}_delta_pct"] = d["delta_pct"]
+        result[f"{key}_delta_dir"] = d["delta_dir"]
+    return result
+
+
+def _prev_period(date_from: date, date_to: date) -> tuple[date, date]:
+    """Возвращает предыдущий аналогичный период той же длины."""
+    span = (date_to - date_from).days + 1
+    prev_to   = date_from - timedelta(days=1)
+    prev_from = prev_to - timedelta(days=span - 1)
+    return prev_from, prev_to
+
+
 def _filter_calls(calls: list, operator_id: Optional[str]) -> list:
     if operator_id:
         return [c for c in calls if c.portal_user_id == operator_id]
     return calls
+
+
+async def _load_calls(db: AsyncSession, date_from: date, date_to: date) -> list:
+    extended_to = date_to + timedelta(days=1)
+    return list(await db.scalars(
+        select(Call).where(
+            and_(
+                func.date(Call.call_start_date) >= date_from,
+                func.date(Call.call_start_date) <= extended_to,
+            )
+        )
+    ))
 
 
 @router.post("/collect")
@@ -124,40 +165,45 @@ async def get_stats(
     if not date_to:
         date_to = date_from
 
-    extended_to = date_to + timedelta(days=1)
-    calls_extended = list(await db.scalars(
-        select(Call).where(
-            and_(
-                func.date(Call.call_start_date) >= date_from,
-                func.date(Call.call_start_date) <= extended_to,
-            )
-        )
-    ))
+    # Текущий период
+    curr_calls = await _load_calls(db, date_from, date_to)
+    if operator_id:
+        curr_calls = [c for c in curr_calls if c.portal_user_id == operator_id]
+    curr_ops = _operator_stats(curr_calls)
+
+    # Предыдущий аналогичный период
+    prev_from, prev_to = _prev_period(date_from, date_to)
+    prev_calls = await _load_calls(db, prev_from, prev_to)
+    if operator_id:
+        prev_calls = [c for c in prev_calls if c.portal_user_id == operator_id]
+    prev_ops = _operator_stats(prev_calls)
+
+    # Добавляем дельты
+    operators_with_delta: dict = {}
+    for key, stats in curr_ops.items():
+        prev = prev_ops.get(key, {})
+        operators_with_delta[key] = _add_deltas(stats, prev)
 
     if operator_id:
-        # Для оператора: его звонки + все исходящие (для поиска перезвонов)
-        op_calls = [c for c in calls_extended if c.portal_user_id == operator_id]
-        out_all  = [c for c in calls_extended if c.is_outgoing and c.portal_user_id == operator_id]
-        stats_calls = op_calls
-    else:
-        stats_calls = calls_extended
-
-    operators = _operator_stats(stats_calls)
-
-    if operator_id:
-        # Возвращаем только нужного оператора + total
-        name = settings.LABVITA_OPERATORS.get(operator_id, operator_id)
         return {
             "date_from":   date_from,
             "date_to":     date_to,
+            "prev_from":   prev_from,
+            "prev_to":     prev_to,
             "operator_id": operator_id,
-            "operators":   {
-                operator_id: operators.get(operator_id, {}),
-                "total":     operators.get(operator_id, {}),
+            "operators": {
+                operator_id: operators_with_delta.get(operator_id, {}),
+                "total":     operators_with_delta.get(operator_id, {}),
             },
         }
 
-    return {"date_from": date_from, "date_to": date_to, "operators": operators}
+    return {
+        "date_from": date_from,
+        "date_to":   date_to,
+        "prev_from": prev_from,
+        "prev_to":   prev_to,
+        "operators": operators_with_delta,
+    }
 
 
 @router.get("/daily")
@@ -248,8 +294,8 @@ async def get_hourly(
 
     filled = [s for s in slots.values() if s["incoming"] + s["outgoing"] + s["missed"] > 0]
     if filled:
-        first = filled[0]["time"]
-        last  = filled[-1]["time"]
+        first  = filled[0]["time"]
+        last   = filled[-1]["time"]
         result = [s for s in slots.values() if s["time"] >= first and s["time"] <= last]
     else:
         result = []
@@ -259,7 +305,6 @@ async def get_hourly(
 
 @router.get("/operators")
 async def get_operators():
-    """Список операторов."""
     return {
         "operators": [
             {"id": uid, "name": name}
@@ -275,10 +320,6 @@ async def get_heatmap(
     operator_id: Optional[str] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Тепловая карта: день недели (0=Пн..6=Вс) × час (UTC+7).
-    Возвращает матрицу 7×24 с количеством звонков в каждой ячейке.
-    """
     if not date_from:
         date_from = date.today() - timedelta(days=30)
     if not date_to:
@@ -294,7 +335,6 @@ async def get_heatmap(
     ))
     calls = _filter_calls(calls, operator_id)
 
-    # Матрица [weekday][hour] = {incoming, outgoing, missed, total}
     matrix: dict = {}
     DAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
     for wd in range(7):
@@ -305,13 +345,8 @@ async def get_heatmap(
 
     for c in calls:
         local_h  = (c.call_start_date.hour + 7) % 24
-        # weekday: понедельник=0 ... воскресенье=6
-        # Корректируем день недели при сдвиге UTC+7
-        local_dt = c.call_start_date
-        # Если после сдвига перешли на следующий день
         shifted_h = c.call_start_date.hour + 7
-        wd = (local_dt.weekday() + (1 if shifted_h >= 24 else 0)) % 7
-
+        wd = (c.call_start_date.weekday() + (1 if shifted_h >= 24 else 0)) % 7
         key = (wd, local_h)
         if key in matrix:
             matrix[key]["total"] += 1
@@ -319,25 +354,16 @@ async def get_heatmap(
             if c.is_outgoing: matrix[key]["outgoing"] += 1
             if c.is_missed:   matrix[key]["missed"]   += 1
 
-    return {
-        "date_from": date_from,
-        "date_to":   date_to,
-        "cells":     list(matrix.values()),
-    }
+    return {"date_from": date_from, "date_to": date_to, "cells": list(matrix.values())}
 
 
 @router.get("/comparison")
 async def get_comparison(
     date_from: date = Query(default=None),
     date_to:   date = Query(default=None),
-    metric:    str  = Query(default="total"),  # total | incoming | outgoing | missed
+    metric:    str  = Query(default="total"),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Сравнение операторов по дням.
-    Возвращает временной ряд для каждого оператора.
-    metric: total | incoming | outgoing | missed
-    """
     if not date_from:
         date_from = date.today() - timedelta(days=7)
     if not date_to:
@@ -355,14 +381,12 @@ async def get_comparison(
         )
     ))
 
-    # Строим список дат
     dates = []
     current = date_from
     while current <= date_to:
         dates.append(current.isoformat())
         current += timedelta(days=1)
 
-    # Для каждого оператора — ряд значений по датам
     series = []
     for uid, name in settings.LABVITA_OPERATORS.items():
         op_calls = [c for c in calls if c.portal_user_id == uid]
