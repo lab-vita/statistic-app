@@ -5,18 +5,64 @@ interface AppointmentsTableProps {
   total: AdminAppointmentStats;
 }
 
-export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
-  const rows = Object.values(byAdmin).sort((a, b) => b.total - a.total);
+const GROUP_ORDER = ["callcenter", "admin", "other"] as const;
+const GROUP_LABELS: Record<string, string> = {
+  callcenter: "Колл-центр",
+  admin:      "Администраторы",
+  other:      "Прочие",
+};
 
-  const headers = [
-    "Администратор", "Записей", "Явки", "% явки",
-    "Неявки", "Отмены", "Новые пациенты",
-  ];
+const headers = [
+  "Сотрудник", "Записей", "Явки", "% явки",
+  "Неявки", "Отмены", "Новые пациенты",
+];
+
+export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
+  const rows = Object.values(byAdmin);
+
+  const grouped = GROUP_ORDER.reduce((acc, g) => {
+    acc[g] = rows.filter(r => r.group === g).sort((a, b) => b.total - a.total);
+    return acc;
+  }, {} as Record<string, AdminAppointmentStats[]>);
+
+  const visitColor = (pct: number) =>
+    pct >= 90 ? "bg-emerald-500/10 text-emerald-500"
+    : pct >= 75 ? "bg-yellow-500/10 text-yellow-500"
+    : "bg-red-500/10 text-red-500";
+
+  const renderRow = (op: AdminAppointmentStats) => (
+    <tr key={op.name} className="hover:bg-muted/40 transition-colors">
+      <td className="px-5 py-3 font-medium whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          {op.name}
+          {op.group === "other" && op.group_label !== "Прочие" && (
+            <span className="text-[10px] text-muted-foreground font-normal">
+              {op.group_label}
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-5 py-3 text-right font-mono font-medium">{op.total}</td>
+      <td className="px-5 py-3 text-right font-mono text-emerald-500 font-medium">{op.visits}</td>
+      <td className="px-5 py-3 text-right font-mono">
+        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${visitColor(op.visit_pct)}`}>
+          {op.visit_pct}%
+        </span>
+      </td>
+      <td className="px-5 py-3 text-right font-mono">
+        {op.noshow > 0
+          ? <span className="text-red-500">{op.noshow}</span>
+          : <span className="text-muted-foreground">0</span>}
+      </td>
+      <td className="px-5 py-3 text-right font-mono text-muted-foreground">{op.cancels}</td>
+      <td className="px-5 py-3 text-right font-mono text-purple-500">{op.new_patients}</td>
+    </tr>
+  );
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-medium">По администраторам</h3>
+        <h3 className="text-sm font-medium">По сотрудникам</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -31,38 +77,20 @@ export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map(op => (
-              <tr key={op.name} className="hover:bg-muted/40 transition-colors">
-                <td className="px-5 py-3.5 font-medium whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    {op.is_callcenter && (
-                      <span className="inline-flex items-center rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-500">
-                        КЦ
-                      </span>
-                    )}
-                    {op.name}
-                  </div>
-                </td>
-                <td className="px-5 py-3.5 text-right font-mono font-medium">{op.total}</td>
-                <td className="px-5 py-3.5 text-right font-mono text-emerald-500 font-medium">{op.visits}</td>
-                <td className="px-5 py-3.5 text-right font-mono">
-                  <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
-                    op.visit_pct >= 90 ? "bg-emerald-500/10 text-emerald-500"
-                    : op.visit_pct >= 75 ? "bg-yellow-500/10 text-yellow-500"
-                    : "bg-red-500/10 text-red-500"
-                  }`}>
-                    {op.visit_pct}%
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 text-right font-mono">
-                  {op.noshow > 0
-                    ? <span className="text-red-500">{op.noshow}</span>
-                    : <span className="text-muted-foreground">0</span>}
-                </td>
-                <td className="px-5 py-3.5 text-right font-mono text-muted-foreground">{op.cancels}</td>
-                <td className="px-5 py-3.5 text-right font-mono text-purple-500">{op.new_patients}</td>
-              </tr>
-            ))}
+            {GROUP_ORDER.map(group => {
+              const items = grouped[group];
+              if (!items?.length) return null;
+              return (
+                <>
+                  <tr key={`group-${group}`} className="bg-muted/20">
+                    <td colSpan={7} className="px-5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      {GROUP_LABELS[group]}
+                    </td>
+                  </tr>
+                  {items.map(renderRow)}
+                </>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-border bg-muted/30">
@@ -70,10 +98,7 @@ export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
               <td className="px-5 py-3.5 text-right font-mono font-semibold">{total.total}</td>
               <td className="px-5 py-3.5 text-right font-mono font-semibold text-emerald-500">{total.visits}</td>
               <td className="px-5 py-3.5 text-right font-mono">
-                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
-                  total.visit_pct >= 90 ? "bg-emerald-500/10 text-emerald-500"
-                  : "bg-yellow-500/10 text-yellow-500"
-                }`}>
+                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${visitColor(total.visit_pct)}`}>
                   {total.visit_pct}%
                 </span>
               </td>
