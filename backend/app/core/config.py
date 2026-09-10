@@ -32,8 +32,38 @@ class Settings(BaseSettings):
     MEDODS_PASSWORD: str = ""
     MEDODS_CLINIC_ID: int = 1
 
+    # Группы администраторов МедОДС
+    # callcenter  — делают записи по звонкам
+    # admin       — встречают пациентов вживую
+    # other       — все остальные роли
+    ADMIN_GROUPS: dict[str, dict] = {
+        "Пирожкова":    {"group": "callcenter", "label": "Колл-центр"},
+        "Часовских":    {"group": "callcenter", "label": "Колл-центр"},
+        "Белобородова": {"group": "callcenter", "label": "Колл-центр"},
+        "Колотова":     {"group": "admin",       "label": "Администратор"},
+        "Шипелова":     {"group": "admin",       "label": "Администратор"},
+        "Осокина":      {"group": "admin",       "label": "Администратор"},
+        "Книга":        {"group": "admin",       "label": "Администратор"},
+        "Жданова":      {"group": "other",       "label": "Профосмотры"},
+        "Волкова":      {"group": "other",       "label": "PR"},
+        "Admin":        {"group": "other",       "label": "Директор"},
+        "Варанкина":    {"group": "other",       "label": "Врач"},
+        "Поспелов":     {"group": "other",       "label": "Врач"},
+        "Чеснокова":    {"group": "other",       "label": "Врач"},
+        "Малеева":      {"group": "other",       "label": "Врач"},
+        "Иванова":      {"group": "other",       "label": "Прочие"},
+    }
+
     CALLCENTER_SURNAMES: set[str] = {
         "Пирожкова", "Часовских", "Белобородова", "Жданова"
+    }
+
+    # Оператор Жданова — профосмотры, не показываем красные метрики
+    OPERATOR_ROLES: dict[str, str] = {
+        "168": "callcenter",
+        "520": "callcenter",
+        "544": "profosmotr",  # Жданова
+        "696": "callcenter",
     }
 
     MEDODS_VISIT_STATUSES: set[int] = {6, 7, 8}
