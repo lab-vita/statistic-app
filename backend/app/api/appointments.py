@@ -11,6 +11,23 @@ from app.core.config import settings
 router = APIRouter()
 
 
+def _prev_period(date_from: date, date_to: date) -> tuple[date, date]:
+    span = (date_to - date_from).days + 1
+    prev_to   = date_from - timedelta(days=1)
+    prev_from = prev_to - timedelta(days=span - 1)
+    return prev_from, prev_to
+
+
+def _delta(current: int | float, prev: int | float) -> dict:
+    if not prev:
+        return {"delta_pct": None, "delta_dir": None}
+    pct = round((current - prev) / prev * 100)
+    return {
+        "delta_pct": abs(pct),
+        "delta_dir": "up" if pct > 0 else "down" if pct < 0 else "flat",
+    }
+
+
 @router.post("/collect")
 async def collect(
     date_from: date = Query(default=None),
@@ -28,14 +45,12 @@ async def collect(
 
 @router.get("/admins")
 async def get_admins(db: AsyncSession = Depends(get_db)):
-    """Список администраторов из БД с их группами."""
     rows = await db.execute(
         select(Appointment.administrator_surname)
         .where(Appointment.administrator_surname.isnot(None))
         .distinct()
     )
     surnames = sorted(r[0] for r in rows if r[0])
-
     result = []
     for surname in surnames:
         group_info = settings.ADMIN_GROUPS.get(surname, {"group": "other", "label": "Прочие"})
@@ -48,25 +63,49 @@ async def get_admins(db: AsyncSession = Depends(get_db)):
 
 
 def _stats_from_appts(appts: list) -> dict:
-    total    = len(appts)
-    visits   = sum(1 for a in appts if a.is_visit)
-    noshow   = sum(1 for a in appts if a.is_noshow)
-    cancels  = sum(1 for a in appts if a.is_cancelled)
-    pending  = sum(1 for a in appts if a.is_pending)
-    new_pts  = sum(1 for a in appts if a.new_patient)
+    total      = len(appts)
+    visits     = sum(1 for a in appts if a.is_visit)
+    noshow     = sum(1 for a in appts if a.is_noshow)
+    cancels    = sum(1 for a in appts if a.is_cancelled)
+    pending    = sum(1 for a in appts if a.is_pending)
+    new_pts    = sum(1 for a in appts if a.new_patient)
     callcenter = sum(1 for a in appts if a.is_callcenter)
-
     return {
-        "total":           total,
-        "visits":          visits,
-        "noshow":          noshow,
-        "cancels":         cancels,
-        "pending":         pending,
-        "new_patients":    new_pts,
+        "total":            total,
+        "visits":           visits,
+        "noshow":           noshow,
+        "cancels":          cancels,
+        "pending":          pending,
+        "new_patients":     new_pts,
         "callcenter_total": callcenter,
-        "visit_pct":       round(visits / total * 100, 1) if total else 0,
-        "noshow_pct":      round(noshow / total * 100, 1) if total else 0,
+        "visit_pct":        round(visits  / total * 100, 1) if total else 0,
+        "noshow_pct":       round(noshow  / total * 100, 1) if total else 0,
+        "new_pct":          round(new_pts / total * 100, 1) if total else 0,
+        "cancel_pct":       round(cancels / total * 100, 1) if total else 0,
     }
+
+
+def _add_deltas(curr: dict, prev: dict) -> dict:
+    result = dict(curr)
+    for key in ("total", "visits", "noshow", "new_patients", "callcenter_total",
+                "visit_pct", "noshow_pct", "cancel_pct"):
+        d = _delta(curr.get(key, 0), prev.get(key, 0))
+        result[f"{key}_delta_pct"] = d["delta_pct"]
+        result[f"{key}_delta_dir"] = d["delta_dir"]
+    return result
+
+
+async def _load_appts(db: AsyncSession, date_from: date, date_to: date,
+                      admin_surname: Optional[str] = None) -> list:
+    q = select(Appointment).where(
+        and_(
+            Appointment.appointment_date >= date_from,
+            Appointment.appointment_date <= date_to,
+        )
+    )
+    if admin_surname:
+        q = q.where(Appointment.administrator_surname == admin_surname)
+    return list(await db.scalars(q))
 
 
 @router.get("/stats")
@@ -81,38 +120,37 @@ async def get_stats(
     if not date_to:
         date_to = date_from
 
-    q = select(Appointment).where(
-        and_(
-            Appointment.appointment_date >= date_from,
-            Appointment.appointment_date <= date_to,
-        )
-    )
-    if admin_surname:
-        q = q.where(Appointment.administrator_surname == admin_surname)
+    prev_from, prev_to = _prev_period(date_from, date_to)
 
-    appts = list(await db.scalars(q))
+    curr_appts = await _load_appts(db, date_from, date_to, admin_surname)
+    prev_appts = await _load_appts(db, prev_from, prev_to, admin_surname)
 
-    # Статистика по администраторам с группами
+    curr_total = _stats_from_appts(curr_appts)
+    prev_total = _stats_from_appts(prev_appts)
+
+    # По администраторам с дельтами
     by_admin: dict = {}
-    all_surnames = {a.administrator_surname for a in appts if a.administrator_surname}
+    all_surnames = {a.administrator_surname for a in curr_appts if a.administrator_surname}
     for surname in sorted(all_surnames):
-        sub = [a for a in appts if a.administrator_surname == surname]
-        if not sub:
-            continue
+        curr_sub = [a for a in curr_appts if a.administrator_surname == surname]
+        prev_sub = [a for a in prev_appts if a.administrator_surname == surname]
         group_info = settings.ADMIN_GROUPS.get(surname, {"group": "other", "label": "Прочие"})
-        s = _stats_from_appts(sub)
+        curr_s = _stats_from_appts(curr_sub)
+        prev_s = _stats_from_appts(prev_sub)
         by_admin[surname] = {
             "name":         surname,
             "group":        group_info["group"],
             "group_label":  group_info["label"],
             "is_callcenter": group_info["group"] == "callcenter",
-            **s,
+            **_add_deltas(curr_s, prev_s),
         }
 
     return {
         "date_from": date_from,
         "date_to":   date_to,
-        "total":     _stats_from_appts(appts),
+        "prev_from": prev_from,
+        "prev_to":   prev_to,
+        "total":     _add_deltas(curr_total, prev_total),
         "by_admin":  by_admin,
     }
 
@@ -129,16 +167,7 @@ async def get_daily(
     if not date_to:
         date_to = date.today() - timedelta(days=1)
 
-    q = select(Appointment).where(
-        and_(
-            Appointment.appointment_date >= date_from,
-            Appointment.appointment_date <= date_to,
-        )
-    )
-    if admin_surname:
-        q = q.where(Appointment.administrator_surname == admin_surname)
-
-    appts = list(await db.scalars(q))
+    appts = await _load_appts(db, date_from, date_to, admin_surname)
 
     days: dict = {}
     current = date_from
