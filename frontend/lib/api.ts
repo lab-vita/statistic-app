@@ -1,5 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export type DeltaDir = "up" | "down" | "flat" | null;
+
 export interface OperatorStats {
   name: string;
   incoming: number;
@@ -12,12 +14,27 @@ export interface OperatorStats {
   callback_count: number;
   callback_pct: number;
   avg_reaction_sec: number;
-  role?: string; // "callcenter" | "profosmotr"
+  role?: string;
+  // Дельты vs предыдущий период
+  incoming_delta_pct:     number | null;
+  incoming_delta_dir:     DeltaDir;
+  outgoing_delta_pct:     number | null;
+  outgoing_delta_dir:     DeltaDir;
+  missed_delta_pct:       number | null;
+  missed_delta_dir:       DeltaDir;
+  total_delta_pct:        number | null;
+  total_delta_dir:        DeltaDir;
+  avg_duration_delta_pct: number | null;
+  avg_duration_delta_dir: DeltaDir;
+  callback_pct_delta_pct: number | null;
+  callback_pct_delta_dir: DeltaDir;
 }
 
 export interface StatsResponse {
   date_from: string;
-  date_to: string;
+  date_to:   string;
+  prev_from: string;
+  prev_to:   string;
   operator_id?: string;
   operators: Record<string, OperatorStats>;
 }
@@ -31,34 +48,34 @@ export interface SlotItem {
 
 export interface HourlyResponse {
   date_from: string;
-  date_to: string;
-  interval: number;
-  slots: SlotItem[];
+  date_to:   string;
+  interval:  number;
+  slots:     SlotItem[];
 }
 
 export interface DailyItem {
-  date: string;
+  date:     string;
   incoming: number;
   outgoing: number;
-  missed: number;
-  total: number;
+  missed:   number;
+  total:    number;
 }
 
 export interface DailyResponse {
   date_from: string;
-  date_to: string;
-  days: DailyItem[];
+  date_to:   string;
+  days:      DailyItem[];
 }
 
 export interface Operator {
-  id: string;
+  id:   string;
   name: string;
 }
 
 export interface Admin {
   surname: string;
-  group: "callcenter" | "admin" | "other";
-  label: string;
+  group:   "callcenter" | "admin" | "other";
+  label:   string;
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
@@ -118,33 +135,33 @@ export function addDays(d: Date, n: number): Date {
 }
 
 export interface HeatmapCell {
-  weekday: number;
+  weekday:      number;
   weekday_name: string;
-  hour: number;
-  incoming: number;
-  outgoing: number;
-  missed: number;
-  total: number;
+  hour:         number;
+  incoming:     number;
+  outgoing:     number;
+  missed:       number;
+  total:        number;
 }
 
 export interface HeatmapResponse {
   date_from: string;
-  date_to: string;
-  cells: HeatmapCell[];
+  date_to:   string;
+  cells:     HeatmapCell[];
 }
 
 export interface ComparisonSeries {
   operator_id: string;
-  name: string;
-  values: { date: string; value: number }[];
+  name:        string;
+  values:      { date: string; value: number }[];
 }
 
 export interface ComparisonResponse {
   date_from: string;
-  date_to: string;
-  metric: string;
-  dates: string[];
-  series: ComparisonSeries[];
+  date_to:   string;
+  metric:    string;
+  dates:     string[];
+  series:    ComparisonSeries[];
 }
 
 export type ComparisonMetric = "total" | "incoming" | "outgoing" | "missed";
@@ -160,40 +177,40 @@ export function fetchComparison(dateFrom: string, dateTo: string, metric: Compar
 // ─── МедОДС ──────────────────────────────────────────────────
 
 export interface AdminAppointmentStats {
-  name: string;
-  group: "callcenter" | "admin" | "other";
-  group_label: string;
-  is_callcenter: boolean;
-  total: number;
-  visits: number;
-  noshow: number;
-  cancels: number;
-  pending: number;
-  new_patients: number;
+  name:             string;
+  group:            "callcenter" | "admin" | "other";
+  group_label:      string;
+  is_callcenter:    boolean;
+  total:            number;
+  visits:           number;
+  noshow:           number;
+  cancels:          number;
+  pending:          number;
+  new_patients:     number;
   callcenter_total: number;
-  visit_pct: number;
-  noshow_pct: number;
+  visit_pct:        number;
+  noshow_pct:       number;
 }
 
 export interface AppointmentStatsResponse {
   date_from: string;
-  date_to: string;
-  total: AdminAppointmentStats;
-  by_admin: Record<string, AdminAppointmentStats>;
+  date_to:   string;
+  total:     AdminAppointmentStats;
+  by_admin:  Record<string, AdminAppointmentStats>;
 }
 
 export interface AppointmentDailyItem {
-  date: string;
-  total: number;
-  visits: number;
-  noshow: number;
+  date:         string;
+  total:        number;
+  visits:       number;
+  noshow:       number;
   new_patients: number;
 }
 
 export interface AppointmentDailyResponse {
   date_from: string;
-  date_to: string;
-  days: AppointmentDailyItem[];
+  date_to:   string;
+  days:      AppointmentDailyItem[];
 }
 
 export function fetchAppointmentStats(
