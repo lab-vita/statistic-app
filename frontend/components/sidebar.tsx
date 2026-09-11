@@ -1,9 +1,9 @@
 "use client";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LayoutDashboard, Phone, Calendar } from "lucide-react";
+import { LayoutDashboard, Phone, Calendar, BarChart2 } from "lucide-react";
 
-export type Section = "home" | "calls" | "appointments";
+export type Section = "home" | "calls" | "appointments" | "reports";
 
 interface SidebarProps {
   section: Section;
@@ -11,9 +11,10 @@ interface SidebarProps {
 }
 
 const SECTIONS = [
-  { id: "home"         as Section, label: "Главная", icon: LayoutDashboard },
-  { id: "calls"        as Section, label: "Звонки",  icon: Phone           },
-  { id: "appointments" as Section, label: "Записи",  icon: Calendar        },
+  { id: "home"         as Section, label: "Главная",  icon: LayoutDashboard },
+  { id: "calls"        as Section, label: "Звонки",   icon: Phone           },
+  { id: "appointments" as Section, label: "Записи",   icon: Calendar        },
+  { id: "reports"      as Section, label: "Отчёты",   icon: BarChart2       },
 ];
 
 export function Sidebar({ section, onSelectSection }: SidebarProps) {
