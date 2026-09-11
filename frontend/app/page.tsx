@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sidebar, Section } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { HomeDashboard } from "@/components/home-dashboard";
+import { ReportsDashboard } from "@/components/reports-dashboard";
 import { CardsOverview } from "@/components/cards-overview";
 import { HourlyChart } from "@/components/hourly-chart";
 import { DailyChart } from "@/components/daily-chart";
@@ -27,42 +28,41 @@ import {
 import { Period, PeriodType, getDefaultPeriod } from "@/lib/periods";
 
 export default function DashboardPage() {
-  const [section, setSection]         = useState<Section>("home");
-  const [operators, setOperators]     = useState<Operator[]>([]);
-  const [admins, setAdmins]           = useState<Admin[]>([]);
-  const [selectedOp, setSelectedOp]   = useState<string | null>(null);
+  const [section, setSection]             = useState<Section>("home");
+  const [operators, setOperators]         = useState<Operator[]>([]);
+  const [admins, setAdmins]               = useState<Admin[]>([]);
+  const [selectedOp, setSelectedOp]       = useState<string | null>(null);
   const [selectedAdmin, setSelectedAdmin] = useState<string | null>(null);
 
-  const [period, setPeriod]           = useState<Period>(getDefaultPeriod("day"));
-  const [interval, setIntervalVal]    = useState(60);
-  const [customFrom, setCustomFrom]   = useState(toDateStr(addDays(new Date(), -7)));
-  const [customTo, setCustomTo]       = useState(toDateStr(addDays(new Date(), -1)));
+  const [period, setPeriod]               = useState<Period>(getDefaultPeriod("day"));
+  const [interval, setIntervalVal]        = useState(60);
+  const [customFrom, setCustomFrom]       = useState(toDateStr(addDays(new Date(), -7)));
+  const [customTo, setCustomTo]           = useState(toDateStr(addDays(new Date(), -1)));
 
-  const [stats, setStats]             = useState<StatsResponse | null>(null);
-  const [hourly, setHourly]           = useState<HourlyResponse | null>(null);
-  const [daily, setDaily]             = useState<DailyResponse | null>(null);
-  const [heatmap, setHeatmap]         = useState<HeatmapResponse | null>(null);
-  const [comparison, setComparison]   = useState<ComparisonResponse | null>(null);
-  const [compMetric, setCompMetric]   = useState<ComparisonMetric>("total");
+  const [stats, setStats]                 = useState<StatsResponse | null>(null);
+  const [hourly, setHourly]               = useState<HourlyResponse | null>(null);
+  const [daily, setDaily]                 = useState<DailyResponse | null>(null);
+  const [heatmap, setHeatmap]             = useState<HeatmapResponse | null>(null);
+  const [comparison, setComparison]       = useState<ComparisonResponse | null>(null);
+  const [compMetric, setCompMetric]       = useState<ComparisonMetric>("total");
 
-  const [apptStats, setApptStats]     = useState<AppointmentStatsResponse | null>(null);
-  const [apptDaily, setApptDaily]     = useState<AppointmentDailyResponse | null>(null);
+  const [apptStats, setApptStats]         = useState<AppointmentStatsResponse | null>(null);
+  const [apptDaily, setApptDaily]         = useState<AppointmentDailyResponse | null>(null);
 
-  const [loading, setLoading]         = useState(false);
-  const [refreshing, setRefreshing]   = useState(false);
-  const [error, setError]             = useState<string | null>(null);
+  const [loading, setLoading]             = useState(false);
+  const [refreshing, setRefreshing]       = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
 
   const dateFrom = period.type === "custom" ? customFrom : toDateStr(period.dateFrom);
   const dateTo   = period.type === "custom" ? customTo   : toDateStr(period.dateTo);
 
-  // Загружаем операторов и администраторов один раз
   useEffect(() => {
     fetchOperators().then(r => setOperators(r.operators)).catch(() => {});
     fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
-    if (section === "home") return;
+    if (section === "home" || section === "reports") return;
     setLoading(true);
     setError(null);
     try {
@@ -84,7 +84,6 @@ export default function DashboardPage() {
         } else {
           setDaily(chart); setHourly(null); setComparison(comp ?? null);
         }
-
       } else if (section === "appointments") {
         const [as_, ad] = await Promise.all([
           fetchAppointmentStats(dateFrom, dateTo, selectedAdmin ?? undefined),
@@ -108,11 +107,8 @@ export default function DashboardPage() {
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      if (section === "calls") {
-        await collectCalls(dateFrom, dateTo);
-      } else if (section === "appointments") {
-        await collectAppointments(dateFrom, dateTo);
-      }
+      if (section === "calls") await collectCalls(dateFrom, dateTo);
+      else if (section === "appointments") await collectAppointments(dateFrom, dateTo);
       await load();
     } finally {
       setRefreshing(false);
@@ -145,12 +141,14 @@ export default function DashboardPage() {
     </div>
   );
 
+  const showTopbar = section !== "home" && section !== "reports";
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar section={section} onSelectSection={handleSelectSection} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {section !== "home" && (
+        {showTopbar && (
           <Topbar
             section={section}
             period={period}
@@ -180,6 +178,10 @@ export default function DashboardPage() {
 
           {section === "home" && (
             <HomeDashboard onNavigate={handleSelectSection} />
+          )}
+
+          {section === "reports" && (
+            <ReportsDashboard />
           )}
 
           {section === "calls" && (
