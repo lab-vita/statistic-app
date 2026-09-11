@@ -212,8 +212,6 @@ export interface AdminAppointmentStats {
 export interface AppointmentStatsResponse {
   date_from: string;
   date_to:   string;
-  prev_from: string;
-  prev_to:   string;
   total:     AdminAppointmentStats;
   by_admin:  Record<string, AdminAppointmentStats>;
 }
@@ -255,81 +253,70 @@ export async function collectAppointments(dateFrom: string, dateTo: string) {
   return res.json();
 }
 
-// ─── Отчёты ──────────────────────────────────────────────────
+// ─── Планы ───────────────────────────────────────────────────
 
-export type Granularity = "day" | "week" | "month";
-
-export interface ReportRow {
-  period:        string;
-  total:         number;
-  incoming?:     number;
-  outgoing?:     number;
-  missed?:       number;
-  visits?:       number;
-  noshow?:       number;
-  cancels?:      number;
-  new_patients?: number;
-  visit_pct?:    number;
+export interface PlanDay {
+  date:           string;
+  weekday:        number;
+  is_weekend:     boolean;
+  calls_incoming: number;
+  calls_outgoing: number;
+  appt_count:     number;
 }
 
-export interface ReportOperatorRow {
-  operator_id:   string;
-  name:          string;
-  incoming:      number;
-  outgoing:      number;
-  missed:        number;
-  total:         number;
-  [key: string]: any;
+export interface PlanMonthResponse {
+  year:   number;
+  month:  number;
+  days:   PlanDay[];
+  totals: { calls_incoming: number; calls_outgoing: number; appt_count: number };
+  fixed:  { calls_missed_pct: number };
 }
 
-export interface ReportAdminRow {
-  name:          string;
-  group:         string;
-  group_label:   string;
-  total:         number;
-  visits:        number;
-  noshow:        number;
-  new_patients:  number;
-  visit_pct:     number;
-  [key: string]: any;
+export interface PlanRangeResponse {
+  date_from: string;
+  date_to:   string;
+  by_day:    Record<string, Record<string, number>>;
+  totals:    { calls_incoming: number; calls_outgoing: number; appt_count: number };
+  fixed:     { calls_missed_pct: number };
 }
 
-export interface CallsReportResponse {
-  date_from:   string;
-  date_to:     string;
-  prev_from:   string;
-  prev_to:     string;
-  granularity: Granularity;
-  rows:        ReportRow[];
-  summary:     Record<string, any>;
-  by_operator: ReportOperatorRow[];
+export interface PlanUpsertItem {
+  date:   string;
+  metric: string;
+  value:  number;
 }
 
-export interface AppointmentsReportResponse {
-  date_from:   string;
-  date_to:     string;
-  prev_from:   string;
-  prev_to:     string;
-  granularity: Granularity;
-  rows:        ReportRow[];
-  summary:     Record<string, any>;
-  by_admin:    ReportAdminRow[];
+export function fetchPlanMonth(year: number, month: number): Promise<PlanMonthResponse> {
+  return apiFetch(`/api/plans/month?year=${year}&month=${month}`);
 }
 
-export function fetchCallsReport(
+export function fetchPlanRange(dateFrom: string, dateTo: string): Promise<PlanRangeResponse> {
+  return apiFetch(`/api/plans/range?date_from=${dateFrom}&date_to=${dateTo}`);
+}
+
+export async function upsertPlans(items: PlanUpsertItem[]) {
+  const res = await fetch(`${API_URL}/api/plans/upsert`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error("Ошибка сохранения планов");
+  return res.json();
+}
+
+export async function fillPlans(
   dateFrom: string, dateTo: string,
-  granularity: Granularity,
-  operatorId?: string,
-): Promise<CallsReportResponse> {
-  const q = operatorId ? `&operator_id=${operatorId}` : "";
-  return apiFetch(`/api/reports/calls?date_from=${dateFrom}&date_to=${dateTo}&granularity=${granularity}${q}`);
-}
-
-export function fetchAppointmentsReport(
-  dateFrom: string, dateTo: string,
-  granularity: Granularity,
-  adminSurname?: string,
-): Promise<AppointmentsReportResponse> {
-  const q = adminSurname ? `&admin_surname=${encodeURIComponent(adminSurname)}` : "";
-  return apiFetch(`/api/reports/appointments?date_from=${dateFrom}&date_to=${dateTo}&granularity=${granularity}${q}`);
+  metric: string, value: number,
+  skipWeekends = true,
+) {
+  const res = await fetch(`${API_URL}/api/plans/fill`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({
+      date_from: dateFrom, date_to: dateTo,
+      metric, value, skip_weekends: skipWeekends,
+    }),
+  });
+  if (!res.ok) throw new Error("Ошибка заполнения планов");
+  return res.json();
 }
