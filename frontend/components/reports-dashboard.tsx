@@ -2,166 +2,239 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchCallsReport, fetchAppointmentsReport,
+  fetchStats, fetchDaily, fetchAppointmentStats, fetchAppointmentDaily,
   fetchOperators, fetchAdmins,
   toDateStr, addDays, formatDuration,
-  Granularity, Operator, Admin,
-  CallsReportResponse, AppointmentsReportResponse,
-  DeltaDir,
+  Operator, Admin, DeltaDir,
+  StatsResponse, DailyResponse,
+  AppointmentStatsResponse, AppointmentDailyResponse,
 } from "@/lib/api";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
-import { useRef } from "react";
+import { TrendingUp, TrendingDown } from "lucide-react";
+
+// ─── Типы ────────────────────────────────────────────────────
+
+type Source    = "calls" | "appointments";
+type Breakdown = "day" | "week" | "month";
+type ChartType = "bar" | "line";
+
+type CallMetric = "incoming" | "outgoing" | "missed" | "total";
+type ApptMetric = "total" | "visits" | "noshow" | "new_patients";
+
+interface ReportConfig {
+  source:    Source;
+  dateFrom:  string;
+  dateTo:    string;
+  breakdown: Breakdown;
+  chartType: ChartType;
+  // Звонки
+  callMetrics:  CallMetric[];
+  operatorId:   string | null;
+  // Записи
+  apptMetrics:  ApptMetric[];
+  adminSurname: string | null;
+}
+
+interface Preset {
+  id:     string;
+  label:  string;
+  config: Partial<ReportConfig>;
+}
 
 // ─── Пресеты ─────────────────────────────────────────────────
 
-type Source      = "calls" | "appointments";
-type ChartMetric = "incoming" | "outgoing" | "missed" | "total" | "visits" | "noshow" | "new_patients" | "visit_pct";
-
-interface Preset {
-  id:          string;
-  label:       string;
-  source:      Source;
-  granularity: Granularity;
-  daysBack:    number;
-  metric:      ChartMetric;
-  description: string;
-}
-
 const PRESETS: Preset[] = [
-  { id: "calls_week",    label: "Звонки за неделю",          source: "calls",        granularity: "day",   daysBack: 7,  metric: "incoming",    description: "Входящие/пропущенные по дням + таблица операторов" },
-  { id: "calls_month",   label: "Звонки за месяц",           source: "calls",        granularity: "week",  daysBack: 30, metric: "incoming",    description: "Входящие по неделям + сравнение с прошлым месяцем" },
-  { id: "calls_missed",  label: "Пропущенные и перезвоны",   source: "calls",        granularity: "day",   daysBack: 14, metric: "missed",      description: "Динамика пропущенных за 2 недели" },
-  { id: "appt_week",     label: "Явка за неделю",            source: "appointments", granularity: "day",   daysBack: 7,  metric: "visits",      description: "Явки/неявки по дням + таблица администраторов" },
-  { id: "appt_month",    label: "Записи за месяц",           source: "appointments", granularity: "week",  daysBack: 30, metric: "total",       description: "Записи по неделям с дельтами" },
-  { id: "appt_new",      label: "Новые пациенты",            source: "appointments", granularity: "week",  daysBack: 60, metric: "new_patients", description: "Динамика новых пациентов за 2 месяца" },
-  { id: "monthly_calls", label: "Месячный обзор (звонки)",   source: "calls",        granularity: "month", daysBack: 90, metric: "total",       description: "Помесячная динамика звонков за квартал" },
-  { id: "monthly_appt",  label: "Месячный обзор (записи)",   source: "appointments", granularity: "month", daysBack: 90, metric: "visit_pct",  description: "Помесячная явка за квартал" },
+  {
+    id: "calls_week",
+    label: "Звонки за неделю",
+    config: {
+      source: "calls", breakdown: "day", chartType: "bar",
+      callMetrics: ["incoming", "missed"],
+      dateFrom: toDateStr(addDays(new Date(), -7)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
+  {
+    id: "calls_month",
+    label: "Операторы за месяц",
+    config: {
+      source: "calls", breakdown: "day", chartType: "line",
+      callMetrics: ["incoming"],
+      dateFrom: toDateStr(addDays(new Date(), -30)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
+  {
+    id: "calls_missed",
+    label: "Пропущенные и перезвоны",
+    config: {
+      source: "calls", breakdown: "day", chartType: "bar",
+      callMetrics: ["missed"],
+      dateFrom: toDateStr(addDays(new Date(), -14)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
+  {
+    id: "appt_week",
+    label: "Явка за неделю",
+    config: {
+      source: "appointments", breakdown: "day", chartType: "bar",
+      apptMetrics: ["total", "visits", "noshow"],
+      dateFrom: toDateStr(addDays(new Date(), -7)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
+  {
+    id: "appt_month",
+    label: "Записи за месяц",
+    config: {
+      source: "appointments", breakdown: "day", chartType: "line",
+      apptMetrics: ["total", "visits"],
+      dateFrom: toDateStr(addDays(new Date(), -30)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
+  {
+    id: "appt_new",
+    label: "Новые пациенты",
+    config: {
+      source: "appointments", breakdown: "day", chartType: "bar",
+      apptMetrics: ["new_patients", "total"],
+      dateFrom: toDateStr(addDays(new Date(), -30)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
+  {
+    id: "summary_month",
+    label: "Месячный обзор",
+    config: {
+      source: "calls", breakdown: "day", chartType: "bar",
+      callMetrics: ["incoming", "missed"],
+      dateFrom: toDateStr(addDays(new Date(), -30)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
+  {
+    id: "summary_quarter",
+    label: "Квартальный обзор",
+    config: {
+      source: "calls", breakdown: "week", chartType: "line",
+      callMetrics: ["incoming", "outgoing", "missed"],
+      dateFrom: toDateStr(addDays(new Date(), -90)),
+      dateTo:   toDateStr(addDays(new Date(), -1)),
+    },
+  },
 ];
 
-const CALL_METRICS: { value: ChartMetric; label: string }[] = [
-  { value: "incoming",    label: "Входящие"    },
-  { value: "outgoing",    label: "Исходящие"   },
-  { value: "missed",      label: "Пропущенные" },
-  { value: "total",       label: "Всего"       },
-];
+// ─── Вспомогательные константы ───────────────────────────────
 
-const APPT_METRICS: { value: ChartMetric; label: string }[] = [
-  { value: "total",        label: "Записей"         },
-  { value: "visits",       label: "Явки"            },
-  { value: "noshow",       label: "Неявки"          },
-  { value: "new_patients", label: "Новые пациенты"  },
-  { value: "visit_pct",    label: "% явки"          },
-];
+const CALL_METRIC_LABELS: Record<CallMetric, string> = {
+  incoming: "Входящие",
+  outgoing: "Исходящие",
+  missed:   "Пропущенные",
+  total:    "Всего",
+};
 
-const GRANULARITIES: { value: Granularity; label: string }[] = [
-  { value: "day",   label: "По дням"    },
-  { value: "week",  label: "По неделям" },
-  { value: "month", label: "По месяцам" },
-];
+const APPT_METRIC_LABELS: Record<ApptMetric, string> = {
+  total:        "Всего записей",
+  visits:       "Явки",
+  noshow:       "Неявки",
+  new_patients: "Новые пациенты",
+};
 
-const COLORS = ["#22c55e", "#3b82f6", "#a855f7", "#eab308", "#ef4444", "#f97316"];
-const GROUP_ORDER = ["callcenter", "admin", "other"] as const;
-const GROUP_LABELS: Record<string, string> = { callcenter: "Колл-центр", admin: "Администраторы", other: "Прочие" };
+const METRIC_COLORS: Record<string, string> = {
+  incoming:     "#22c55e",
+  outgoing:     "#3b82f6",
+  missed:       "#ef4444",
+  total:        "#6366f1",
+  visits:       "#22c55e",
+  noshow:       "#ef4444",
+  new_patients: "#a855f7",
+};
 
-// ─── Вспомогательные ─────────────────────────────────────────
+const BREAKDOWN_LABELS: Record<Breakdown, string> = {
+  day:   "По дням",
+  week:  "По неделям",
+  month: "По месяцам",
+};
 
-function formatPeriod(p: string, granularity: Granularity): string {
-  if (granularity === "month") {
-    const [y, m] = p.split("-");
-    return new Date(+y, +m - 1).toLocaleDateString("ru-RU", { month: "short", year: "numeric" });
-  }
-  if (granularity === "week") {
-    return "нед. " + new Date(p).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-  }
-  return new Date(p).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-}
+// ─── Компонент дельты ────────────────────────────────────────
 
-function DeltaBadge({ pct, dir, invert }: { pct: number | null; dir: DeltaDir; invert?: boolean }) {
-  if (pct == null || dir == null || dir === "flat") return <span className="text-[10px] text-muted-foreground">—</span>;
+function DeltaBadge({ pct, dir, invert }: { pct?: number | null; dir?: DeltaDir; invert?: boolean }) {
+  if (!dir || dir === "flat" || pct == null) return null;
   const isGood = invert ? dir === "down" : dir === "up";
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${isGood ? "text-emerald-500" : "text-red-500"}`}>
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isGood ? "text-emerald-500" : "text-red-500"}`}>
       {dir === "up" ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {dir === "up" ? "+" : "−"}{pct}%
     </span>
   );
 }
 
-function SummaryCard({ label, value, deltaPct, deltaDir, invert }: {
-  label: string; value: string | number;
-  deltaPct?: number | null; deltaDir?: DeltaDir; invert?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-      <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{label}</div>
-      <div className="text-xl font-semibold font-mono">{value}</div>
-      {deltaDir !== undefined && (
-        <div className="mt-1">
-          <DeltaBadge pct={deltaPct ?? null} dir={deltaDir ?? null} invert={invert} />
-        </div>
-      )}
-    </div>
-  );
+// ─── Агрегация данных по неделям/месяцам ─────────────────────
+
+function aggregateDays(days: any[], breakdown: Breakdown): any[] {
+  if (breakdown === "day") return days;
+
+  const groups: Record<string, any> = {};
+  for (const d of days) {
+    const dt = new Date(d.date);
+    let key: string;
+    if (breakdown === "week") {
+      const monday = new Date(dt);
+      monday.setDate(dt.getDate() - dt.getDay() + 1);
+      key = toDateStr(monday);
+    } else {
+      key = d.date.slice(0, 7);
+    }
+    if (!groups[key]) {
+      groups[key] = { date: key, incoming: 0, outgoing: 0, missed: 0, total: 0,
+                      visits: 0, noshow: 0, new_patients: 0 };
+    }
+    for (const k of ["incoming","outgoing","missed","total","visits","noshow","new_patients"]) {
+      groups[key][k] = (groups[key][k] || 0) + (d[k] || 0);
+    }
+  }
+  return Object.values(groups);
 }
 
-// ─── Выпадашка ───────────────────────────────────────────────
-
-function Dropdown({ label, children }: { label: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-  return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-background text-xs hover:bg-muted/40 transition-colors">
-        {label} <ChevronDown className="h-3 w-3" />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 min-w-[160px] rounded-lg border border-border bg-background shadow-md py-1 max-h-64 overflow-y-auto">
-          {children}
-        </div>
-      )}
-    </div>
-  );
+function formatDateTick(d: string, breakdown: Breakdown): string {
+  const dt = new Date(d);
+  if (breakdown === "month") return dt.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" });
+  if (breakdown === "week")  return dt.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  return dt.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 }
 
-function DropdownItem({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick}
-      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${active ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"}`}>
-      {label}
-    </button>
-  );
-}
+// ─── Основной компонент ──────────────────────────────────────
 
-// ─── Главный компонент ────────────────────────────────────────
+const DEFAULT_CONFIG: ReportConfig = {
+  source:       "calls",
+  dateFrom:     toDateStr(addDays(new Date(), -30)),
+  dateTo:       toDateStr(addDays(new Date(), -1)),
+  breakdown:    "day",
+  chartType:    "bar",
+  callMetrics:  ["incoming", "missed"],
+  operatorId:   null,
+  apptMetrics:  ["total", "visits"],
+  adminSurname: null,
+};
 
 export function ReportsDashboard() {
-  const [source, setSource]           = useState<Source>("calls");
-  const [granularity, setGranularity] = useState<Granularity>("day");
-  const [metric, setMetric]           = useState<ChartMetric>("incoming");
-  const [daysBack, setDaysBack]       = useState(7);
-  const [operatorId, setOperatorId]   = useState<string | null>(null);
-  const [adminSurname, setAdminSurname] = useState<string | null>(null);
-  const [activePreset, setActivePreset] = useState<string | null>("calls_week");
+  const [config, setConfig]         = useState<ReportConfig>(DEFAULT_CONFIG);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
-  const [operators, setOperators] = useState<Operator[]>([]);
-  const [admins, setAdmins]       = useState<Admin[]>([]);
+  const [operators, setOperators]   = useState<Operator[]>([]);
+  const [admins, setAdmins]         = useState<Admin[]>([]);
 
-  const [callsData, setCallsData]   = useState<CallsReportResponse | null>(null);
-  const [apptData, setApptData]     = useState<AppointmentsReportResponse | null>(null);
-  const [loading, setLoading]       = useState(false);
+  const [callsData, setCallsData]         = useState<StatsResponse | null>(null);
+  const [callsDaily, setCallsDaily]       = useState<DailyResponse | null>(null);
+  const [apptData, setApptData]           = useState<AppointmentStatsResponse | null>(null);
+  const [apptDaily, setApptDaily]         = useState<AppointmentDailyResponse | null>(null);
 
-  const dateTo   = toDateStr(addDays(new Date(), -1));
-  const dateFrom = toDateStr(addDays(new Date(), -daysBack));
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchOperators().then(r => setOperators(r.operators)).catch(() => {});
@@ -171,285 +244,411 @@ export function ReportsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (source === "calls") {
-        const d = await fetchCallsReport(dateFrom, dateTo, granularity, operatorId ?? undefined);
-        setCallsData(d);
+      if (config.source === "calls") {
+        const [s, d] = await Promise.all([
+          fetchStats(config.dateFrom, config.dateTo, config.operatorId ?? undefined),
+          fetchDaily(config.dateFrom, config.dateTo, config.operatorId ?? undefined),
+        ]);
+        setCallsData(s); setCallsDaily(d);
+        setApptData(null); setApptDaily(null);
       } else {
-        const d = await fetchAppointmentsReport(dateFrom, dateTo, granularity, adminSurname ?? undefined);
-        setApptData(d);
+        const [s, d] = await Promise.all([
+          fetchAppointmentStats(config.dateFrom, config.dateTo, config.adminSurname ?? undefined),
+          fetchAppointmentDaily(config.dateFrom, config.dateTo, config.adminSurname ?? undefined),
+        ]);
+        setApptData(s); setApptDaily(d);
+        setCallsData(null); setCallsDaily(null);
       }
-    } catch (e) {
-      console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, source, granularity, operatorId, adminSurname]);
+  }, [config]);
 
   useEffect(() => { load(); }, [load]);
 
-  function applyPreset(p: Preset) {
-    setActivePreset(p.id);
-    setSource(p.source);
-    setGranularity(p.granularity);
-    setDaysBack(p.daysBack);
-    setMetric(p.metric);
-    setOperatorId(null);
-    setAdminSurname(null);
+  function applyPreset(preset: Preset) {
+    setConfig(prev => ({ ...DEFAULT_CONFIG, ...prev, ...preset.config }));
+    setActivePreset(preset.id);
   }
 
-  const currentMetrics = source === "calls" ? CALL_METRICS : APPT_METRICS;
-  const data = source === "calls" ? callsData : apptData;
+  function updateConfig(patch: Partial<ReportConfig>) {
+    setConfig(prev => ({ ...prev, ...patch }));
+    setActivePreset(null);
+  }
 
-  const chartData = data?.rows.map(r => ({
-    ...r,
-    period: formatPeriod(r.period, granularity),
-  })) ?? [];
+  function toggleCallMetric(m: CallMetric) {
+    setConfig(prev => ({
+      ...prev,
+      callMetrics: prev.callMetrics.includes(m)
+        ? prev.callMetrics.filter(x => x !== m)
+        : [...prev.callMetrics, m],
+    }));
+    setActivePreset(null);
+  }
 
-  const summary = data?.summary;
-  const adminsByGroup = GROUP_ORDER.reduce((acc, g) => {
-    acc[g] = admins.filter(a => a.group === g);
-    return acc;
-  }, {} as Record<string, Admin[]>);
+  function toggleApptMetric(m: ApptMetric) {
+    setConfig(prev => ({
+      ...prev,
+      apptMetrics: prev.apptMetrics.includes(m)
+        ? prev.apptMetrics.filter(x => x !== m)
+        : [...prev.apptMetrics, m],
+    }));
+    setActivePreset(null);
+  }
+
+  // Данные для графика
+  const rawDays = config.source === "calls"
+    ? (callsDaily?.days ?? [])
+    : (apptDaily?.days ?? []);
+  const chartData = aggregateDays(rawDays, config.breakdown);
+  const metrics   = config.source === "calls" ? config.callMetrics : config.apptMetrics;
+
+  // Сводные метрики (для таблицы)
+  const summaryStats = config.source === "calls"
+    ? callsData?.operators[config.operatorId ?? "total"]
+    : apptData?.total;
+
+  const prevLabel = (() => {
+    const span = Math.round((new Date(config.dateTo).getTime() - new Date(config.dateFrom).getTime()) / 86400000) + 1;
+    return `пред. ${span} дн.`;
+  })();
+
+  const ChartComponent = config.chartType === "line" ? LineChart : BarChart;
+
+  const tickInterval = chartData.length > 60 ? 6 : chartData.length > 30 ? 2 : 0;
 
   return (
     <div className="space-y-5">
 
       {/* Пресеты */}
       <div>
-        <h1 className="text-base font-semibold mb-3">Отчёты</h1>
+        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Быстрые отчёты</div>
         <div className="flex flex-wrap gap-2">
           {PRESETS.map(p => (
-            <button key={p.id} onClick={() => applyPreset(p)}
+            <button
+              key={p.id}
+              onClick={() => applyPreset(p)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 activePreset === p.id
                   ? "bg-foreground text-background border-foreground"
-                  : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40"
-              }`}>
+                  : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+              }`}
+            >
               {p.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Панель настроек */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
+      {/* Настройки */}
+      <div className="rounded-xl border border-border bg-card p-4 flex flex-wrap gap-4 items-end">
+
         {/* Источник */}
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/30 p-1">
-          {(["calls", "appointments"] as Source[]).map(s => (
-            <button key={s} onClick={() => { setSource(s); setActivePreset(null); setMetric(s === "calls" ? "incoming" : "total"); }}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                source === s ? "bg-background text-foreground border border-border shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}>
-              {s === "calls" ? "Звонки" : "Записи"}
-            </button>
-          ))}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Источник</div>
+          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+            {(["calls","appointments"] as Source[]).map(s => (
+              <button key={s} onClick={() => updateConfig({ source: s })}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  config.source === s
+                    ? "bg-background border border-border text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}>
+                {s === "calls" ? "Звонки" : "Записи"}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Метрика */}
-        <Dropdown label={currentMetrics.find(m => m.value === metric)?.label ?? "Метрика"}>
-          {currentMetrics.map(m => (
-            <DropdownItem key={m.value} label={m.label} active={metric === m.value}
-              onClick={() => { setMetric(m.value); setActivePreset(null); }} />
-          ))}
-        </Dropdown>
+        {/* Период */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Период</div>
+          <div className="flex items-center gap-1.5">
+            <input type="date" value={config.dateFrom}
+              onChange={e => updateConfig({ dateFrom: e.target.value })}
+              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40" />
+            <span className="text-muted-foreground text-xs">—</span>
+            <input type="date" value={config.dateTo}
+              onChange={e => updateConfig({ dateTo: e.target.value })}
+              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40" />
+          </div>
+        </div>
 
-        {/* Гранулярность */}
-        <Dropdown label={GRANULARITIES.find(g => g.value === granularity)?.label ?? "Период"}>
-          {GRANULARITIES.map(g => (
-            <DropdownItem key={g.value} label={g.label} active={granularity === g.value}
-              onClick={() => { setGranularity(g.value); setActivePreset(null); }} />
-          ))}
-        </Dropdown>
-
-        {/* Глубина */}
-        <Dropdown label={`${daysBack} дней`}>
-          {[7, 14, 30, 60, 90, 180, 365].map(d => (
-            <DropdownItem key={d} label={`${d} дней`} active={daysBack === d}
-              onClick={() => { setDaysBack(d); setActivePreset(null); }} />
-          ))}
-        </Dropdown>
-
-        {/* Фильтр по человеку */}
-        {source === "calls" && (
-          <Dropdown label={operatorId ? operators.find(o => o.id === operatorId)?.name.split(" ")[0] ?? "Все" : "Все операторы"}>
-            <DropdownItem label="Все операторы" active={!operatorId} onClick={() => setOperatorId(null)} />
-            {operators.map(op => (
-              <DropdownItem key={op.id} label={op.name} active={operatorId === op.id}
-                onClick={() => setOperatorId(op.id)} />
+        {/* Разбивка */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Разбивка</div>
+          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+            {(["day","week","month"] as Breakdown[]).map(b => (
+              <button key={b} onClick={() => updateConfig({ breakdown: b })}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  config.breakdown === b
+                    ? "bg-background border border-border text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}>
+                {BREAKDOWN_LABELS[b]}
+              </button>
             ))}
-          </Dropdown>
-        )}
-        {source === "appointments" && (
-          <Dropdown label={adminSurname ?? "Все"}>
-            <DropdownItem label="Все" active={!adminSurname} onClick={() => setAdminSurname(null)} />
-            {GROUP_ORDER.map(group => {
-              const items = adminsByGroup[group];
-              if (!items?.length) return null;
-              return (
-                <div key={group}>
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                    {GROUP_LABELS[group]}
-                  </div>
-                  {items.map(a => (
-                    <DropdownItem key={a.surname} label={a.surname} active={adminSurname === a.surname}
-                      onClick={() => setAdminSurname(a.surname)} />
-                  ))}
-                </div>
-              );
-            })}
-          </Dropdown>
+          </div>
+        </div>
+
+        {/* Тип графика */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">График</div>
+          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+            {(["bar","line"] as ChartType[]).map(t => (
+              <button key={t} onClick={() => updateConfig({ chartType: t })}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  config.chartType === t
+                    ? "bg-background border border-border text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}>
+                {t === "bar" ? "Столбцы" : "Линии"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Метрики — Звонки */}
+        {config.source === "calls" && (
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Метрики</div>
+            <div className="flex gap-1 flex-wrap">
+              {(Object.keys(CALL_METRIC_LABELS) as CallMetric[]).map(m => (
+                <button key={m} onClick={() => toggleCallMetric(m)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    config.callMetrics.includes(m)
+                      ? "border-transparent text-white"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                  style={config.callMetrics.includes(m) ? { background: METRIC_COLORS[m] } : {}}>
+                  {CALL_METRIC_LABELS[m]}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
-        {loading && <span className="text-xs text-muted-foreground ml-auto">Загрузка...</span>}
+        {/* Метрики — Записи */}
+        {config.source === "appointments" && (
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Метрики</div>
+            <div className="flex gap-1 flex-wrap">
+              {(Object.keys(APPT_METRIC_LABELS) as ApptMetric[]).map(m => (
+                <button key={m} onClick={() => toggleApptMetric(m)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    config.apptMetrics.includes(m)
+                      ? "border-transparent text-white"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                  style={config.apptMetrics.includes(m) ? { background: METRIC_COLORS[m] } : {}}>
+                  {APPT_METRIC_LABELS[m]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Фильтр по оператору */}
+        {config.source === "calls" && (
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Оператор</div>
+            <select value={config.operatorId ?? ""}
+              onChange={e => updateConfig({ operatorId: e.target.value || null })}
+              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40 min-w-32">
+              <option value="">Все</option>
+              {operators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Фильтр по администратору */}
+        {config.source === "appointments" && (
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Сотрудник</div>
+            <select value={config.adminSurname ?? ""}
+              onChange={e => updateConfig({ adminSurname: e.target.value || null })}
+              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40 min-w-32">
+              <option value="">Все</option>
+              {admins.map(a => <option key={a.surname} value={a.surname}>{a.surname} — {a.label}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* Сводные карточки */}
-      {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {source === "calls" ? (
-            <>
-              <SummaryCard label="Входящие"    value={summary.incoming} deltaPct={summary.incoming_delta_pct} deltaDir={summary.incoming_delta_dir} />
-              <SummaryCard label="Исходящие"   value={summary.outgoing} deltaPct={summary.outgoing_delta_pct} deltaDir={summary.outgoing_delta_dir} />
-              <SummaryCard label="Пропущенные" value={summary.missed}   deltaPct={summary.missed_delta_pct}   deltaDir={summary.missed_delta_dir} invert />
-              <SummaryCard label="Всего"       value={summary.total}    deltaPct={summary.total_delta_pct}    deltaDir={summary.total_delta_dir} />
-            </>
-          ) : (
-            <>
-              <SummaryCard label="Записей"          value={summary.total}        deltaPct={summary.total_delta_pct}        deltaDir={summary.total_delta_dir} />
-              <SummaryCard label="Явки"             value={summary.visits}       deltaPct={summary.visits_delta_pct}       deltaDir={summary.visits_delta_dir} />
-              <SummaryCard label="% явки"           value={`${summary.visit_pct}%`} deltaPct={summary.visit_pct_delta_pct} deltaDir={summary.visit_pct_delta_dir} />
-              <SummaryCard label="Новые пациенты"   value={summary.new_patients} deltaPct={summary.new_patients_delta_pct} deltaDir={summary.new_patients_delta_dir} />
-            </>
-          )}
-        </div>
-      )}
-
       {/* График */}
-      {chartData.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
             <h3 className="text-sm font-medium">
-              {currentMetrics.find(m => m.value === metric)?.label} · {GRANULARITIES.find(g => g.value === granularity)?.label}
+              {config.source === "calls" ? "Звонки" : "Записи"} · {BREAKDOWN_LABELS[config.breakdown].toLowerCase()}
             </h3>
-            <span className="text-xs text-muted-foreground">
-              {data?.date_from} — {data?.date_to}
-            </span>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {new Date(config.dateFrom).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} —{" "}
+              {new Date(config.dateTo).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+            </p>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
-            {metric === "visit_pct" ? (
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#00000010" vertical={false} />
-                <XAxis dataKey="period" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
-                <Tooltip formatter={(v: any) => `${v}%`} />
-                <Line type="monotone" dataKey={metric} stroke="#22c55e" strokeWidth={2} dot={false} name="% явки" />
-              </LineChart>
-            ) : (
-              <BarChart data={chartData} barCategoryGap="35%">
-                <CartesianGrid strokeDasharray="3 3" stroke="#00000010" vertical={false} />
-                <XAxis dataKey="period" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey={metric} fill={COLORS[0]} radius={[3,3,0,0]}
-                  name={currentMetrics.find(m => m.value === metric)?.label} />
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap justify-end">
+            {metrics.map(m => (
+              <span key={m} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm inline-block" style={{ background: METRIC_COLORS[m] }} />
+                {config.source === "calls" ? CALL_METRIC_LABELS[m as CallMetric] : APPT_METRIC_LABELS[m as ApptMetric]}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="h-64 rounded-lg bg-muted/40 animate-pulse" />
+        ) : chartData.length === 0 ? (
+          <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
+            Нет данных за выбранный период
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            {config.chartType === "bar" ? (
+              <BarChart data={chartData} barCategoryGap="30%" barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={d => formatDateTick(d, config.breakdown)}
+                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                  axisLine={false} tickLine={false} interval={tickInterval} />
+                <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                  axisLine={false} tickLine={false} width={28} />
+                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8,
+                  border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }}
+                  labelFormatter={d => formatDateTick(d, config.breakdown)} />
+                {metrics.map(m => (
+                  <Bar key={m} dataKey={m} fill={METRIC_COLORS[m]} opacity={0.85}
+                    radius={[2,2,0,0]}
+                    name={config.source === "calls" ? CALL_METRIC_LABELS[m as CallMetric] : APPT_METRIC_LABELS[m as ApptMetric]} />
+                ))}
               </BarChart>
+            ) : (
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={d => formatDateTick(d, config.breakdown)}
+                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                  axisLine={false} tickLine={false} interval={tickInterval} />
+                <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                  axisLine={false} tickLine={false} width={28} />
+                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8,
+                  border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }}
+                  labelFormatter={d => formatDateTick(d, config.breakdown)} />
+                <Legend formatter={v =>
+                  <span style={{ fontSize: 11 }}>
+                    {config.source === "calls" ? CALL_METRIC_LABELS[v as CallMetric] : APPT_METRIC_LABELS[v as ApptMetric]}
+                  </span>} />
+                {metrics.map(m => (
+                  <Line key={m} type="monotone" dataKey={m} stroke={METRIC_COLORS[m]}
+                    strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }}
+                    name={m} />
+                ))}
+              </LineChart>
             )}
           </ResponsiveContainer>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Таблица — операторы */}
-      {source === "calls" && callsData && !operatorId && (
+      {/* Сводная таблица с дельтами */}
+      {summaryStats && !loading && (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium">По операторам · сравнение с предыдущим периодом</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Пред. период: {callsData.prev_from} — {callsData.prev_to}
-            </p>
+            <h3 className="text-sm font-medium">Сводка · сравнение с {prevLabel}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  {["Оператор", "Входящие", "Δ", "Исходящие", "Δ", "Пропущенные", "Δ", "Всего", "Δ"].map((h, i) => (
-                    <th key={i} className={`px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
-                  ))}
+                  <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-left">Метрика</th>
+                  <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Значение</th>
+                  <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Динамика</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {callsData.by_operator.map(op => (
-                  <tr key={op.operator_id} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-4 py-3 font-medium">{op.name}</td>
-                    <td className="px-4 py-3 text-right font-mono text-emerald-500">{op.incoming}</td>
-                    <td className="px-4 py-3 text-right"><DeltaBadge pct={op.incoming_delta_pct} dir={op.incoming_delta_dir} /></td>
-                    <td className="px-4 py-3 text-right font-mono text-blue-500">{op.outgoing}</td>
-                    <td className="px-4 py-3 text-right"><DeltaBadge pct={op.outgoing_delta_pct} dir={op.outgoing_delta_dir} /></td>
-                    <td className="px-4 py-3 text-right font-mono text-red-500">{op.missed}</td>
-                    <td className="px-4 py-3 text-right"><DeltaBadge pct={op.missed_delta_pct} dir={op.missed_delta_dir} invert /></td>
-                    <td className="px-4 py-3 text-right font-mono">{op.total}</td>
-                    <td className="px-4 py-3 text-right"><DeltaBadge pct={op.total_delta_pct} dir={op.total_delta_dir} /></td>
-                  </tr>
-                ))}
+                {config.source === "calls" && (() => {
+                  const s = summaryStats as any;
+                  return [
+                    { label: "Входящие",       val: s.incoming,      pct: s.incoming_delta_pct,     dir: s.incoming_delta_dir },
+                    { label: "Исходящие",       val: s.outgoing,      pct: s.outgoing_delta_pct,     dir: s.outgoing_delta_dir },
+                    { label: "Пропущенные",     val: s.missed,        pct: s.missed_delta_pct,       dir: s.missed_delta_dir,       inv: true },
+                    { label: "Всего",           val: s.total,         pct: s.total_delta_pct,        dir: s.total_delta_dir },
+                    { label: "Ср. разговор",    val: formatDuration(s.avg_duration), pct: s.avg_duration_delta_pct, dir: s.avg_duration_delta_dir },
+                    { label: "% перезвонов",    val: `${s.callback_pct}%`, pct: s.callback_pct_delta_pct, dir: s.callback_pct_delta_dir },
+                  ].map(row => (
+                    <tr key={row.label} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-5 py-3 font-medium">{row.label}</td>
+                      <td className="px-5 py-3 text-right font-mono">{row.val}</td>
+                      <td className="px-5 py-3 text-right">
+                        <DeltaBadge pct={row.pct} dir={row.dir as DeltaDir} invert={row.inv} />
+                      </td>
+                    </tr>
+                  ));
+                })()}
+                {config.source === "appointments" && (() => {
+                  const s = summaryStats as any;
+                  return [
+                    { label: "Всего записей",   val: s.total,         pct: s.total_delta_pct,        dir: s.total_delta_dir },
+                    { label: "Явки",            val: s.visits,        pct: s.visits_delta_pct,       dir: s.visits_delta_dir },
+                    { label: "% явки",          val: `${s.visit_pct}%`, pct: s.visit_pct_delta_pct,  dir: s.visit_pct_delta_dir },
+                    { label: "Неявки",          val: s.noshow,        pct: s.noshow_delta_pct,       dir: s.noshow_delta_dir, inv: true },
+                    { label: "Отмены",          val: s.cancels,       pct: s.cancel_pct_delta_pct,   dir: s.cancel_pct_delta_dir, inv: true },
+                    { label: "Новые пациенты",  val: s.new_patients,  pct: s.new_patients_delta_pct, dir: s.new_patients_delta_dir },
+                  ].map(row => (
+                    <tr key={row.label} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-5 py-3 font-medium">{row.label}</td>
+                      <td className="px-5 py-3 text-right font-mono">{row.val}</td>
+                      <td className="px-5 py-3 text-right">
+                        <DeltaBadge pct={row.pct} dir={row.dir as DeltaDir} invert={row.inv} />
+                      </td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* Таблица — администраторы */}
-      {source === "appointments" && apptData && (
+      {/* Детализация по администраторам (только записи, без фильтра) */}
+      {config.source === "appointments" && !config.adminSurname && apptData && !loading && (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium">По сотрудникам · сравнение с предыдущим периодом</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Пред. период: {apptData.prev_from} — {apptData.prev_to}
-            </p>
+            <h3 className="text-sm font-medium">По сотрудникам · сравнение с {prevLabel}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  {["Сотрудник", "Записей", "Δ", "Явки", "Δ", "% явки", "Δ", "Новые", "Δ", "Неявки", "Δ"].map((h, i) => (
-                    <th key={i} className={`px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
+                  {["Сотрудник","Записей","Δ","Явки","% явки","Δ","Неявки","Δ","Новые","Δ"].map((h, i) => (
+                    <th key={i} className={`px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {GROUP_ORDER.map(group => {
-                  const items = apptData.by_admin.filter(a => a.group === group);
-                  if (!items.length) return null;
-                  return (
-                    <>
-                      <tr key={`g-${group}`} className="bg-muted/20">
-                        <td colSpan={11} className="px-4 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          {GROUP_LABELS[group]}
-                        </td>
-                      </tr>
-                      {items.map(a => (
-                        <tr key={a.name} className="hover:bg-muted/40 transition-colors">
-                          <td className="px-4 py-3 font-medium">{a.name}</td>
-                          <td className="px-4 py-3 text-right font-mono">{a.total}</td>
-                          <td className="px-4 py-3 text-right"><DeltaBadge pct={a.total_delta_pct} dir={a.total_delta_dir} /></td>
-                          <td className="px-4 py-3 text-right font-mono text-emerald-500">{a.visits}</td>
-                          <td className="px-4 py-3 text-right"><DeltaBadge pct={a.visits_delta_pct} dir={a.visits_delta_dir} /></td>
-                          <td className="px-4 py-3 text-right font-mono">
-                            <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
-                              a.visit_pct >= 90 ? "bg-emerald-500/10 text-emerald-500"
-                              : a.visit_pct >= 75 ? "bg-yellow-500/10 text-yellow-500"
-                              : "bg-red-500/10 text-red-500"}`}>
-                              {a.visit_pct}%
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right"><DeltaBadge pct={a.visit_pct_delta_pct} dir={a.visit_pct_delta_dir} /></td>
-                          <td className="px-4 py-3 text-right font-mono text-purple-500">{a.new_patients}</td>
-                          <td className="px-4 py-3 text-right"><DeltaBadge pct={a.new_patients_delta_pct} dir={a.new_patients_delta_dir} /></td>
-                          <td className="px-4 py-3 text-right font-mono text-red-500">{a.noshow}</td>
-                          <td className="px-4 py-3 text-right"><DeltaBadge pct={a.noshow_delta_pct} dir={a.noshow_delta_dir} invert /></td>
-                        </tr>
-                      ))}
-                    </>
-                  );
-                })}
+                {Object.values(apptData.by_admin).sort((a: any, b: any) => b.total - a.total).map((a: any) => (
+                  <tr key={a.name} className="hover:bg-muted/40 transition-colors">
+                    <td className="px-4 py-3 font-medium whitespace-nowrap">
+                      {a.name}
+                      {a.group_label && a.group !== "callcenter" && a.group !== "admin" && (
+                        <span className="text-[10px] text-muted-foreground ml-1.5">{a.group_label}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">{a.total}</td>
+                    <td className="px-4 py-3 text-right"><DeltaBadge pct={a.total_delta_pct} dir={a.total_delta_dir} /></td>
+                    <td className="px-4 py-3 text-right font-mono text-emerald-500">{a.visits}</td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${
+                        a.visit_pct >= 90 ? "bg-emerald-500/10 text-emerald-500"
+                        : a.visit_pct >= 75 ? "bg-yellow-500/10 text-yellow-500"
+                        : "bg-red-500/10 text-red-500"
+                      }`}>{a.visit_pct}%</span>
+                    </td>
+                    <td className="px-4 py-3 text-right"><DeltaBadge pct={a.visit_pct_delta_pct} dir={a.visit_pct_delta_dir} /></td>
+                    <td className="px-4 py-3 text-right font-mono text-red-500">{a.noshow}</td>
+                    <td className="px-4 py-3 text-right"><DeltaBadge pct={a.noshow_delta_pct} dir={a.noshow_delta_dir} invert /></td>
+                    <td className="px-4 py-3 text-right font-mono text-purple-500">{a.new_patients}</td>
+                    <td className="px-4 py-3 text-right"><DeltaBadge pct={a.new_patients_delta_pct} dir={a.new_patients_delta_dir} /></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
