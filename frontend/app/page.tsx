@@ -5,6 +5,7 @@ import { Sidebar, Section } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { ReportsDashboard } from "@/components/reports-dashboard";
+import { PlansDashboard } from "@/components/plans-dashboard";
 import { CardsOverview } from "@/components/cards-overview";
 import { HourlyChart } from "@/components/hourly-chart";
 import { DailyChart } from "@/components/daily-chart";
@@ -61,8 +62,10 @@ export default function DashboardPage() {
     fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
   }, []);
 
+  const noTopbar = ["home", "reports", "plans"];
+
   const load = useCallback(async () => {
-    if (section === "home" || section === "reports") return;
+    if (noTopbar.includes(section)) return;
     setLoading(true);
     setError(null);
     try {
@@ -141,14 +144,12 @@ export default function DashboardPage() {
     </div>
   );
 
-  const showTopbar = section !== "home" && section !== "reports";
-
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar section={section} onSelectSection={handleSelectSection} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {showTopbar && (
+        {!noTopbar.includes(section) && (
           <Topbar
             section={section}
             period={period}
@@ -176,13 +177,9 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {section === "home" && (
-            <HomeDashboard onNavigate={handleSelectSection} />
-          )}
-
-          {section === "reports" && (
-            <ReportsDashboard />
-          )}
+          {section === "home" && <HomeDashboard onNavigate={handleSelectSection} />}
+          {section === "reports" && <ReportsDashboard />}
+          {section === "plans" && <PlansDashboard />}
 
           {section === "calls" && (
             <>
