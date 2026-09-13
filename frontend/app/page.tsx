@@ -214,7 +214,12 @@ export default function DashboardPage() {
           {section === "appointments" && (
             <>
               {loading ? <Skeleton /> : apptStats ? (
-                <AppointmentCards stats={apptStats.total} dateFrom={dateFrom} dateTo={dateTo} />
+                <AppointmentCards
+                  stats={apptStats.total}
+                  byGroup={apptStats.by_group ?? {}}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                />
               ) : (
                 <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                   Нет данных за выбранный период
