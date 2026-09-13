@@ -77,6 +77,28 @@ export interface Admin {
   label:   string;
 }
 
+// ─── Конверсия ───────────────────────────────────────────────
+
+export interface ConversionOperator {
+  operator_id:     string;
+  name:            string;
+  surname:         string;
+  incoming:        number;
+  appointments:    number;
+  conversion_pct:  number;
+}
+
+export interface ConversionResponse {
+  date_from: string;
+  date_to:   string;
+  operators: ConversionOperator[];
+  total: {
+    incoming:       number;
+    appointments:   number;
+    conversion_pct: number;
+  };
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Ошибка загрузки данных");
@@ -105,6 +127,10 @@ export function fetchOperators(): Promise<{ operators: Operator[] }> {
 
 export function fetchAdmins(): Promise<{ admins: Admin[] }> {
   return apiFetch("/api/appointments/admins");
+}
+
+export function fetchConversion(dateFrom: string, dateTo: string): Promise<ConversionResponse> {
+  return apiFetch(`/api/calls/conversion?date_from=${dateFrom}&date_to=${dateTo}`);
 }
 
 export async function collectCalls(dateFrom: string, dateTo: string) {
