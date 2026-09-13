@@ -12,6 +12,7 @@ import { DailyChart } from "@/components/daily-chart";
 import { HeatmapChart } from "@/components/heatmap-chart";
 import { ComparisonChart } from "@/components/comparison-chart";
 import { OperatorsTable } from "@/components/operators-table";
+import { ConversionBlock } from "@/components/conversion-block";
 import { AppointmentCards } from "@/components/appointments-cards";
 import { AppointmentsTable } from "@/components/appointments-table";
 import { AppointmentsDailyChart } from "@/components/appointments-daily-chart";
@@ -207,6 +208,10 @@ export default function DashboardPage() {
               )}
               {!loading && !selectedOp && stats && (
                 <OperatorsTable operators={stats.operators} />
+              )}
+              {/* Конверсия — только когда не выбран конкретный оператор */}
+              {!loading && !selectedOp && (
+                <ConversionBlock dateFrom={dateFrom} dateTo={dateTo} />
               )}
             </>
           )}
