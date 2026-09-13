@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from typing import Optional
 from app.db.database import get_db
 from app.models.call import Call
+from app.models.appointment import Appointment
 from app.services.collector import collect_calls
 from app.core.config import settings
 
@@ -12,6 +13,14 @@ router = APIRouter()
 
 ALLOWED_INTERVALS = {1, 5, 10, 15, 30, 60, 120}
 MAX_CALLBACK_HOURS = 24
+
+# Связка Битрикс ID → фамилия в МедОДС (только операторы колл-центра)
+OPERATOR_TO_SURNAME: dict[str, str] = {
+    "168": "Белобородова",
+    "520": "Пирожкова",
+    "696": "Часовских",
+    # Жданова (544) — профосмотры, не считаем конверсию
+}
 
 
 def _calc_callbacks(calls: list) -> list:
@@ -93,7 +102,6 @@ def _operator_stats(calls: list) -> dict:
 
 
 def _delta(current: int | float, prev: int | float) -> dict:
-    """Считает дельту в % относительно предыдущего периода."""
     if not prev:
         return {"delta_pct": None, "delta_dir": None}
     pct = round((current - prev) / prev * 100)
@@ -104,7 +112,6 @@ def _delta(current: int | float, prev: int | float) -> dict:
 
 
 def _add_deltas(current: dict, prev: dict) -> dict:
-    """Добавляет дельты к статистике оператора."""
     result = dict(current)
     for key in ("incoming", "outgoing", "missed", "total", "avg_duration", "callback_pct"):
         d = _delta(current.get(key, 0), prev.get(key, 0))
@@ -114,7 +121,6 @@ def _add_deltas(current: dict, prev: dict) -> dict:
 
 
 def _prev_period(date_from: date, date_to: date) -> tuple[date, date]:
-    """Возвращает предыдущий аналогичный период той же длины."""
     span = (date_to - date_from).days + 1
     prev_to   = date_from - timedelta(days=1)
     prev_from = prev_to - timedelta(days=span - 1)
@@ -165,20 +171,17 @@ async def get_stats(
     if not date_to:
         date_to = date_from
 
-    # Текущий период
     curr_calls = await _load_calls(db, date_from, date_to)
     if operator_id:
         curr_calls = [c for c in curr_calls if c.portal_user_id == operator_id]
     curr_ops = _operator_stats(curr_calls)
 
-    # Предыдущий аналогичный период
     prev_from, prev_to = _prev_period(date_from, date_to)
     prev_calls = await _load_calls(db, prev_from, prev_to)
     if operator_id:
         prev_calls = [c for c in prev_calls if c.portal_user_id == operator_id]
     prev_ops = _operator_stats(prev_calls)
 
-    # Добавляем дельты
     operators_with_delta: dict = {}
     for key, stats in curr_ops.items():
         prev = prev_ops.get(key, {})
@@ -203,6 +206,81 @@ async def get_stats(
         "prev_from": prev_from,
         "prev_to":   prev_to,
         "operators": operators_with_delta,
+    }
+
+
+@router.get("/conversion")
+async def get_conversion(
+    date_from: date = Query(default=None),
+    date_to:   date = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Конверсия звонок → запись для операторов колл-центра.
+    Считает: сколько записей сделал оператор / его входящие звонки × 100%.
+    Только для Белобородовой, Пирожковой, Часовских.
+    """
+    if not date_from:
+        date_from = date.today() - timedelta(days=1)
+    if not date_to:
+        date_to = date_from
+
+    # Загружаем звонки
+    calls = await _load_calls(db, date_from, date_to)
+
+    # Загружаем записи за тот же период
+    appts = list(await db.scalars(
+        select(Appointment).where(
+            and_(
+                Appointment.appointment_date >= date_from,
+                Appointment.appointment_date <= date_to,
+            )
+        )
+    ))
+
+    # Считаем записи по фамилии
+    appts_by_surname: dict[str, int] = {}
+    for a in appts:
+        s = a.administrator_surname
+        if s:
+            appts_by_surname[s] = appts_by_surname.get(s, 0) + 1
+
+    # Считаем конверсию для каждого оператора
+    result = []
+    total_incoming  = 0
+    total_appts     = 0
+
+    for uid, surname in OPERATOR_TO_SURNAME.items():
+        op_calls    = [c for c in calls if c.portal_user_id == uid]
+        incoming    = sum(1 for c in op_calls if c.is_incoming)
+        op_appts    = appts_by_surname.get(surname, 0)
+        conversion  = round(op_appts / incoming * 100, 1) if incoming else 0
+
+        full_name   = settings.LABVITA_OPERATORS.get(uid, surname)
+
+        result.append({
+            "operator_id": uid,
+            "name":        full_name,
+            "surname":     surname,
+            "incoming":    incoming,
+            "appointments": op_appts,
+            "conversion_pct": conversion,
+        })
+
+        total_incoming += incoming
+        total_appts    += op_appts
+
+    total_conversion = round(total_appts / total_incoming * 100, 1) if total_incoming else 0
+
+    return {
+        "date_from":   date_from,
+        "date_to":     date_to,
+        "operators":   result,
+        "total": {
+            "incoming":       total_incoming,
+            "appointments":   total_appts,
+            "conversion_pct": total_conversion,
+        },
     }
 
 
@@ -344,7 +422,7 @@ async def get_heatmap(
                                "missed": 0, "total": 0}
 
     for c in calls:
-        local_h  = (c.call_start_date.hour + 7) % 24
+        local_h   = (c.call_start_date.hour + 7) % 24
         shifted_h = c.call_start_date.hour + 7
         wd = (c.call_start_date.weekday() + (1 if shifted_h >= 24 else 0)) % 7
         key = (wd, local_h)
