@@ -21,21 +21,21 @@ type EditableMetric = "calls_incoming" | "calls_outgoing" | "appt_count";
 // ─── Модалка редактирования ───────────────────────────────────
 
 interface EditModalProps {
-  metric:    EditableMetric;
-  label:     string;
-  accent:    string;
-  year:      number;
-  month:     number;
-  onClose:   () => void;
-  onSaved:   () => void;
+  metric:  EditableMetric;
+  label:   string;
+  accent:  string;
+  year:    number;
+  month:   number;
+  onClose: () => void;
+  onSaved: () => void;
 }
 
 function EditModal({ metric, label, accent, year, month: initMonth, onClose, onSaved }: EditModalProps) {
   const [y, setY] = useState(year);
   const [m, setM] = useState(initMonth);
-  const [data, setData]     = useState<PlanMonthResponse | null>(null);
-  const [edited, setEdited] = useState<Record<string, number>>({});
-  const [saving, setSaving] = useState(false);
+  const [data, setData]       = useState<PlanMonthResponse | null>(null);
+  const [edited, setEdited]   = useState<Record<string, number>>({});
+  const [saving, setSaving]   = useState(false);
   const [fillVal, setFillVal] = useState("");
   const [showFill, setShowFill] = useState(false);
 
@@ -58,9 +58,7 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
   async function handleSave() {
     if (!data) return;
     setSaving(true);
-    const items = data.days.map(d => ({
-      date: d.date, metric, value: getValue(d),
-    }));
+    const items = data.days.map(d => ({ date: d.date, metric, value: getValue(d) }));
     await upsertPlans(items);
     setSaving(false);
     onSaved();
@@ -73,8 +71,7 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
     const lastDay  = new Date(y, m, 0).getDate();
     const dateTo   = `${y}-${String(m).padStart(2,"0")}-${String(lastDay).padStart(2,"0")}`;
     await fillPlans(dateFrom, dateTo, metric, Number(fillVal), false);
-    setFillVal("");
-    setShowFill(false);
+    setFillVal(""); setShowFill(false);
     await load();
   }
 
@@ -87,7 +84,6 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-background border border-border rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
 
-        {/* Шапка */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
           <h3 className="text-sm font-semibold">{label}</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -95,7 +91,6 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
           </button>
         </div>
 
-        {/* Навигация */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border flex-shrink-0">
           <button onClick={prevMonth} className="h-7 w-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted/40 transition-colors">
             <ChevronLeft className="h-3.5 w-3.5" />
@@ -106,16 +101,13 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
           </button>
         </div>
 
-        {/* Быстрое заполнение */}
         <div className="px-5 py-3 border-b border-border flex-shrink-0">
           {showFill ? (
             <div className="flex items-center gap-2">
-              <input
-                type="number" value={fillVal} onChange={e => setFillVal(e.target.value)}
+              <input type="number" value={fillVal} onChange={e => setFillVal(e.target.value)}
                 placeholder="Значение на каждый день"
                 className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-foreground/40"
-                autoFocus
-              />
+                autoFocus />
               <button onClick={applyFill} disabled={!fillVal}
                 className="px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium disabled:opacity-40">
                 Применить
@@ -132,7 +124,6 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
           )}
         </div>
 
-        {/* Таблица дней */}
         <div className="overflow-y-auto flex-1">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-background border-b border-border">
@@ -145,7 +136,6 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
             <tbody className="divide-y divide-border">
               {data?.days.map(day => {
                 const isWeekend = day.is_weekend;
-                const val = getValue(day);
                 return (
                   <tr key={day.date} className={isWeekend ? "bg-muted/20" : "hover:bg-muted/20 transition-colors"}>
                     <td className="px-5 py-1.5">
@@ -160,9 +150,7 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
                     </td>
                     <td className="px-3 py-1 text-right">
                       <EditableCell
-                        value={val}
-                        isWeekend={isWeekend}
-                        accent={accent}
+                        value={getValue(day)} isWeekend={isWeekend} accent={accent}
                         onChange={v => handleChange(day.date, v)}
                       />
                     </td>
@@ -179,7 +167,6 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
           </table>
         </div>
 
-        {/* Кнопки */}
         <div className="flex gap-2 px-5 py-4 border-t border-border flex-shrink-0">
           <button onClick={onClose}
             className="flex-1 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -196,16 +183,13 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
   );
 }
 
-// Редактируемая ячейка
 function EditableCell({ value, isWeekend, accent, onChange }: {
   value: number; isWeekend: boolean; accent: string; onChange: (v: number) => void;
 }) {
   const [local, setLocal] = useState(String(value || ""));
   useEffect(() => { setLocal(String(value || "")); }, [value]);
-
   return (
-    <input
-      type="number" value={local}
+    <input type="number" value={local}
       onChange={e => setLocal(e.target.value)}
       onBlur={() => onChange(Number(local) || 0)}
       onKeyDown={e => { if (e.key === "Enter") onChange(Number(local) || 0); }}
@@ -217,7 +201,6 @@ function EditableCell({ value, isWeekend, accent, onChange }: {
   );
 }
 
-// Модалка для % пропущенных
 function MissedPctModal({ value, onClose, onSaved }: {
   value: number; onClose: () => void; onSaved: (v: number) => void;
 }) {
@@ -266,8 +249,6 @@ function MissedPctModal({ value, onClose, onSaved }: {
   );
 }
 
-// ─── Карточка плана ───────────────────────────────────────────
-
 interface PlanCardProps {
   title:      string;
   icon:       React.ReactNode;
@@ -280,11 +261,9 @@ interface PlanCardProps {
 
 function PlanCard({ title, icon, accent, value, sub, clickable, onClick }: PlanCardProps) {
   return (
-    <div
-      onClick={clickable ? onClick : undefined}
+    <div onClick={clickable ? onClick : undefined}
       className={`rounded-xl border border-border bg-card p-4 flex flex-col gap-1.5 transition-colors
-        ${clickable ? "cursor-pointer hover:border-foreground/30 hover:bg-muted/20" : ""}`}
-    >
+        ${clickable ? "cursor-pointer hover:border-foreground/30 hover:bg-muted/20" : ""}`}>
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{title}</span>
         <div className="flex items-center gap-1.5">
@@ -302,11 +281,11 @@ function PlanCard({ title, icon, accent, value, sub, clickable, onClick }: PlanC
 
 export function PlansDashboard() {
   const now = new Date();
-  const [year]  = useState(now.getFullYear());
-  const [month] = useState(now.getMonth() + 1);
+  const [year, setYear]   = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
 
-  const [data, setData]         = useState<PlanMonthResponse | null>(null);
-  const [missedPct, setMissedPct] = useState(6);
+  const [data, setData]             = useState<PlanMonthResponse | null>(null);
+  const [missedPct, setMissedPct]   = useState(6);
   const [openMetric, setOpenMetric] = useState<EditableMetric | null>(null);
   const [openMissed, setOpenMissed] = useState(false);
 
@@ -318,25 +297,32 @@ export function PlansDashboard() {
 
   useEffect(() => { load(); }, [year, month]);
 
-  const totals = data?.totals ?? { calls_incoming: 0, calls_outgoing: 0, appt_count: 0 };
+  function prevMonth() {
+    if (month === 1) { setYear(y => y - 1); setMonth(12); }
+    else setMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (month === 12) { setYear(y => y + 1); setMonth(1); }
+    else setMonth(m => m + 1);
+  }
+
+  const totals     = data?.totals ?? { calls_incoming: 0, calls_outgoing: 0, appt_count: 0 };
   const totalCalls = totals.calls_incoming + totals.calls_outgoing;
 
   const MODAL_META: Record<EditableMetric, { label: string; accent: string }> = {
-    calls_incoming: { label: "Входящие звонки",   accent: "text-emerald-500" },
-    calls_outgoing: { label: "Исходящие звонки",  accent: "text-blue-500"    },
-    appt_count:     { label: "Записей в день",     accent: "text-purple-500"  },
+    calls_incoming: { label: "Входящие звонки",  accent: "text-emerald-500" },
+    calls_outgoing: { label: "Исходящие звонки", accent: "text-blue-500"    },
+    appt_count:     { label: "Записей в день",   accent: "text-purple-500"  },
   };
 
   return (
     <div className="space-y-5">
-      {/* Модалки */}
       {openMetric && (
         <EditModal
           metric={openMetric}
           label={MODAL_META[openMetric].label}
           accent={MODAL_META[openMetric].accent}
-          year={year}
-          month={month}
+          year={year} month={month}
           onClose={() => setOpenMetric(null)}
           onSaved={load}
         />
@@ -349,15 +335,30 @@ export function PlansDashboard() {
         />
       )}
 
-      {/* Шапка */}
-      <div>
-        <h1 className="text-base font-semibold">Плановые показатели</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {MONTH_NAMES[month-1]} {year} · нажмите на карточку чтобы редактировать
-        </p>
+      {/* Шапка с навигацией */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-base font-semibold">Плановые показатели</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            нажмите на карточку чтобы редактировать
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={prevMonth}
+            className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted/40 transition-colors">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-medium min-w-36 text-center">
+            {MONTH_NAMES[month-1]} {year}
+          </span>
+          <button onClick={nextMonth}
+            className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted/40 transition-colors">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Карточки — Звонки */}
+      {/* Звонки */}
       <div>
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Звонки</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -384,7 +385,7 @@ export function PlansDashboard() {
         </div>
       </div>
 
-      {/* Карточки — Записи */}
+      {/* Записи */}
       <div>
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Записи</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
