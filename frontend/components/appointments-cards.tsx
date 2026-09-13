@@ -2,34 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { StatCard } from "@/components/stat-card";
-import { AdminAppointmentStats, fetchPlanRange, PlanRangeResponse } from "@/lib/api";
-import { CalendarCheck, CalendarX, UserPlus, Phone } from "lucide-react";
+import {
+  AdminAppointmentStats, GroupBreakdownItem,
+  fetchPlanRange, PlanRangeResponse,
+} from "@/lib/api";
+import { CalendarCheck, CalendarX, UserPlus, Phone, Users } from "lucide-react";
 
 interface AppointmentCardsProps {
   stats:    AdminAppointmentStats;
+  byGroup:  Record<string, GroupBreakdownItem>;
   dateFrom: string;
   dateTo:   string;
 }
 
-export function AppointmentCards({ stats: s, dateFrom, dateTo }: AppointmentCardsProps) {
+const GROUP_ORDER  = ["callcenter", "admin", "other", "unknown"] as const;
+const GROUP_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
+  callcenter: { bar: "bg-blue-500",    text: "text-blue-500",    bg: "bg-blue-500/10"    },
+  admin:      { bar: "bg-emerald-500", text: "text-emerald-500", bg: "bg-emerald-500/10" },
+  other:      { bar: "bg-purple-500",  text: "text-purple-500",  bg: "bg-purple-500/10"  },
+  unknown:    { bar: "bg-muted",       text: "text-muted-foreground", bg: "bg-muted/30"  },
+};
+
+export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: AppointmentCardsProps) {
   const [plan, setPlan] = useState<PlanRangeResponse | null>(null);
 
   useEffect(() => {
     fetchPlanRange(dateFrom, dateTo).then(setPlan).catch(() => {});
   }, [dateFrom, dateTo]);
 
-  // Считаем кол-во рабочих дней в периоде для среднего
-  const spanDays = Math.max(
-    1,
-    Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86400000) + 1
-  );
-
-  // Суммарный план записей за период = план_в_день * кол-во_дней_с_планом
   const apptPlanTotal = plan?.totals.appt_count ?? 0;
   const apptPlanPct   = apptPlanTotal > 0 ? Math.round(s.total / apptPlanTotal * 100) : null;
 
+  const hasGroups = Object.keys(byGroup).length > 0;
+
   return (
     <div className="space-y-3">
+      {/* Основные карточки */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           title="Всего записей" value={s.total} sub="за период"
@@ -53,12 +61,8 @@ export function AppointmentCards({ stats: s, dateFrom, dateTo }: AppointmentCard
           accent="purple" icon={<UserPlus className="h-4 w-4 text-purple-500" />}
         />
       </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatCard
-          title="Колл-центр" value={s.callcenter_total}
-          sub={`${s.total > 0 ? Math.round(s.callcenter_total / s.total * 100) : 0}% всех записей`}
-          accent="blue" icon={<Phone className="h-4 w-4 text-blue-500" />}
-        />
         <StatCard
           title="Отмены" value={s.cancels} sub="отменено пациентами"
           icon={<CalendarX className="h-4 w-4 text-muted-foreground" />}
@@ -68,6 +72,50 @@ export function AppointmentCards({ stats: s, dateFrom, dateTo }: AppointmentCard
           icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
         />
       </div>
+
+      {/* Разбивка по источникам записей */}
+      {hasGroups && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Источники записей</span>
+            <span className="text-xs text-muted-foreground ml-auto">всего {s.total}</span>
+          </div>
+
+          <div className="space-y-3">
+            {GROUP_ORDER.map(group => {
+              const item = byGroup[group];
+              if (!item) return null;
+              const colors = GROUP_COLORS[group];
+              return (
+                <div key={group}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${colors.bg} ${colors.text}`}>
+                        {item.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-sm font-semibold font-mono ${colors.text}`}>
+                        {item.count}
+                      </span>
+                      <span className="text-xs text-muted-foreground w-10 text-right">
+                        {item.pct}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${colors.bar}`}
+                      style={{ width: `${item.pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
