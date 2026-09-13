@@ -175,6 +175,12 @@ export function fetchComparison(dateFrom: string, dateTo: string, metric: Compar
 
 // ─── МедОДС ──────────────────────────────────────────────────
 
+export interface GroupBreakdownItem {
+  count: number;
+  pct:   number;
+  label: string;
+}
+
 export interface AdminAppointmentStats {
   name:             string;
   group:            "callcenter" | "admin" | "other";
@@ -213,6 +219,7 @@ export interface AppointmentStatsResponse {
   date_from: string;
   date_to:   string;
   total:     AdminAppointmentStats;
+  by_group:  Record<string, GroupBreakdownItem>;
   by_admin:  Record<string, AdminAppointmentStats>;
 }
 
