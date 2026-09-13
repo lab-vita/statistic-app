@@ -85,6 +85,38 @@ def _stats_from_appts(appts: list) -> dict:
     }
 
 
+def _group_breakdown(appts: list, total: int) -> dict:
+    """Разбивка записей по группам сотрудников."""
+    groups: dict[str, int] = {
+        "callcenter": 0,
+        "admin":      0,
+        "other":      0,
+        "unknown":    0,
+    }
+    for a in appts:
+        surname    = a.administrator_surname
+        group_info = settings.ADMIN_GROUPS.get(surname, None) if surname else None
+        group      = group_info["group"] if group_info else "unknown"
+        groups[group] = groups.get(group, 0) + 1
+
+    GROUP_LABELS = {
+        "callcenter": "Колл-центр",
+        "admin":      "Администраторы",
+        "other":      "Прочие",
+        "unknown":    "Не указан",
+    }
+
+    return {
+        g: {
+            "count": cnt,
+            "pct":   round(cnt / total * 100, 1) if total else 0,
+            "label": GROUP_LABELS.get(g, g),
+        }
+        for g, cnt in groups.items()
+        if cnt > 0  # не показываем пустые группы
+    }
+
+
 def _add_deltas(curr: dict, prev: dict) -> dict:
     result = dict(curr)
     for key in ("total", "visits", "noshow", "new_patients", "callcenter_total",
@@ -128,6 +160,9 @@ async def get_stats(
     curr_total = _stats_from_appts(curr_appts)
     prev_total = _stats_from_appts(prev_appts)
 
+    # Разбивка по группам (только для общей статистики, без фильтра по сотруднику)
+    by_group = _group_breakdown(curr_appts, curr_total["total"]) if not admin_surname else {}
+
     # По администраторам с дельтами
     by_admin: dict = {}
     all_surnames = {a.administrator_surname for a in curr_appts if a.administrator_surname}
@@ -138,9 +173,9 @@ async def get_stats(
         curr_s = _stats_from_appts(curr_sub)
         prev_s = _stats_from_appts(prev_sub)
         by_admin[surname] = {
-            "name":         surname,
-            "group":        group_info["group"],
-            "group_label":  group_info["label"],
+            "name":          surname,
+            "group":         group_info["group"],
+            "group_label":   group_info["label"],
             "is_callcenter": group_info["group"] == "callcenter",
             **_add_deltas(curr_s, prev_s),
         }
@@ -151,6 +186,7 @@ async def get_stats(
         "prev_from": prev_from,
         "prev_to":   prev_to,
         "total":     _add_deltas(curr_total, prev_total),
+        "by_group":  by_group,
         "by_admin":  by_admin,
     }
 
