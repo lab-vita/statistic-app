@@ -139,3 +139,27 @@ async def fetch_appointments(
             break
 
     return all_records
+
+
+def _format_period(d: date) -> str:
+    MONTHS = ["", "января", "февраля", "марта", "апреля", "мая", "июня",
+              "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+    return f"{d.day} {MONTHS[d.month]} {d.year}"
+
+
+async def fetch_payment_types(client: httpx.AsyncClient, day: date) -> list[dict]:
+    period_str = f"{_format_period(day)} - {_format_period(day)}"
+    resp = await client.post(
+        f"{settings.MEDODS_URL}/reports/create_payment_types",
+        data={
+            "authenticity_token": "",
+            "report[clinic_id]":  settings.MEDODS_CLINIC_ID,
+            "report[period]":     period_str,
+            "report[page]":       "1",
+            "report[per_page]":   "1000",
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    if resp.status_code != 200:
+        raise Exception(f"payment_types [{day}]: {resp.status_code} — {resp.text[:200]}")
+    return resp.json().get("data", [])

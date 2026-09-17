@@ -16,6 +16,7 @@ from app.db.database import async_session_factory
 from app.services.collector import collect_calls
 from app.services.medods_collector import collect_appointments
 from app.services.payments_collector import collect_payments
+from app.services.revenue_collector import collect_revenue
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,16 @@ async def _sync_today() -> None:
     async with async_session_factory() as db:
         try:
             pay_count = await collect_payments(db, today, today)
-            logger.info(f"[scheduler] Выручка: {pay_count} типов оплат обновлено")
+            logger.info(f"[scheduler] Выручка (payments): {pay_count} типов оплат обновлено")
         except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора выручки: {e}")
+            logger.error(f"[scheduler] Ошибка сбора выручки (payments): {e}")
+
+    async with async_session_factory() as db:
+        try:
+            rev_results = await collect_revenue(db, today, today)
+            logger.info(f"[scheduler] Выручка (revenue): {rev_results}")
+        except Exception as e:
+            logger.error(f"[scheduler] Ошибка сбора выручки (revenue): {e}")
 
 
 def create_scheduler() -> AsyncIOScheduler:
