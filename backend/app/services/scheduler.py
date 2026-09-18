@@ -17,6 +17,8 @@ from app.services.collector import collect_calls
 from app.services.medods_collector import collect_appointments
 from app.services.payments_collector import collect_payments
 from app.services.revenue_collector import collect_revenue
+from app.services.payment_detail_collector import collect_payment_details
+from app.services.sales_collector import collect_sales
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +47,30 @@ async def _sync_today() -> None:
     async with async_session_factory() as db:
         try:
             pay_count = await collect_payments(db, today, today)
-            logger.info(f"[scheduler] Выручка (payments): {pay_count} типов оплат обновлено")
+            logger.info(f"[scheduler] Payments: {pay_count} типов оплат")
         except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора выручки (payments): {e}")
+            logger.error(f"[scheduler] Ошибка сбора payments: {e}")
 
     async with async_session_factory() as db:
         try:
             rev_results = await collect_revenue(db, today, today)
-            logger.info(f"[scheduler] Выручка (revenue): {rev_results}")
+            logger.info(f"[scheduler] Revenue: {rev_results}")
         except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора выручки (revenue): {e}")
+            logger.error(f"[scheduler] Ошибка сбора revenue: {e}")
+
+    async with async_session_factory() as db:
+        try:
+            pd_stats = await collect_payment_details(db, today, today)
+            logger.info(f"[scheduler] PaymentDetails: {pd_stats}")
+        except Exception as e:
+            logger.error(f"[scheduler] Ошибка сбора payment_details: {e}")
+
+    async with async_session_factory() as db:
+        try:
+            sales_stats = await collect_sales(db, today, today)
+            logger.info(f"[scheduler] Sales: {sales_stats}")
+        except Exception as e:
+            logger.error(f"[scheduler] Ошибка сбора sales: {e}")
 
 
 def create_scheduler() -> AsyncIOScheduler:
