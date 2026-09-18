@@ -56,18 +56,20 @@ def _months(date_from: date, date_to: date):
 # ---------------------------------------------------------------------------
 
 async def _calls_fill_from(db, chunk_from: date, chunk_to: date):
-    from sqlalchemy import select, func
+    """Call хранит DateTime, приводим к date через cast."""
+    from sqlalchemy import select, func, cast, Date
     from app.models.call import Call
     max_date = await db.scalar(
-        select(func.max(Call.call_date)).where(
-            Call.call_date >= chunk_from, Call.call_date <= chunk_to
+        select(func.max(cast(Call.call_start_date, Date))).where(
+            cast(Call.call_start_date, Date) >= chunk_from,
+            cast(Call.call_start_date, Date) <= chunk_to,
         )
     )
     if max_date is None:
-        return chunk_from           # нет данных — грузим всё
+        return chunk_from
     if max_date >= chunk_to:
-        return None                 # покрыто полностью
-    return max_date + timedelta(days=1)  # дозаполняем с пропущенного дня
+        return None
+    return max_date + timedelta(days=1)
 
 
 async def _appointments_fill_from(db, chunk_from: date, chunk_to: date):
