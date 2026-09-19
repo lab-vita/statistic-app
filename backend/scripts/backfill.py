@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 DATE_FROM     = date(2026, 1, 1)
 DATE_TO       = date.today()
-CHUNK_DAYS    = 7   # для подневных данных
-REVENUE_CHUNK = 30  # для revenue / payment_details
+CHUNK_DAYS    = 7
+REVENUE_CHUNK = 30
 
 
 def _chunks(date_from: date, date_to: date, days: int):
@@ -50,13 +50,7 @@ def _months(date_from: date, date_to: date):
         d = next_m
 
 
-# ---------------------------------------------------------------------------
-# Функции определения "с какой даты догружать"
-# Возвращают None если чанк полностью покрыт, иначе дату начала дозагрузки.
-# ---------------------------------------------------------------------------
-
-async def _calls_fill_from(db, chunk_from: date, chunk_to: date):
-    """Call хранит DateTime, приводим к date через cast."""
+async def _calls_fill_from(db, chunk_from, chunk_to):
     from sqlalchemy import select, func, cast, Date
     from app.models.call import Call
     max_date = await db.scalar(
@@ -65,14 +59,12 @@ async def _calls_fill_from(db, chunk_from: date, chunk_to: date):
             cast(Call.call_start_date, Date) <= chunk_to,
         )
     )
-    if max_date is None:
-        return chunk_from
-    if max_date >= chunk_to:
-        return None
+    if max_date is None: return chunk_from
+    if max_date >= chunk_to: return None
     return max_date + timedelta(days=1)
 
 
-async def _appointments_fill_from(db, chunk_from: date, chunk_to: date):
+async def _appointments_fill_from(db, chunk_from, chunk_to):
     from sqlalchemy import select, func
     from app.models.appointment import Appointment
     max_date = await db.scalar(
@@ -81,30 +73,12 @@ async def _appointments_fill_from(db, chunk_from: date, chunk_to: date):
             Appointment.appointment_date <= chunk_to,
         )
     )
-    if max_date is None:
-        return chunk_from
-    if max_date >= chunk_to:
-        return None
+    if max_date is None: return chunk_from
+    if max_date >= chunk_to: return None
     return max_date + timedelta(days=1)
 
 
-async def _payments_fill_from(db, chunk_from: date, chunk_to: date):
-    from sqlalchemy import select, func
-    from app.models.payment import Payment
-    max_date = await db.scalar(
-        select(func.max(Payment.payment_date)).where(
-            Payment.payment_date >= chunk_from,
-            Payment.payment_date <= chunk_to,
-        )
-    )
-    if max_date is None:
-        return chunk_from
-    if max_date >= chunk_to:
-        return None
-    return max_date + timedelta(days=1)
-
-
-async def _revenue_fill_from(db, chunk_from: date, chunk_to: date):
+async def _revenue_fill_from(db, chunk_from, chunk_to):
     from sqlalchemy import select, func
     from app.models.revenue import Revenue
     max_date = await db.scalar(
@@ -113,14 +87,12 @@ async def _revenue_fill_from(db, chunk_from: date, chunk_to: date):
             Revenue.revenue_date <= chunk_to,
         )
     )
-    if max_date is None:
-        return chunk_from
-    if max_date >= chunk_to:
-        return None
+    if max_date is None: return chunk_from
+    if max_date >= chunk_to: return None
     return max_date + timedelta(days=1)
 
 
-async def _payment_details_fill_from(db, chunk_from: date, chunk_to: date):
+async def _payment_details_fill_from(db, chunk_from, chunk_to):
     from sqlalchemy import select, func
     from app.models.payment_detail import PaymentDetail
     max_date = await db.scalar(
@@ -129,15 +101,12 @@ async def _payment_details_fill_from(db, chunk_from: date, chunk_to: date):
             PaymentDetail.payment_date <= chunk_to,
         )
     )
-    if max_date is None:
-        return chunk_from
-    if max_date >= chunk_to:
-        return None
+    if max_date is None: return chunk_from
+    if max_date >= chunk_to: return None
     return max_date + timedelta(days=1)
 
 
-async def _sales_covered(db, month_start: date) -> bool:
-    """Sales — агрегат за месяц целиком, проверяем просто наличие записей."""
+async def _sales_covered(db, month_start):
     from sqlalchemy import select, func
     from app.models.sale import Sale
     count = await db.scalar(
@@ -146,13 +115,9 @@ async def _sales_covered(db, month_start: date) -> bool:
     return (count or 0) > 0
 
 
-# ---------------------------------------------------------------------------
-# Секции бэкфилла
-# ---------------------------------------------------------------------------
-
 async def run_calls(session_factory) -> None:
     from app.services.collector import collect_calls
-    logger.info("\n--- [1/6] ЗВОНКИ ---")
+    logger.info("\n--- [1/5] ЗВОНКИ ---")
     for chunk_from, chunk_to in _chunks(DATE_FROM, DATE_TO, CHUNK_DAYS):
         async with session_factory() as db:
             fill_from = await _calls_fill_from(db, chunk_from, chunk_to)
@@ -172,7 +137,7 @@ async def run_calls(session_factory) -> None:
 
 async def run_appointments(session_factory) -> None:
     from app.services.medods_collector import collect_appointments
-    logger.info("\n--- [2/6] ЗАПИСИ ---")
+    logger.info("\n--- [2/5] ЗАПИСИ ---")
     for chunk_from, chunk_to in _chunks(DATE_FROM, DATE_TO, CHUNK_DAYS):
         async with session_factory() as db:
             fill_from = await _appointments_fill_from(db, chunk_from, chunk_to)
@@ -190,29 +155,9 @@ async def run_appointments(session_factory) -> None:
         await asyncio.sleep(1.0)
 
 
-async def run_payments(session_factory) -> None:
-    from app.services.payments_collector import collect_payments
-    logger.info("\n--- [3/6] PAYMENTS ---")
-    for chunk_from, chunk_to in _chunks(DATE_FROM, DATE_TO, CHUNK_DAYS):
-        async with session_factory() as db:
-            fill_from = await _payments_fill_from(db, chunk_from, chunk_to)
-        if fill_from is None:
-            logger.info(f"  [{chunk_from} – {chunk_to}] покрыто, пропуск")
-            continue
-        if fill_from > chunk_from:
-            logger.info(f"  [{chunk_from} – {chunk_to}] дозагружаем с {fill_from}")
-        try:
-            async with session_factory() as db:
-                count = await collect_payments(db, fill_from, chunk_to)
-            logger.info(f"  [{fill_from} – {chunk_to}] {count} типов")
-        except Exception as e:
-            logger.error(f"  [{fill_from} – {chunk_to}] ОШИБКА: {e}")
-        await asyncio.sleep(0.5)
-
-
 async def run_revenue(session_factory) -> None:
     from app.services.revenue_collector import collect_revenue
-    logger.info("\n--- [4/6] REVENUE ---")
+    logger.info("\n--- [3/5] REVENUE ---")
     for chunk_from, chunk_to in _chunks(DATE_FROM, DATE_TO, REVENUE_CHUNK):
         async with session_factory() as db:
             fill_from = await _revenue_fill_from(db, chunk_from, chunk_to)
@@ -232,7 +177,7 @@ async def run_revenue(session_factory) -> None:
 
 async def run_payment_details(session_factory) -> None:
     from app.services.payment_detail_collector import collect_payment_details
-    logger.info("\n--- [5/6] PAYMENT DETAILS ---")
+    logger.info("\n--- [4/5] PAYMENT DETAILS ---")
     for chunk_from, chunk_to in _chunks(DATE_FROM, DATE_TO, REVENUE_CHUNK):
         async with session_factory() as db:
             fill_from = await _payment_details_fill_from(db, chunk_from, chunk_to)
@@ -255,7 +200,7 @@ async def run_payment_details(session_factory) -> None:
 
 async def run_sales(session_factory) -> None:
     from app.services.sales_collector import collect_sales
-    logger.info("\n--- [6/6] SALES ---")
+    logger.info("\n--- [5/5] SALES ---")
     for d_from, d_to in _months(DATE_FROM, DATE_TO):
         async with session_factory() as db:
             covered = await _sales_covered(db, d_from)
@@ -274,10 +219,6 @@ async def run_sales(session_factory) -> None:
         await asyncio.sleep(2.0)
 
 
-# ---------------------------------------------------------------------------
-# Главная функция
-# ---------------------------------------------------------------------------
-
 async def main() -> None:
     from app.db.database import engine, Base, async_session_factory
 
@@ -288,7 +229,6 @@ async def main() -> None:
 
     await run_calls(async_session_factory)
     await run_appointments(async_session_factory)
-    await run_payments(async_session_factory)
     await run_revenue(async_session_factory)
     await run_payment_details(async_session_factory)
     await run_sales(async_session_factory)
