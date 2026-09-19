@@ -1,12 +1,14 @@
 """
 Коллектор продаж по номенклатуре через ActionCable WebSocket МедОДС.
 
-Механизм:
-  1. POST /api/internal/analytics/reports/sales → {request_id}
-  2. Сервер шлёт данные батчами через WebSocket (wss://.../_ ws)
-     на канал по протоколу ActionCable
-  3. Каждый батч — список batch[] с type="data" | type="total"
-  4. Конец — сообщение data="eof" с meta.request_id
+Механизм (выяснен через отладку):
+  1. Открываем WebSocket wss://.../_ ws
+  2. Подписываемся на ReportChannel + UserChannel
+  3. Ждём handshake (type=report, meta.type=handshake)
+  4. Только ПОСЛЕ handshake делаем POST → получаем request_id
+  5. МедОДС шлёт батчи на оба канала одновременно — читаем только ReportChannel
+  6. message.data — строка JSON с {"batch": [...]}
+  7. Конец — message.data == "eof" с meta.request_id
 
 Зависимости:
   pip install websockets
@@ -30,8 +32,9 @@ from app.services.medods import login
 
 logger = logging.getLogger(__name__)
 
-_WS_TIMEOUT  = 60   # секунд ждать eof
+_WS_TIMEOUT  = 120  # секунд ждать eof после POST
 _WS_URL_PATH = "/_ws"
+_READ_CHANNEL = "ReportChannel"  # UserChannel дублирует — читаем только один
 
 
 def _fmt_period(d_from: date, d_to: date) -> str:
@@ -43,11 +46,7 @@ def _fmt_period(d_from: date, d_to: date) -> str:
 
 
 def _ws_connect(ws_url: str, cookie_header: str):
-    """
-    Совместимый вызов websockets.connect для разных версий библиотеки:
-      < 10.x  — extra_headers
-      >= 10.x — additional_headers
-    """
+    """Совместимый вызов для разных версий websockets."""
     ver = tuple(int(x) for x in websockets.__version__.split(".")[:2])
     header_key = "additional_headers" if ver >= (10, 0) else "extra_headers"
     return websockets.connect(
@@ -90,23 +89,22 @@ async def _post_sales_report(client, date_from: date, date_to: date) -> str:
     return request_id
 
 
-async def _collect_via_websocket(cookies: dict, request_id: str) -> list[dict]:
+async def _collect_via_websocket(
+    client,
+    date_from: date,
+    date_to: date,
+) -> list[dict]:
     """
-    Подключается к ActionCable WebSocket, собирает батчи до eof.
+    Полный цикл: открываем WS → handshake → POST → собираем батчи → eof.
     Возвращает список entry из type="data" батчей.
     """
     base = settings.MEDODS_URL.replace("https://", "").replace("http://", "")
     ws_url = f"wss://{base}{_WS_URL_PATH}"
-    cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
+    cookie_header = "; ".join(f"{k}={v}" for k, v in dict(client.cookies).items())
 
     entries: list[dict] = []
-    seen_eof = False
 
     async with _ws_connect(ws_url, cookie_header) as ws:
-        # Ждём welcome
-        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
-        if msg.get("type") != "welcome":
-            raise Exception(f"ActionCable: ожидал welcome, получил: {msg}")
 
         # Подписываемся на оба канала
         for channel in ("ReportChannel", "UserChannel"):
@@ -115,21 +113,26 @@ async def _collect_via_websocket(cookies: dict, request_id: str) -> list[dict]:
                 "identifier": json.dumps({"channel": channel}),
             }))
 
-        # Ждём подтверждений
-        confirmed = set()
+        # Ждём handshake перед POST
+        handshake_count = 0
         deadline = asyncio.get_event_loop().time() + 15
-        while len(confirmed) < 2:
+        while handshake_count < 1:
             remaining = deadline - asyncio.get_event_loop().time()
             if remaining <= 0:
-                break
+                raise Exception("[sales] Timeout ожидания handshake")
             raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
             m = json.loads(raw)
-            if m.get("type") == "confirm_subscription":
-                confirmed.add(m.get("identifier", ""))
+            msg = m.get("message") or {}
+            if isinstance(msg, dict) and msg.get("meta", {}).get("type") == "handshake":
+                handshake_count += 1
+                logger.info(f"[sales] Handshake получен, делаем POST")
 
-        logger.info(f"[sales] WebSocket подписки подтверждены: {confirmed}")
+        # POST — только после handshake
+        request_id = await _post_sales_report(client, date_from, date_to)
+        logger.info(f"[sales] request_id={request_id} за {date_from}–{date_to}")
 
-        # Собираем до eof
+        # Собираем батчи до eof
+        seen_eof = False
         deadline = asyncio.get_event_loop().time() + _WS_TIMEOUT
         while not seen_eof:
             remaining = deadline - asyncio.get_event_loop().time()
@@ -139,25 +142,30 @@ async def _collect_via_websocket(cookies: dict, request_id: str) -> list[dict]:
             raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
             m = json.loads(raw)
 
-            if m.get("type") in ("ping", "welcome", "confirm_subscription"):
+            # Пропускаем ping
+            if m.get("type") == "ping":
                 continue
 
-            # Обрабатываем только ReportChannel
-            if '"ReportChannel"' not in m.get("identifier", ""):
+            # Читаем только ReportChannel чтобы не дублировать
+            if f'"channel": "{_READ_CHANNEL}"' not in m.get("identifier", "") \
+               and f'"channel":"{_READ_CHANNEL}"' not in m.get("identifier", ""):
                 continue
 
-            message = m.get("message", {})
+            message = m.get("message")
             if not isinstance(message, dict):
                 continue
 
             data = message.get("data")
 
+            # EOF
             if data == "eof":
-                if message.get("meta", {}).get("request_id") == request_id:
+                meta = message.get("meta", {})
+                if meta.get("request_id") == request_id:
                     seen_eof = True
-                    logger.info(f"[sales] Получен eof для request_id={request_id}")
+                    logger.info(f"[sales] EOF получен, всего entry: {len(entries)}")
                 continue
 
+            # Батч — data это строка JSON
             if isinstance(data, str):
                 try:
                     batch_obj = json.loads(data)
@@ -185,13 +193,10 @@ async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dic
     stats = {"fetched": 0, "created": 0, "updated": 0}
 
     try:
-        cookies = dict(client.cookies)
-        request_id = await _post_sales_report(client, date_from, date_to)
-        logger.info(f"[sales] request_id={request_id} за {date_from}–{date_to}")
+        entries = await _collect_via_websocket(client, date_from, date_to)
     finally:
         await client.aclose()
 
-    entries = await _collect_via_websocket(cookies, request_id)
     stats["fetched"] = len(entries)
     logger.info(f"[sales] Получено {len(entries)} записей продаж")
 
