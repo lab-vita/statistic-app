@@ -32,7 +32,7 @@ async def export_table(session_factory, filename: str, query, columns: list[str]
 
 
 async def main():
-    from sqlalchemy import select, text
+    from sqlalchemy import select
     from app.db.database import engine, Base, async_session_factory
 
     print(f"=== ЭКСПОРТ CSV: {datetime.now():%Y-%m-%d %H:%M} ===\n")
@@ -42,10 +42,10 @@ async def main():
 
     from app.models.call import Call
     from app.models.appointment import Appointment
-    from app.models.payment import Payment
     from app.models.revenue import Revenue
     from app.models.payment_detail import PaymentDetail
     from app.models.sale import Sale
+    from app.models.service import Service, ServiceCategory
 
     # 1. Звонки
     await export_table(
@@ -83,18 +83,7 @@ async def main():
          "services_json", "created_at_medods"],
     )
 
-    # 3. Payments (агрегат по типам оплат)
-    await export_table(
-        async_session_factory,
-        "payments.csv",
-        select(
-            Payment.id, Payment.payment_date, Payment.payment_type,
-            Payment.amount, Payment.total_sum, Payment.percent,
-        ).order_by(Payment.payment_date, Payment.payment_type),
-        ["id", "payment_date", "payment_type", "amount", "total_sum", "percent"],
-    )
-
-    # 4. Revenue (агрегат по типам оплат из create_payment_types)
+    # 3. Revenue (агрегат по типам оплат)
     await export_table(
         async_session_factory,
         "revenue.csv",
@@ -105,7 +94,7 @@ async def main():
         ["id", "revenue_date", "payment_type", "amount", "total", "percent"],
     )
 
-    # 5. Payment details (детальные платежи)
+    # 4. Payment details (детальные платежи)
     await export_table(
         async_session_factory,
         "payment_details.csv",
@@ -125,7 +114,7 @@ async def main():
          "order_id", "order_sum", "order_date", "doctor_id", "doctor_name", "doctor_surname"],
     )
 
-    # 6. Sales (продажи по номенклатуре)
+    # 5. Sales (продажи по номенклатуре)
     await export_table(
         async_session_factory,
         "sales.csv",
@@ -135,6 +124,27 @@ async def main():
         ).order_by(Sale.sale_date, Sale.service_title),
         ["id", "sale_date", "service_title", "unit", "amount",
          "total_sum", "final_sum", "sum_percent"],
+    )
+
+    # 6. Справочник услуг
+    await export_table(
+        async_session_factory,
+        "services.csv",
+        select(
+            Service.id, Service.title, Service.category_id,
+            Service.price, Service.kind, Service.unit, Service.deleted,
+        ).order_by(Service.category_id, Service.title),
+        ["id", "title", "category_id", "price", "kind", "unit", "deleted"],
+    )
+
+    # 7. Категории услуг
+    await export_table(
+        async_session_factory,
+        "service_categories.csv",
+        select(
+            ServiceCategory.id, ServiceCategory.title, ServiceCategory.parent_id,
+        ).order_by(ServiceCategory.title),
+        ["id", "title", "parent_id"],
     )
 
     print(f"\n✅ Готово! Файлы в папке: {EXPORT_DIR.resolve()}")
