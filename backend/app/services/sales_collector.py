@@ -9,13 +9,12 @@
   4. Конец — сообщение data="eof" с meta.request_id
 
 Зависимости:
-  pip install websockets  (уже есть в большинстве сред)
+  pip install websockets
 """
 import asyncio
 import json
 import logging
-from datetime import date, timedelta
-from typing import AsyncIterator
+from datetime import date
 
 try:
     import websockets
@@ -31,9 +30,7 @@ from app.services.medods import login
 
 logger = logging.getLogger(__name__)
 
-# ActionCable каналы з которых приходят данные
-_REPORT_CHANNELS = {'{"channel":"ReportChannel"}', '{"channel":"UserChannel"}'}
-_WS_TIMEOUT = 60  # секунд ждать eof
+_WS_TIMEOUT  = 60   # секунд ждать eof
 _WS_URL_PATH = "/_ws"
 
 
@@ -45,11 +42,24 @@ def _fmt_period(d_from: date, d_to: date) -> str:
     return f"{fmt(d_from)} - {fmt(d_to)}"
 
 
-async def _post_sales_report(
-    client,
-    date_from: date,
-    date_to: date,
-) -> str:
+def _ws_connect(ws_url: str, cookie_header: str):
+    """
+    Совместимый вызов websockets.connect для разных версий библиотеки:
+      < 10.x  — extra_headers
+      >= 10.x — additional_headers
+    """
+    ver = tuple(int(x) for x in websockets.__version__.split(".")[:2])
+    header_key = "additional_headers" if ver >= (10, 0) else "extra_headers"
+    return websockets.connect(
+        ws_url,
+        ping_interval=20,
+        ping_timeout=30,
+        open_timeout=15,
+        **{header_key: {"Cookie": cookie_header}},
+    )
+
+
+async def _post_sales_report(client, date_from: date, date_to: date) -> str:
     """POST запрос на генерацию отчёта. Возвращает request_id."""
     resp = await client.post(
         f"{settings.MEDODS_URL}/api/internal/analytics/reports/sales",
@@ -80,32 +90,20 @@ async def _post_sales_report(
     return request_id
 
 
-async def _collect_via_websocket(
-    cookies: dict,
-    request_id: str,
-) -> list[dict]:
+async def _collect_via_websocket(cookies: dict, request_id: str) -> list[dict]:
     """
-    Подключается к ActionCable WebSocket, ждёт батчи с данными
-    до получения eof. Возвращает список записей entry.
+    Подключается к ActionCable WebSocket, собирает батчи до eof.
+    Возвращает список entry из type="data" батчей.
     """
-    # Базовый URL без https://
     base = settings.MEDODS_URL.replace("https://", "").replace("http://", "")
     ws_url = f"wss://{base}{_WS_URL_PATH}"
-
-    # Cookie для авторизации
     cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
 
     entries: list[dict] = []
     seen_eof = False
 
-    async with websockets.connect(
-        ws_url,
-        extra_headers={"Cookie": cookie_header},
-        ping_interval=20,
-        ping_timeout=30,
-        open_timeout=15,
-    ) as ws:
-        # ActionCable handshake: ждём welcome
+    async with _ws_connect(ws_url, cookie_header) as ws:
+        # Ждём welcome
         msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
         if msg.get("type") != "welcome":
             raise Exception(f"ActionCable: ожидал welcome, получил: {msg}")
@@ -117,7 +115,7 @@ async def _collect_via_websocket(
                 "identifier": json.dumps({"channel": channel}),
             }))
 
-        # Ждём подтверждения подписок
+        # Ждём подтверждений
         confirmed = set()
         deadline = asyncio.get_event_loop().time() + 15
         while len(confirmed) < 2:
@@ -131,27 +129,21 @@ async def _collect_via_websocket(
 
         logger.info(f"[sales] WebSocket подписки подтверждены: {confirmed}")
 
-        # Собираем сообщения до eof
+        # Собираем до eof
         deadline = asyncio.get_event_loop().time() + _WS_TIMEOUT
         while not seen_eof:
             remaining = deadline - asyncio.get_event_loop().time()
             if remaining <= 0:
                 raise Exception(f"[sales] Timeout: eof не получен за {_WS_TIMEOUT}с")
 
-            try:
-                raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
-            except asyncio.TimeoutError:
-                raise Exception(f"[sales] WebSocket timeout при ожидании батча")
-
+            raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
             m = json.loads(raw)
 
-            # Пропускаем ping и прочее
             if m.get("type") in ("ping", "welcome", "confirm_subscription"):
                 continue
 
-            identifier = m.get("identifier", "")
-            # Обрабатываем только ReportChannel (UserChannel дублирует данные)
-            if '"ReportChannel"' not in identifier:
+            # Обрабатываем только ReportChannel
+            if '"ReportChannel"' not in m.get("identifier", ""):
                 continue
 
             message = m.get("message", {})
@@ -160,22 +152,18 @@ async def _collect_via_websocket(
 
             data = message.get("data")
 
-            # eof — конец передачи
             if data == "eof":
-                meta = message.get("meta", {})
-                if meta.get("request_id") == request_id:
+                if message.get("meta", {}).get("request_id") == request_id:
                     seen_eof = True
                     logger.info(f"[sales] Получен eof для request_id={request_id}")
                 continue
 
-            # Батч данных
             if isinstance(data, str):
                 try:
                     batch_obj = json.loads(data)
                 except json.JSONDecodeError:
                     continue
-                batch = batch_obj.get("batch", [])
-                for item in batch:
+                for item in batch_obj.get("batch", []):
                     if item.get("type") == "data":
                         entry = item.get("data", {}).get("entry", {})
                         if entry:
@@ -184,17 +172,12 @@ async def _collect_via_websocket(
     return entries
 
 
-async def collect_sales(
-    db: AsyncSession,
-    date_from: date,
-    date_to: date,
-) -> dict:
+async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dict:
     """
     Собирает продажи по номенклатуре за период через WebSocket.
 
-    Важно: один запрос = весь период. Не делить на дни!
-    Данные приходят агрегированные за весь период,
-    поэтому сохраняем как sale_date=date_from.
+    Один запрос = весь период (данные агрегированы МедОДС).
+    Сохраняем с sale_date=date_from.
 
     Возвращает: {"fetched": N, "created": N, "updated": N}
     """
@@ -202,24 +185,16 @@ async def collect_sales(
     stats = {"fetched": 0, "created": 0, "updated": 0}
 
     try:
-        # Извлекаем куки из httpx-клиента для WS
         cookies = dict(client.cookies)
-
-        # POST → request_id
         request_id = await _post_sales_report(client, date_from, date_to)
         logger.info(f"[sales] request_id={request_id} за {date_from}–{date_to}")
-
     finally:
         await client.aclose()
 
-    # Получаем данные через WebSocket
     entries = await _collect_via_websocket(cookies, request_id)
     stats["fetched"] = len(entries)
     logger.info(f"[sales] Получено {len(entries)} записей продаж")
 
-    # Upsert: ключ (sale_date, service_title)
-    # Используем date_from как дату периода для простоты.
-    # Для ежедневного сбора date_from == date_to.
     for entry in entries:
         title = (entry.get("title") or "").strip()
         if not title:
