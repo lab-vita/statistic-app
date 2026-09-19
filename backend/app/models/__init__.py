@@ -4,3 +4,4 @@ from app.models.plan import Plan
 from app.models.revenue import Revenue
 from app.models.payment_detail import PaymentDetail
 from app.models.sale import Sale
+from app.models.service import Service, ServiceCategory
