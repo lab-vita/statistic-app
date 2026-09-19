@@ -28,23 +28,24 @@ async def main():
     ws_url = f"wss://{base}/_ws"
     cookie_header = "; ".join(f"{k}={v}" for k, v in cookies.items())
 
-    print(f"\n=== WebSocket: {ws_url} ===")
-    print("Печатаем все сообщения 90 секунд...\n")
+    print(f"\n=== WebSocket: {ws_url} ===\n")
 
     async with _ws_connect(ws_url, cookie_header) as ws:
-        # subscribe
+        # Подписываемся на стандартные каналы
         for channel in ("ReportChannel", "UserChannel"):
             await ws.send(json.dumps({
                 "command": "subscribe",
                 "identifier": json.dumps({"channel": channel}),
             }))
 
-        deadline = asyncio.get_event_loop().time() + 90
+        private_channel = None
+        deadline = asyncio.get_event_loop().time() + 120
         msg_count = 0
+
         while True:
             remaining = deadline - asyncio.get_event_loop().time()
             if remaining <= 0:
-                print("\n[timeout 90s]")
+                print("\n[timeout 120s]")
                 break
             try:
                 raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
@@ -64,27 +65,39 @@ async def main():
 
                 print(f"[{msg_count:03d}] type={t!r} identifier={identifier!r}")
                 if message is not None:
-                    msg_str = json.dumps(message, ensure_ascii=False)
-                    print(f"       message={msg_str[:300]}")
+                    print(f"       message={json.dumps(message, ensure_ascii=False)[:500]}")
 
-                # Если data - строка, попробуем распарсить
+                # Ловим wsid из handshake и подписываемся на приватный канал
                 if isinstance(message, dict):
+                    meta = message.get("meta", {})
+                    wsid = meta.get("wsid")
+                    if wsid and wsid != private_channel:
+                        private_channel = wsid
+                        print(f"\n>>> Найден приватный канал: {wsid}")
+                        print(f">>> Подписываемся...\n")
+                        await ws.send(json.dumps({
+                            "command": "subscribe",
+                            "identifier": json.dumps({"channel": wsid}),
+                        }))
+
+                    # Смотрим data
                     data = message.get("data")
-                    if isinstance(data, str) and data != "eof":
-                        try:
-                            parsed = json.loads(data)
-                            batch = parsed.get("batch", [])
-                            print(f"       → batch: {len(batch)} items, "
-                                  f"types={list({i.get('type') for i in batch})}")
-                        except Exception:
-                            print(f"       → data (str, not json): {data[:100]}")
-                    elif data == "eof":
-                        meta = message.get("meta", {})
-                        print(f"       *** EOF *** meta={meta}")
+                    if isinstance(data, str):
+                        if data == "eof":
+                            print(f"       *** EOF *** meta={meta}")
+                        else:
+                            try:
+                                parsed = json.loads(data)
+                                batch = parsed.get("batch", [])
+                                print(f"       → batch: {len(batch)} items, "
+                                      f"types={list({i.get('type') for i in batch})}")
+                                if batch:
+                                    print(f"       → первый: {json.dumps(batch[0], ensure_ascii=False)[:300]}")
+                            except Exception:
+                                print(f"       → data(str): {data[:200]}")
 
             except Exception as e:
-                print(f"[{msg_count:03d}] RAW ({len(raw)} bytes): {raw[:200]}")
-                print(f"       parse error: {e}")
+                print(f"[{msg_count:03d}] RAW: {raw[:200]}, error: {e}")
 
     print(f"\nИтого сообщений: {msg_count}")
 
