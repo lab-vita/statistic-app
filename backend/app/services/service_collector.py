@@ -1,20 +1,20 @@
 """
 Коллектор справочника услуг из МедОДС.
 
-Алгоритм:
-  1. POST /categories/entry_types с id=373 (корень) → список категорий
-  2. Для каждой категории POST с её id → список услуг
-  3. Upsert ServiceCategory и Service по medods id
+Алгоритм (рекурсивный обход дерева категорий):
+  1. POST /categories/entry_types с id=373 (корень «Лабвита»)
+  2. Сохраняем текущую категорию и её услуги (items)
+  3. Для каждой подкатегории (catalogs) — рекурсивно повторяем п.1-3
+  4. Upsert ServiceCategory и Service по medods id
 
-Запускать вручную при обновлении прайса или добавлении новых услуг.
-Автоматически в планировщике не нужен — справочник меняется редко.
+Запускать вручную при обновлении прайса:
+  POST /api/services/sync
 """
 import logging
 from datetime import datetime
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.core.config import settings
 from app.models.service import Service, ServiceCategory
@@ -58,18 +58,14 @@ async def _upsert_category(db: AsyncSession, cat: dict) -> None:
 async def _upsert_service(db: AsyncSession, item: dict) -> None:
     existing = await db.get(Service, item["id"])
     now = datetime.utcnow()
-    unit = None
-    mu = item.get("measure_unit")
-    if mu:
-        unit = mu.get("short_title")
-
+    mu = item.get("measure_unit") or {}
     vals = dict(
         title       = item["title"],
         category_id = item.get("category_id"),
         price       = float(item.get("price") or 0),
         cost_price  = float(item.get("cost_price") or 0),
         kind        = int(item.get("kind") or 4),
-        unit        = unit,
+        unit        = mu.get("short_title"),
         deleted     = False,
         synced_at   = now,
     )
@@ -78,6 +74,34 @@ async def _upsert_service(db: AsyncSession, item: dict) -> None:
             setattr(existing, k, v)
     else:
         db.add(Service(id=item["id"], **vals))
+
+
+async def _traverse(
+    client: httpx.AsyncClient,
+    db: AsyncSession,
+    category_id: int,
+    stats: dict,
+    depth: int = 0,
+) -> None:
+    """Рекурсивно обходит дерево категорий и сохраняет услуги."""
+    data = await _fetch_category(client, category_id)
+    indent = "  " * depth
+
+    current = data.get("current", {})
+    if current:
+        await _upsert_category(db, current)
+        stats["categories"] += 1
+
+    items = data.get("items", [])
+    for item in items:
+        await _upsert_service(db, item)
+        stats["services"] += 1
+
+    if items:
+        logger.info(f"{indent}[{category_id}] {current.get('title', '')} — {len(items)} услуг")
+
+    for sub in data.get("catalogs", []):
+        await _traverse(client, db, sub["id"], stats, depth + 1)
 
 
 async def collect_services(db: AsyncSession) -> dict:
@@ -89,39 +113,13 @@ async def collect_services(db: AsyncSession) -> dict:
     stats = {"categories": 0, "services": 0}
 
     try:
-        # Корневая категория + список категорий
-        root_data = await _fetch_category(client, ROOT_CATEGORY_ID)
-
-        # Сохраняем корень
-        await _upsert_category(db, root_data["current"])
-        stats["categories"] += 1
-
-        categories = root_data.get("catalogs", [])
-        logger.info(f"[services] Найдено категорий: {len(categories)}")
-
-        for cat in categories:
-            await _upsert_category(db, cat)
-            stats["categories"] += 1
-
-            # Услуги категории
-            cat_data = await _fetch_category(client, cat["id"])
-            items = cat_data.get("items", [])
-
-            for item in items:
-                await _upsert_service(db, item)
-                stats["services"] += 1
-
-            # Товары из корня (items в root_data)
-            logger.info(f"  {cat['title']}: {len(items)} услуг")
-
-        # Услуги прямо в корне (без подкатегории)
-        for item in root_data.get("items", []):
-            await _upsert_service(db, item)
-            stats["services"] += 1
-
+        logger.info(f"[services] Начало синхронизации от корня id={ROOT_CATEGORY_ID}")
+        await _traverse(client, db, ROOT_CATEGORY_ID, stats)
         await db.commit()
-        logger.info(f"[services] Готово: {stats['categories']} категорий, {stats['services']} услуг")
-
+        logger.info(
+            f"[services] Готово: {stats['categories']} категорий, "
+            f"{stats['services']} услуг"
+        )
     finally:
         await client.aclose()
 
