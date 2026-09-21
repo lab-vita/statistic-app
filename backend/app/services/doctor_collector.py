@@ -2,9 +2,10 @@
 Коллектор врачей из МедОДС.
 
 Алгоритм:
-  1. Авторизуемся через login() — получаем клиент с куками и CSRF
-  2. POST /utils/search {"title": "", "model": "user"} — отдаёт список всех пользователей
-  3. Парсим список, upsert в таблицу doctors
+  1. Авторизуемся через login()
+  2. POST /utils/search {"title": "<буква>", "model": "user"} для каждой буквы
+     русского алфавита — МедОДС требует непустой запрос
+  3. Дедуплицируем по id, upsert в таблицу doctors
   4. Помечаем deleted=True тех, кого нет в ответе (мягкое удаление)
 
 Запускается вручную:
@@ -23,33 +24,38 @@ from app.services.medods import login
 
 logger = logging.getLogger(__name__)
 
+# Русский алфавит + латиница на случай если есть иностранные имена
+SEARCH_CHARS = list("абвгдеёжзийклмнопрстуфхцчшщъыьэюяabcdefghijklmnopqrstuvwxyz")
+
+
+async def _search_users(client: httpx.AsyncClient, title: str) -> list[dict]:
+    resp = await client.post(
+        f"{settings.MEDODS_URL}/utils/search",
+        json={"title": title, "model": "user"},
+    )
+    if resp.status_code != 200:
+        logger.warning(f"[doctors] /utils/search '{title}' → HTTP {resp.status_code}")
+        return []
+    data = resp.json()
+    return data if isinstance(data, list) else []
+
 
 async def _fetch_all_users(client: httpx.AsyncClient) -> list[dict]:
     """
-    POST /utils/search с пустым title и model=user.
-    МедОДС возвращает JSON-список всех пользователей сразу (без пагинации).
+    Перебирает буквы алфавита и собирает всех уникальных пользователей.
+    МедОДС не поддерживает пустой поисковый запрос.
     """
-    resp = await client.post(
-        f"{settings.MEDODS_URL}/utils/search",
-        json={"title": "", "model": "user"},
-    )
-    logger.info(f"[doctors] POST /utils/search → HTTP {resp.status_code}")
-    logger.info(f"[doctors] Content-Type: {resp.headers.get('content-type', '?')}")
-    logger.info(f"[doctors] Response body (500 chars): {resp.text[:500]}")
+    seen: dict[int, dict] = {}
 
-    if resp.status_code != 200:
-        raise Exception(
-            f"POST /utils/search: HTTP {resp.status_code} — {resp.text[:500]}"
-        )
+    for char in SEARCH_CHARS:
+        results = await _search_users(client, char)
+        for u in results:
+            uid = u.get("id")
+            if uid and uid not in seen:
+                seen[uid] = u
 
-    data = resp.json()
-    if isinstance(data, list):
-        logger.info(f"[doctors] Получено пользователей: {len(data)}")
-        return data
-
-    # Иногда ответ обёрнут в объект
-    logger.info(f"[doctors] Ответ — объект, ключи: {list(data.keys())}")
-    return data.get("users", data.get("data", []))
+    logger.info(f"[doctors] Всего уникальных пользователей: {len(seen)}")
+    return list(seen.values())
 
 
 async def collect_doctors(db: AsyncSession) -> dict:
