@@ -35,6 +35,7 @@ async def _fetch_all_users(client: httpx.AsyncClient) -> list[dict]:
     )
     logger.info(f"[doctors] POST /utils/search → HTTP {resp.status_code}")
     logger.info(f"[doctors] Content-Type: {resp.headers.get('content-type', '?')}")
+    logger.info(f"[doctors] Response body (500 chars): {resp.text[:500]}")
 
     if resp.status_code != 200:
         raise Exception(
@@ -42,8 +43,13 @@ async def _fetch_all_users(client: httpx.AsyncClient) -> list[dict]:
         )
 
     data = resp.json()
-    logger.info(f"[doctors] Получено пользователей: {len(data)}")
-    return data
+    if isinstance(data, list):
+        logger.info(f"[doctors] Получено пользователей: {len(data)}")
+        return data
+
+    # Иногда ответ обёрнут в объект
+    logger.info(f"[doctors] Ответ — объект, ключи: {list(data.keys())}")
+    return data.get("users", data.get("data", []))
 
 
 async def collect_doctors(db: AsyncSession) -> dict:
