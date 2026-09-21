@@ -3,14 +3,12 @@
 
 Алгоритм:
   1. Авторизуемся через login() — получаем клиент с куками и CSRF
-  2. GET /users?page=N с заголовком X-Requested-With: XMLHttpRequest
-     → МедОДС отдаёт JSON вместо HTML
-  3. Парсим список пользователей, upsert в таблицу doctors
+  2. POST /utils/search {"title": "", "model": "user"} — отдаёт список всех пользователей
+  3. Парсим список, upsert в таблицу doctors
   4. Помечаем deleted=True тех, кого нет в ответе (мягкое удаление)
 
 Запускается вручную:
   POST /api/doctors/sync
-Или добавить в scheduler по необходимости.
 """
 import logging
 from datetime import datetime
@@ -26,24 +24,26 @@ from app.services.medods import login
 logger = logging.getLogger(__name__)
 
 
-async def _fetch_users_page(client: httpx.AsyncClient, page: int) -> dict:
-    """Запрашивает одну страницу пользователей. Возвращает распарсенный JSON."""
-    resp = await client.get(
-        f"{settings.MEDODS_URL}/users",
-        params={"page": page},
-        headers={
-            "Accept": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-        },
+async def _fetch_all_users(client: httpx.AsyncClient) -> list[dict]:
+    """
+    POST /utils/search с пустым title и model=user.
+    МедОДС возвращает JSON-список всех пользователей сразу (без пагинации).
+    """
+    resp = await client.post(
+        f"{settings.MEDODS_URL}/utils/search",
+        json={"title": "", "model": "user"},
     )
-    logger.info(f"[doctors] GET /users?page={page} → HTTP {resp.status_code}")
+    logger.info(f"[doctors] POST /utils/search → HTTP {resp.status_code}")
     logger.info(f"[doctors] Content-Type: {resp.headers.get('content-type', '?')}")
-    logger.info(f"[doctors] Response body (500 chars): {resp.text[:500]}")
 
     if resp.status_code != 200:
-        raise Exception(f"GET /users?page={page}: HTTP {resp.status_code} — {resp.text[:500]}")
+        raise Exception(
+            f"POST /utils/search: HTTP {resp.status_code} — {resp.text[:500]}"
+        )
 
-    return resp.json()
+    data = resp.json()
+    logger.info(f"[doctors] Получено пользователей: {len(data)}")
+    return data
 
 
 async def collect_doctors(db: AsyncSession) -> dict:
@@ -56,53 +56,33 @@ async def collect_doctors(db: AsyncSession) -> dict:
     seen_ids: set[int] = set()
 
     try:
-        page = 1
-        while True:
-            logger.info(f"[doctors] Загрузка страницы {page}")
-            data = await _fetch_users_page(client, page)
+        users = await _fetch_all_users(client)
 
-            # МедОДС возвращает либо список напрямую, либо {users: [...], total_pages: N}
-            if isinstance(data, list):
-                users = data
-                total_pages = 1
+        now = datetime.utcnow()
+        for u in users:
+            uid = u.get("id")
+            if not uid:
+                continue
+
+            seen_ids.add(uid)
+            existing = await db.get(Doctor, uid)
+
+            vals = dict(
+                surname=u.get("surname"),
+                name=u.get("name"),
+                second_name=u.get("second_name"),
+                specialty=u.get("specialties_titles"),
+                deleted=u.get("deleted_at") is not None,
+                synced_at=now,
+            )
+
+            if existing:
+                for k, v in vals.items():
+                    setattr(existing, k, v)
+                stats["updated"] += 1
             else:
-                users = data.get("users", data.get("data", []))
-                total_pages = data.get("total_pages", data.get("pages", 1))
-
-            logger.info(f"[doctors] Страница {page}/{total_pages}, пользователей: {len(users)}")
-
-            if not users:
-                break
-
-            now = datetime.utcnow()
-            for u in users:
-                uid = u.get("id")
-                if not uid:
-                    continue
-
-                seen_ids.add(uid)
-                existing = await db.get(Doctor, uid)
-
-                vals = dict(
-                    surname=u.get("surname"),
-                    name=u.get("name"),
-                    second_name=u.get("second_name"),
-                    specialty=u.get("specialties_titles"),
-                    deleted=u.get("deleted_at") is not None,
-                    synced_at=now,
-                )
-
-                if existing:
-                    for k, v in vals.items():
-                        setattr(existing, k, v)
-                    stats["updated"] += 1
-                else:
-                    db.add(Doctor(id=uid, **vals))
-                    stats["created"] += 1
-
-            if page >= total_pages:
-                break
-            page += 1
+                db.add(Doctor(id=uid, **vals))
+                stats["created"] += 1
 
         # Мягкое удаление тех, кого нет в ответе
         result = await db.execute(select(Doctor).where(Doctor.deleted == False))
