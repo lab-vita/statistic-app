@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Матчинг продаж со справочником услуг — заполняет sale.service_id и sale.exclude_from_analytics.
 
@@ -24,15 +23,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Ручной маппинг: нормализованное название из sales → service_id
-# Нормализация: нижний регистр, кир. → лат., множ. пробелы → один
-MANUAL_MAPPING = {
-    # опечатка "Ультрозвуковая" → [543]
-    "a04.12.002 ultrozukovaa dopplerografia sosudov (arterij i ven) verxnix konecnostej": 543,
-    # опечатка "ввдение" → [892]
-    "vnutrisustavnoe  vvedenie lekarstvennyh preparatov": 892,
-}
-
 
 def normalize(s: str) -> str:
     cyrillic_latin = {
@@ -42,6 +32,16 @@ def normalize(s: str) -> str:
         'с': 'c', 'х': 'x',
     }
     return re.sub(r'\s+', ' ', ''.join(cyrillic_latin.get(c, c) for c in s)).strip().lower()
+
+
+# Ручной маппинг: normalize(sale.service_title) → service_id
+# Ключи генерируются через normalize() чтобы гарантировать совпадение
+MANUAL_MAPPING = {
+    # опечатка "Ультрозвуковая" → [543]
+    normalize("А04.12.002 Ультрозвуковая допплерография сосудов (артерий и вен) верхних конечностей"): 543,
+    # опечатка "ввдение" → [892]
+    normalize("Внутрисуставное  ввдение лекарственных препаратов"): 892,
+}
 
 
 async def main() -> None:
@@ -74,7 +74,7 @@ async def main() -> None:
             norm_title = normalize(title)
             svc = None
 
-            # 1. Ручной маппинг (по нормализованному названию)
+            # 1. Ручной маппинг
             if norm_title in MANUAL_MAPPING:
                 svc = svc_by_id.get(MANUAL_MAPPING[norm_title])
                 if svc:
