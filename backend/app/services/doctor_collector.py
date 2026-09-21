@@ -36,8 +36,13 @@ async def _fetch_users_page(client: httpx.AsyncClient, page: int) -> dict:
             "X-Requested-With": "XMLHttpRequest",
         },
     )
+    logger.info(f"[doctors] GET /users?page={page} → HTTP {resp.status_code}")
+    logger.info(f"[doctors] Content-Type: {resp.headers.get('content-type', '?')}")
+    logger.info(f"[doctors] Response body (500 chars): {resp.text[:500]}")
+
     if resp.status_code != 200:
-        raise Exception(f"GET /users?page={page}: HTTP {resp.status_code} — {resp.text[:200]}")
+        raise Exception(f"GET /users?page={page}: HTTP {resp.status_code} — {resp.text[:500]}")
+
     return resp.json()
 
 
@@ -63,6 +68,8 @@ async def collect_doctors(db: AsyncSession) -> dict:
             else:
                 users = data.get("users", data.get("data", []))
                 total_pages = data.get("total_pages", data.get("pages", 1))
+
+            logger.info(f"[doctors] Страница {page}/{total_pages}, пользователей: {len(users)}")
 
             if not users:
                 break
