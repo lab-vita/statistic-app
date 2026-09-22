@@ -1,5 +1,5 @@
-from sqlalchemy import String, Integer, DateTime, Boolean, Text, Date
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, DateTime, Boolean, Text, Date, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from app.db.database import Base
 
@@ -27,8 +27,9 @@ class Appointment(Base):
     client_phone:   Mapped[str | None]  = mapped_column(String, nullable=True, index=True)
 
     # Врач
-    doctor_id:   Mapped[int | None] = mapped_column(Integer, nullable=True)
+    doctor_id:   Mapped[int | None] = mapped_column(Integer, ForeignKey("doctors.id", ondelete="SET NULL"), nullable=True, index=True)
     doctor_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    doctor:      Mapped["Doctor | None"] = relationship("Doctor", lazy="select")
 
     # Администратор (кто записал)
     administrator_id:      Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
