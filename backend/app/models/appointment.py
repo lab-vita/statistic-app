@@ -26,10 +26,10 @@ class Appointment(Base):
     client_surname: Mapped[str | None]  = mapped_column(String, nullable=True)
     client_phone:   Mapped[str | None]  = mapped_column(String, nullable=True, index=True)
 
-    # Врач
-    doctor_id:   Mapped[int | None] = mapped_column(Integer, ForeignKey("doctors.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Врач — FK на staff
+    doctor_id:   Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id", ondelete="SET NULL"), nullable=True, index=True)
     doctor_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    doctor:      Mapped["Doctor | None"] = relationship("Doctor", lazy="select")
+    doctor:      Mapped["Staff | None"] = relationship("Staff", lazy="select")
 
     # Администратор (кто записал)
     administrator_id:      Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
@@ -40,7 +40,7 @@ class Appointment(Base):
     attraction_source_id:    Mapped[int | None] = mapped_column(Integer, nullable=True)
     attraction_source_title: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    # Услуги — JSON строка ["A04.22.001 УЗИ...", ...]
+    # Услуги — JSON строка [{"title": "...", ...}, ...]
     services_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Служебные
