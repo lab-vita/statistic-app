@@ -15,7 +15,7 @@
 import re
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, date
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +26,26 @@ from app.models.staff import Staff
 from app.services.medods import login
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_date(value: str | None) -> date | None:
+    """Конвертирует строку '1993-10-05' в объект date. МедОДС отдаёт строку."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    """Конвертирует строку datetime из МедОДС в объект datetime."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
 
 
 def _resolve_role(user: dict) -> str:
@@ -142,9 +162,9 @@ async def collect_staff(db: AsyncSession) -> dict:
                 email=user.get("email") or None,
                 user_status_id=user.get("user_status_id", 1),
                 status_title=user.get("status_title"),
-                deleted_at=user.get("deleted_at"),
+                deleted_at=_parse_datetime(user.get("deleted_at")),
                 sex=user.get("sex"),
-                birthdate=user.get("birthdate"),
+                birthdate=_parse_date(user.get("birthdate")),
                 has_appointment=user.get("has_appointment", False),
                 availability_for_online_recording=user.get("availability_for_online_recording"),
                 appointment_duration_id=user.get("appointment_duration_id"),
