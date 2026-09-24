@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.db.database import engine, Base
-from app.api import calls, appointments, plans, revenue, sales, services, doctors
+from app.api import calls, appointments, plans, revenue, sales, services, staff
 from app.services.scheduler import create_scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +38,7 @@ app.include_router(plans.router,        prefix="/api/plans",         tags=["plan
 app.include_router(revenue.router,      prefix="/api/revenue",       tags=["revenue"])
 app.include_router(sales.router,        prefix="/api/sales",         tags=["sales"])
 app.include_router(services.router,     prefix="/api/services",      tags=["services"])
-app.include_router(doctors.router,      prefix="/api/doctors",       tags=["doctors"])
+app.include_router(staff.router,        prefix="/api/staff",         tags=["staff"])
 
 
 @app.get("/")
