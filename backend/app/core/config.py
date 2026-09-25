@@ -1,9 +1,26 @@
+"""
+Настройки приложения — всё через .env.
+
+Константы домена (статусы МедОДС, коды Bitrix и т.д.) — в app/core/constants.py.
+"""
 from pydantic_settings import BaseSettings
 
-class Settings(BaseSettings):
-    DATABASE_URL: str
-    BITRIX_WEBHOOK_URL: str
 
+class Settings(BaseSettings):
+    # БД
+    DATABASE_URL: str
+
+    # Внешние API
+    BITRIX_WEBHOOK_URL: str
+    MEDODS_URL: str = "https://labvita.medods.ru"
+    MEDODS_USERNAME: str = ""
+    MEDODS_PASSWORD: str = ""
+    MEDODS_CLINIC_ID: int = 1
+
+    # CORS — через запятую, например: http://localhost:3000,https://stats.labvita.ru
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+
+    # Номера клиники
     LABVITA_NUMBERS: list[str] = [
         "+79049919191",
         "+79511620204",
@@ -12,6 +29,7 @@ class Settings(BaseSettings):
         "+79234657174",
     ]
 
+    # Операторы колл-центра: portal_user_id → полное имя
     LABVITA_OPERATORS: dict[str, str] = {
         "168": "Белобородова Евгения",
         "520": "Пирожкова Виктория",
@@ -19,6 +37,7 @@ class Settings(BaseSettings):
         "696": "Часовских Наталья",
     }
 
+    # Сопоставление portal_user_id → номер телефона оператора
     OPERATOR_NUMBERS: dict[str, list[str]] = {
         "168": ["+79234657174"],
         "520": ["+79234766196"],
@@ -26,16 +45,21 @@ class Settings(BaseSettings):
         "696": ["+79511660509"],
     }
 
-    # МедОДС
-    MEDODS_URL: str = "https://labvita.medods.ru"
-    MEDODS_USERNAME: str = ""
-    MEDODS_PASSWORD: str = ""
-    MEDODS_CLINIC_ID: int = 1
+    # Роль оператора (callcenter / profosmotr)
+    OPERATOR_ROLES: dict[str, str] = {
+        "168": "callcenter",
+        "520": "callcenter",
+        "544": "profosmotr",  # Жданова — профосмотры
+        "696": "callcenter",
+    }
+
+    # Фамилии администраторов-коллцентра в МедОДС
+    # (совпадают с ключами ADMIN_GROUPS, group="callcenter")
+    CALLCENTER_SURNAMES: set[str] = {
+        "Пирожкова", "Часовских", "Белобородова", "Жданова",
+    }
 
     # Группы администраторов МедОДС
-    # callcenter  — делают записи по звонкам
-    # admin       — встречают пациентов вживую
-    # other       — все остальные роли
     ADMIN_GROUPS: dict[str, dict] = {
         "Пирожкова":    {"group": "callcenter", "label": "Колл-центр"},
         "Часовских":    {"group": "callcenter", "label": "Колл-центр"},
@@ -54,34 +78,7 @@ class Settings(BaseSettings):
         "Иванова":      {"group": "other",       "label": "Прочие"},
     }
 
-    CALLCENTER_SURNAMES: set[str] = {
-        "Пирожкова", "Часовских", "Белобородова", "Жданова"
-    }
+    model_config = {"env_file": ".env"}
 
-    # Оператор Жданова — профосмотры, не показываем красные метрики
-    OPERATOR_ROLES: dict[str, str] = {
-        "168": "callcenter",
-        "520": "callcenter",
-        "544": "profosmotr",  # Жданова
-        "696": "callcenter",
-    }
-
-    MEDODS_VISIT_STATUSES: set[int] = {6, 7, 8}
-    MEDODS_NOSHOW_STATUSES: set[int] = {5}
-    MEDODS_CANCEL_STATUSES: set[int] = {4}
-    MEDODS_PENDING_STATUSES: set[int] = {2, 9}
-    MEDODS_STATUS_NAMES: dict[int, str] = {
-        2: "Не подтверждён",
-        3: "Счёт выставлен",
-        4: "Отменён пациентом",
-        5: "Неявка",
-        6: "Пришёл",
-        7: "Приём завершён",
-        8: "Счёт оплачен",
-        9: "Одобрен",
-    }
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
