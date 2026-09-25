@@ -17,23 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.models.revenue import Revenue
 from app.services.revenue_collector import collect_revenue
+from app.core.utils import prev_period, calc_delta
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-def _prev_period(date_from: date, date_to: date) -> tuple[date, date]:
-    delta = (date_to - date_from).days + 1
-    prev_to   = date_from - timedelta(days=1)
-    prev_from = prev_to   - timedelta(days=delta - 1)
-    return prev_from, prev_to
-
-
-def _delta(current: float, previous: float) -> dict:
-    if previous == 0:
-        return {"pct": None, "dir": "flat"}
-    pct = round((current - previous) / previous * 100)
-    return {"pct": abs(pct), "dir": "up" if pct > 0 else ("down" if pct < 0 else "flat")}
 
 
 async def _total_by_period(db: AsyncSession, date_from: date, date_to: date) -> dict:
@@ -76,27 +63,37 @@ async def stats(
     date_to:   date = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
-    prev_from, prev_to = _prev_period(date_from, date_to)
-    current_by_type  = await _total_by_period(db, date_from, date_to)
-    previous_by_type = await _total_by_period(db, prev_from, prev_to)
+    prev_from, prev_to   = prev_period(date_from, date_to)
+    current_by_type      = await _total_by_period(db, date_from, date_to)
+    previous_by_type     = await _total_by_period(db, prev_from, prev_to)
+
     grand_total      = sum(v["total"]  for v in current_by_type.values())
     grand_amount     = sum(v["amount"] for v in current_by_type.values())
     prev_grand_total = sum(v["total"]  for v in previous_by_type.values())
+
     payment_types = []
     for ptype, cur in current_by_type.items():
         prev = previous_by_type.get(ptype, {"total": 0, "amount": 0})
-        pct_of_total = round(cur["total"] / grand_total * 100, 2) if grand_total else 0
-        d = _delta(cur["total"], prev["total"])
+        d    = calc_delta(cur["total"], prev["total"])
         payment_types.append({
-            "payment_type": ptype, "total": cur["total"], "amount": cur["amount"],
-            "pct_of_total": pct_of_total, "delta_pct": d["pct"], "delta_dir": d["dir"],
+            "payment_type": ptype,
+            "total":        cur["total"],
+            "amount":       cur["amount"],
+            "pct_of_total": round(cur["total"] / grand_total * 100, 2) if grand_total else 0,
+            "delta_pct":    d["delta_pct"],
+            "delta_dir":    d["delta_dir"],
         })
-    total_delta = _delta(grand_total, prev_grand_total)
+
+    total_delta = calc_delta(grand_total, prev_grand_total)
     return {
         "date_from": str(date_from), "date_to": str(date_to),
         "prev_from": str(prev_from), "prev_to": str(prev_to),
-        "total": {"sum": grand_total, "amount": grand_amount,
-                  "delta_pct": total_delta["pct"], "delta_dir": total_delta["dir"]},
+        "total": {
+            "sum":       grand_total,
+            "amount":    grand_amount,
+            "delta_pct": total_delta["delta_pct"],
+            "delta_dir": total_delta["delta_dir"],
+        },
         "by_payment_type": payment_types,
     }
 
@@ -119,11 +116,15 @@ async def daily(
             days[d] = {"date": d, "total": 0.0, "amount": 0, "by_type": {}}
         days[d]["total"]  += float(r.total or 0)
         days[d]["amount"] += int(r.amount or 0)
-        days[d]["by_type"][r.payment_type] = {"total": float(r.total or 0), "amount": int(r.amount or 0)}
+        days[d]["by_type"][r.payment_type] = {
+            "total": float(r.total or 0), "amount": int(r.amount or 0)
+        }
     return {"date_from": str(date_from), "date_to": str(date_to), "days": list(days.values())}
 
 
 @router.get("/payment_types")
 async def payment_types(db: AsyncSession = Depends(get_db)):
-    rows = await db.execute(select(Revenue.payment_type).distinct().order_by(Revenue.payment_type))
+    rows = await db.execute(
+        select(Revenue.payment_type).distinct().order_by(Revenue.payment_type)
+    )
     return {"payment_types": [r[0] for r in rows]}

@@ -2,12 +2,12 @@
 API продаж по номенклатуре.
 
 Эндпоинты:
-  POST /api/sales/collect          — запустить сбор за период
-  POST /api/sales/match            — произвести матчинг с справочником услуг
-  GET  /api/sales/stats            — топ услуг за период + дельты
-  GET  /api/sales/daily            — разбивка по периодам
-  GET  /api/sales/services         — список уникальных услуг в БД
-  GET  /api/sales/unmatched        — названия которые не удалось привязать
+  POST /api/sales/collect   — запустить сбор за период
+  POST /api/sales/match     — матчинг с справочником услуг
+  GET  /api/sales/stats     — топ услуг за период + дельты
+  GET  /api/sales/daily     — разбивка по дням
+  GET  /api/sales/services  — список уникальных услуг в БД
+  GET  /api/sales/unmatched — непривязанные названия
 """
 import logging
 import re
@@ -21,14 +21,15 @@ from app.db.database import get_db
 from app.models.sale import Sale
 from app.models.service import Service
 from app.services.sales_collector import collect_sales
+from app.core.utils import prev_period, calc_delta
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 # Матчинг
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 
 CYRILLIC_TO_LATIN = str.maketrans(
     "АВСЕКМНОРТХаеорсх",
@@ -38,8 +39,7 @@ CYRILLIC_TO_LATIN = str.maketrans(
 
 def _normalize(s: str) -> str:
     s = s.strip().translate(CYRILLIC_TO_LATIN)
-    s = re.sub(r"\s+", " ", s).lower()
-    return s
+    return re.sub(r"\s+", " ", s).lower()
 
 
 async def _run_match(db: AsyncSession) -> dict:
@@ -48,75 +48,46 @@ async def _run_match(db: AsyncSession) -> dict:
     Три прохода:
       1. Точное совпадение по title
       2. Нормализованное совпадение (опечатки, лат./кир. буквы)
-      3. Не найдено — проставляем exclude_from_analytics=True
+      3. Не найдено — exclude_from_analytics=True
     """
-    # Загружаем весь справочник
     svc_rows = await db.execute(select(Service))
     all_services = svc_rows.scalars().all()
 
-    svc_exact = {s.title.strip(): s for s in all_services}
-    svc_norm  = {}
+    svc_exact: dict[str, Service] = {s.title.strip(): s for s in all_services}
+    svc_norm:  dict[str, Service] = {}
     for s in all_services:
         n = _normalize(s.title)
         if n not in svc_norm:
             svc_norm[n] = s
 
-    # Все строки sales
     sale_rows = await db.execute(select(Sale))
     sales = sale_rows.scalars().all()
-
     stats = {"exact": 0, "normalized": 0, "unmatched": 0, "total": len(sales)}
 
     for sale in sales:
         title = sale.service_title.strip()
-
-        # Проход 1: точно
         if title in svc_exact:
             svc = svc_exact[title]
-            sale.service_id = svc.id
-            sale.exclude_from_analytics = svc.exclude_from_analytics
+            sale.service_id              = svc.id
+            sale.exclude_from_analytics  = svc.exclude_from_analytics
             stats["exact"] += 1
-            continue
-
-        # Проход 2: нормализованно
-        norm = _normalize(title)
-        if norm in svc_norm:
+        elif (norm := _normalize(title)) in svc_norm:
             svc = svc_norm[norm]
-            sale.service_id = svc.id
-            sale.exclude_from_analytics = svc.exclude_from_analytics
+            sale.service_id              = svc.id
+            sale.exclude_from_analytics  = svc.exclude_from_analytics
             stats["normalized"] += 1
-            continue
-
-        # Проход 3: не найдено
-        sale.service_id = None
-        sale.exclude_from_analytics = True  # исключаем из аналитики
-        stats["unmatched"] += 1
+        else:
+            sale.service_id              = None
+            sale.exclude_from_analytics  = True
+            stats["unmatched"] += 1
 
     await db.commit()
     return stats
 
 
-# ---------------------------------------------------------------------------
-# Вспомогательные функции
-# ---------------------------------------------------------------------------
-
-def _prev_period(date_from: date, date_to: date) -> tuple[date, date]:
-    delta = (date_to - date_from).days + 1
-    prev_to   = date_from - timedelta(days=1)
-    prev_from = prev_to - timedelta(days=delta - 1)
-    return prev_from, prev_to
-
-
-def _delta(current: float, previous: float) -> dict:
-    if previous == 0:
-        return {"pct": None, "dir": "flat"}
-    pct = round((current - previous) / previous * 100)
-    return {"pct": abs(pct), "dir": "up" if pct > 0 else ("down" if pct < 0 else "flat")}
-
-
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 # Эндпоинты
-# ---------------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────────────
 
 @router.post("/collect")
 async def collect(
@@ -141,10 +112,10 @@ async def match_services(db: AsyncSession = Depends(get_db)):
 
 @router.get("/unmatched")
 async def unmatched(db: AsyncSession = Depends(get_db)):
-    """Названия которые не удалось сопоставить со справочником."""
+    """Названия, которые не удалось сопоставить со справочником."""
     rows = await db.execute(
         select(Sale.service_title, func.sum(Sale.final_sum).label("total"))
-        .where(Sale.service_id == None)
+        .where(Sale.service_id.is_(None))
         .group_by(Sale.service_title)
         .order_by(func.sum(Sale.final_sum).desc())
     )
@@ -159,24 +130,22 @@ async def stats(
     include_excluded: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
-    prev_from, prev_to = _prev_period(date_from, date_to)
+    prev_from, prev_to = prev_period(date_from, date_to)
 
-    def base_filter(d_from, d_to):
+    def _base_filter(d_from: date, d_to: date):
         f = and_(Sale.sale_date >= d_from, Sale.sale_date <= d_to)
         if not include_excluded:
-            f = and_(f, Sale.exclude_from_analytics == False)
+            f = and_(f, Sale.exclude_from_analytics == False)  # noqa: E712
         return f
 
     rows = await db.execute(
         select(
-            Sale.service_title,
-            Sale.service_id,
-            Sale.unit,
+            Sale.service_title, Sale.service_id, Sale.unit,
             func.sum(Sale.amount).label("amount"),
             func.sum(Sale.final_sum).label("final_sum"),
             func.sum(Sale.total_sum).label("total_sum"),
         )
-        .where(base_filter(date_from, date_to))
+        .where(_base_filter(date_from, date_to))
         .group_by(Sale.service_title, Sale.service_id, Sale.unit)
         .order_by(func.sum(Sale.final_sum).desc())
         .limit(limit)
@@ -184,25 +153,22 @@ async def stats(
     current = {r.service_title: r for r in rows}
 
     prev_rows = await db.execute(
-        select(
-            Sale.service_title,
-            func.sum(Sale.final_sum).label("final_sum"),
-        )
-        .where(base_filter(prev_from, prev_to))
+        select(Sale.service_title, func.sum(Sale.final_sum).label("final_sum"))
+        .where(_base_filter(prev_from, prev_to))
         .group_by(Sale.service_title)
     )
     previous = {r.service_title: r for r in prev_rows}
 
     grand_total      = sum(float(r.final_sum or 0) for r in current.values())
     prev_grand_total = sum(float(r.final_sum or 0) for r in previous.values())
-    total_delta      = _delta(grand_total, prev_grand_total)
+    total_delta      = calc_delta(grand_total, prev_grand_total)
 
     services = []
     for title, cur in current.items():
         prev = previous.get(title)
         cur_sum  = float(cur.final_sum or 0)
         prev_sum = float(prev.final_sum or 0) if prev else 0
-        d = _delta(cur_sum, prev_sum)
+        d = calc_delta(cur_sum, prev_sum)
         services.append({
             "service_title": title,
             "service_id":    cur.service_id,
@@ -211,8 +177,8 @@ async def stats(
             "final_sum":     cur_sum,
             "total_sum":     float(cur.total_sum or 0),
             "pct_of_total":  round(cur_sum / grand_total * 100, 2) if grand_total else 0,
-            "delta_pct":     d["pct"],
-            "delta_dir":     d["dir"],
+            "delta_pct":     d["delta_pct"],
+            "delta_dir":     d["delta_dir"],
         })
 
     return {
@@ -220,8 +186,8 @@ async def stats(
         "prev_from": str(prev_from), "prev_to":  str(prev_to),
         "total": {
             "final_sum":  grand_total,
-            "delta_pct":  total_delta["pct"],
-            "delta_dir":  total_delta["dir"],
+            "delta_pct":  total_delta["delta_pct"],
+            "delta_dir":  total_delta["delta_dir"],
         },
         "services": services,
     }
@@ -236,7 +202,7 @@ async def daily(
 ):
     f = and_(Sale.sale_date >= date_from, Sale.sale_date <= date_to)
     if not include_excluded:
-        f = and_(f, Sale.exclude_from_analytics == False)
+        f = and_(f, Sale.exclude_from_analytics == False)  # noqa: E712
 
     rows = await db.execute(
         select(
