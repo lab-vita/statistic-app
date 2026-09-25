@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.services.medods import login, fetch_appointments
 from app.models.appointment import Appointment
+from app.core.config import settings
 
 
 def _parse_appointment(raw: dict) -> dict:
@@ -15,7 +16,6 @@ def _parse_appointment(raw: dict) -> dict:
     source  = a.get("attractionSource") or {}
     services = [et["title"] for et in (a.get("entryTypes") or [])]
 
-    # Парсим дату приёма
     appt_date = None
     if a.get("date"):
         try:
@@ -23,13 +23,15 @@ def _parse_appointment(raw: dict) -> dict:
         except Exception:
             pass
 
-    # Парсим дату создания
     created_at = None
     if a.get("createdAt"):
         try:
             created_at = datetime.fromisoformat(a["createdAt"].split(".")[0])
         except Exception:
             pass
+
+    admin_surname = admin.get("surname")
+    is_callcenter = admin_surname in settings.CALLCENTER_SURNAMES if admin_surname else False
 
     return {
         "medods_id":               a.get("id"),
@@ -47,10 +49,11 @@ def _parse_appointment(raw: dict) -> dict:
         "doctor_name":             f"{doctor.get('surname','')} {doctor.get('name','')}".strip(),
         "administrator_id":        admin.get("id"),
         "administrator_name":      admin.get("name"),
-        "administrator_surname":   admin.get("surname"),
+        "administrator_surname":   admin_surname,
         "attraction_source_id":    source.get("id"),
         "attraction_source_title": source.get("title"),
         "services_json":           json.dumps(services, ensure_ascii=False) if services else None,
+        "is_callcenter":           is_callcenter,
     }
 
 
@@ -74,13 +77,14 @@ async def collect_appointments(
         if not medods_id:
             continue
 
-        # Проверяем — уже есть в БД?
-        exists = await db.scalar(
+        existing = await db.scalar(
             select(Appointment).where(Appointment.medods_id == medods_id)
         )
-        if exists:
-            # Обновляем статус (он может измениться)
-            exists.status = parsed["status"]
+        if existing:
+            # Полное обновление — могут измениться статус, врач, администратор
+            for field, value in parsed.items():
+                if field != "medods_id":
+                    setattr(existing, field, value)
             continue
 
         db.add(Appointment(**parsed))
