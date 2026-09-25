@@ -1,32 +1,43 @@
 import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from app.db.database import engine, Base
+
+from app.core.config import settings
+from app.db.database import engine
 from app.api import calls, appointments, plans, revenue, sales, services, staff
 from app.services.scheduler import create_scheduler
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """
+    Жизненный цикл приложения.
+
+    Создание таблиц — через Alembic (`alembic upgrade head` перед запуском).
+    Base.metadata.create_all здесь нет намеренно: в production авто-креат не обновляет схему.
+    """
     scheduler = create_scheduler()
     scheduler.start()
     logger.info("[main] Планировщик запущен")
     yield
     scheduler.shutdown(wait=False)
+    await engine.dispose()
     logger.info("[main] Планировщик остановлен")
 
 
-app = FastAPI(title="Labvita Stats API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Labvita Stats API", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,4 +54,4 @@ app.include_router(staff.router,        prefix="/api/staff",         tags=["staf
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "Labvita Stats API"}
+    return {"status": "ok", "service": "Labvita Stats API", "version": "0.2.0"}
