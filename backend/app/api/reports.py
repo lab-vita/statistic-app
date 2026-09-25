@@ -3,62 +3,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from datetime import date, timedelta
 from typing import Optional
+
 from app.db.database import get_db
 from app.models.call import Call
 from app.models.appointment import Appointment
 from app.core.config import settings
+from app.core.utils import prev_period, calc_delta, add_deltas, local_date
 
 router = APIRouter()
 
 
-def _prev_period(date_from: date, date_to: date) -> tuple[date, date]:
-    span = (date_to - date_from).days + 1
-    prev_to   = date_from - timedelta(days=1)
-    prev_from = prev_to - timedelta(days=span - 1)
-    return prev_from, prev_to
-
-
-def _delta(current: float, prev: float) -> dict:
-    if not prev:
-        return {"delta_pct": None, "delta_dir": None}
-    pct = round((current - prev) / prev * 100)
-    return {
-        "delta_pct": abs(pct),
-        "delta_dir": "up" if pct > 0 else "down" if pct < 0 else "flat",
-    }
-
-
-# ── Звонки ────────────────────────────────────────────────────
-
-def _calls_by_period(calls: list, dates: list[str], granularity: str) -> list:
-    """Группирует звонки по датам с нужной гранулярностью."""
-    buckets: dict = {}
-
-    for d in dates:
-        buckets[d] = {"period": d, "incoming": 0, "outgoing": 0, "missed": 0, "total": 0}
-
-    for c in calls:
-        local_date = (c.call_start_date + timedelta(hours=7)).date()
-        if granularity == "month":
-            key = local_date.strftime("%Y-%m")
-        elif granularity == "week":
-            monday = local_date - timedelta(days=local_date.weekday())
-            key = monday.isoformat()
-        else:
-            key = local_date.isoformat()
-
-        if key not in buckets:
-            continue
-        buckets[key]["total"] += 1
-        if c.is_incoming: buckets[key]["incoming"] += 1
-        if c.is_outgoing: buckets[key]["outgoing"] += 1
-        if c.is_missed:   buckets[key]["missed"]   += 1
-
-    return list(buckets.values())
-
+# ── Гранулярность ────────────────────────────────────────────────────
 
 def _date_range(date_from: date, date_to: date, granularity: str) -> list[str]:
-    dates = []
+    dates: list[str] = []
     current = date_from
     while current <= date_to:
         if granularity == "month":
@@ -78,33 +36,62 @@ def _date_range(date_from: date, date_to: date, granularity: str) -> list[str]:
     return dates
 
 
-# ── Записи ────────────────────────────────────────────────────
+# ── Звонки ─────────────────────────────────────────────────────────────
 
-def _appts_by_period(appts: list, dates: list[str], granularity: str) -> list:
-    buckets: dict = {}
-    for d in dates:
-        buckets[d] = {"period": d, "total": 0, "visits": 0, "noshow": 0,
-                      "cancels": 0, "new_patients": 0}
-
-    for a in appts:
-        appt_date = a.appointment_date.date() if hasattr(a.appointment_date, 'date') else a.appointment_date
+def _calls_by_period(calls: list, dates: list[str], granularity: str) -> list:
+    buckets: dict[str, dict] = {
+        d: {"period": d, "incoming": 0, "outgoing": 0, "missed": 0, "total": 0}
+        for d in dates
+    }
+    for c in calls:
+        ld = local_date(c.call_start_date)
         if granularity == "month":
-            key = appt_date.strftime("%Y-%m")
+            key = ld.strftime("%Y-%m")
         elif granularity == "week":
-            monday = appt_date - timedelta(days=appt_date.weekday())
-            key = monday.isoformat()
+            key = (ld - timedelta(days=ld.weekday())).isoformat()
         else:
-            key = appt_date.isoformat()
-
+            key = ld.isoformat()
         if key not in buckets:
             continue
         buckets[key]["total"] += 1
-        if a.is_visit:    buckets[key]["visits"]       += 1
-        if a.is_noshow:   buckets[key]["noshow"]        += 1
-        if a.is_cancelled: buckets[key]["cancels"]      += 1
-        if a.new_patient: buckets[key]["new_patients"]  += 1
+        if c.is_incoming: buckets[key]["incoming"] += 1
+        if c.is_outgoing: buckets[key]["outgoing"] += 1
+        if c.is_missed:   buckets[key]["missed"]   += 1
+    return list(buckets.values())
 
-    # Добавляем visit_pct
+
+def _calls_totals(calls: list) -> dict:
+    return {
+        "incoming": sum(1 for c in calls if c.is_incoming),
+        "outgoing": sum(1 for c in calls if c.is_outgoing),
+        "missed":   sum(1 for c in calls if c.is_missed),
+        "total":    len(calls),
+    }
+
+
+# ── Записи ─────────────────────────────────────────────────────────────
+
+def _appts_by_period(appts: list, dates: list[str], granularity: str) -> list:
+    buckets: dict[str, dict] = {
+        d: {"period": d, "total": 0, "visits": 0, "noshow": 0, "cancels": 0, "new_patients": 0}
+        for d in dates
+    }
+    for a in appts:
+        appt_d = a.appointment_date if isinstance(a.appointment_date, date) else a.appointment_date.date()
+        if granularity == "month":
+            key = appt_d.strftime("%Y-%m")
+        elif granularity == "week":
+            key = (appt_d - timedelta(days=appt_d.weekday())).isoformat()
+        else:
+            key = appt_d.isoformat()
+        if key not in buckets:
+            continue
+        buckets[key]["total"] += 1
+        if a.is_visit:     buckets[key]["visits"]      += 1
+        if a.is_noshow:    buckets[key]["noshow"]       += 1
+        if a.is_cancelled: buckets[key]["cancels"]      += 1
+        if a.new_patient:  buckets[key]["new_patients"] += 1
+
     for row in buckets.values():
         t = row["total"]
         row["visit_pct"] = round(row["visits"] / t * 100, 1) if t else 0
@@ -112,11 +99,26 @@ def _appts_by_period(appts: list, dates: list[str], granularity: str) -> list:
     return list(buckets.values())
 
 
+def _appts_totals(appts: list) -> dict:
+    t = len(appts)
+    v = sum(1 for a in appts if a.is_visit)
+    return {
+        "total":        t,
+        "visits":       v,
+        "noshow":       sum(1 for a in appts if a.is_noshow),
+        "cancels":      sum(1 for a in appts if a.is_cancelled),
+        "new_patients": sum(1 for a in appts if a.new_patient),
+        "visit_pct":    round(v / t * 100, 1) if t else 0,
+    }
+
+
+# ── Эндпоинты ───────────────────────────────────────────────────────────
+
 @router.get("/calls")
 async def report_calls(
     date_from:   date          = Query(default=None),
     date_to:     date          = Query(default=None),
-    granularity: str           = Query(default="day"),   # day | week | month
+    granularity: str           = Query(default="day"),
     operator_id: Optional[str] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -127,70 +129,35 @@ async def report_calls(
     if granularity not in ("day", "week", "month"):
         granularity = "day"
 
-    prev_from, prev_to = _prev_period(date_from, date_to)
+    prev_from, prev_to = prev_period(date_from, date_to)
 
-    # Текущий период
-    q = select(Call).where(and_(
-        Call.call_start_date >= date_from,
-        Call.call_start_date <= date_to + timedelta(days=1),
-    ))
-    if operator_id:
-        q = q.where(Call.portal_user_id == operator_id)
-    curr_calls = list(await db.scalars(q))
+    def _q(d_from, d_to):
+        q = select(Call).where(and_(
+            Call.call_start_date >= d_from,
+            Call.call_start_date <= d_to + timedelta(days=1),
+        ))
+        if operator_id:
+            q = q.where(Call.portal_user_id == operator_id)
+        return q
 
-    # Предыдущий период
-    q2 = select(Call).where(and_(
-        Call.call_start_date >= prev_from,
-        Call.call_start_date <= prev_to + timedelta(days=1),
-    ))
-    if operator_id:
-        q2 = q2.where(Call.portal_user_id == operator_id)
-    prev_calls = list(await db.scalars(q2))
+    curr_calls = list(await db.scalars(_q(date_from, date_to)))
+    prev_calls = list(await db.scalars(_q(prev_from, prev_to)))
 
     dates = _date_range(date_from, date_to, granularity)
     rows  = _calls_by_period(curr_calls, dates, granularity)
 
-    # Итоги с дельтами
-    curr_total = {
-        "incoming": sum(1 for c in curr_calls if c.is_incoming),
-        "outgoing": sum(1 for c in curr_calls if c.is_outgoing),
-        "missed":   sum(1 for c in curr_calls if c.is_missed),
-        "total":    len(curr_calls),
-    }
-    prev_total = {
-        "incoming": sum(1 for c in prev_calls if c.is_incoming),
-        "outgoing": sum(1 for c in prev_calls if c.is_outgoing),
-        "missed":   sum(1 for c in prev_calls if c.is_missed),
-        "total":    len(prev_calls),
-    }
-    summary = dict(curr_total)
-    for key in ("incoming", "outgoing", "missed", "total"):
-        d = _delta(curr_total[key], prev_total[key])
-        summary[f"{key}_delta_pct"] = d["delta_pct"]
-        summary[f"{key}_delta_dir"] = d["delta_dir"]
+    curr_total = _calls_totals(curr_calls)
+    prev_total = _calls_totals(prev_calls)
+    summary = add_deltas(curr_total, prev_total, ["incoming", "outgoing", "missed", "total"])
 
-    # По операторам
     by_operator = []
     for uid, name in settings.LABVITA_OPERATORS.items():
         op_curr = [c for c in curr_calls if c.portal_user_id == uid]
         op_prev = [c for c in prev_calls if c.portal_user_id == uid]
-        curr_s = {
-            "incoming": sum(1 for c in op_curr if c.is_incoming),
-            "outgoing": sum(1 for c in op_curr if c.is_outgoing),
-            "missed":   sum(1 for c in op_curr if c.is_missed),
-            "total":    len(op_curr),
-        }
-        prev_s = {
-            "incoming": sum(1 for c in op_prev if c.is_incoming),
-            "outgoing": sum(1 for c in op_prev if c.is_outgoing),
-            "missed":   sum(1 for c in op_prev if c.is_missed),
-            "total":    len(op_prev),
-        }
-        row = {"operator_id": uid, "name": name, **curr_s}
-        for key in ("incoming", "outgoing", "missed", "total"):
-            d = _delta(curr_s[key], prev_s[key])
-            row[f"{key}_delta_pct"] = d["delta_pct"]
-            row[f"{key}_delta_dir"] = d["delta_dir"]
+        curr_s = _calls_totals(op_curr)
+        prev_s = _calls_totals(op_prev)
+        row = {"operator_id": uid, "name": name}
+        row.update(add_deltas(curr_s, prev_s, ["incoming", "outgoing", "missed", "total"]))
         by_operator.append(row)
 
     return {
@@ -220,62 +187,43 @@ async def report_appointments(
     if granularity not in ("day", "week", "month"):
         granularity = "day"
 
-    prev_from, prev_to = _prev_period(date_from, date_to)
+    prev_from, prev_to = prev_period(date_from, date_to)
 
-    q = select(Appointment).where(and_(
-        Appointment.appointment_date >= date_from,
-        Appointment.appointment_date <= date_to,
-    ))
-    if admin_surname:
-        q = q.where(Appointment.administrator_surname == admin_surname)
-    curr_appts = list(await db.scalars(q))
+    def _q(d_from, d_to):
+        q = select(Appointment).where(and_(
+            Appointment.appointment_date >= d_from,
+            Appointment.appointment_date <= d_to,
+        ))
+        if admin_surname:
+            q = q.where(Appointment.administrator_surname == admin_surname)
+        return q
 
-    q2 = select(Appointment).where(and_(
-        Appointment.appointment_date >= prev_from,
-        Appointment.appointment_date <= prev_to,
-    ))
-    if admin_surname:
-        q2 = q2.where(Appointment.administrator_surname == admin_surname)
-    prev_appts = list(await db.scalars(q2))
+    curr_appts = list(await db.scalars(_q(date_from, date_to)))
+    prev_appts = list(await db.scalars(_q(prev_from, prev_to)))
 
     dates = _date_range(date_from, date_to, granularity)
     rows  = _appts_by_period(curr_appts, dates, granularity)
 
-    def _totals(appts):
-        t = len(appts)
-        v = sum(1 for a in appts if a.is_visit)
-        return {
-            "total":        t,
-            "visits":       v,
-            "noshow":       sum(1 for a in appts if a.is_noshow),
-            "cancels":      sum(1 for a in appts if a.is_cancelled),
-            "new_patients": sum(1 for a in appts if a.new_patient),
-            "visit_pct":    round(v / t * 100, 1) if t else 0,
-        }
+    curr_total = _appts_totals(curr_appts)
+    prev_total = _appts_totals(prev_appts)
+    summary = add_deltas(curr_total, prev_total,
+                         ["total", "visits", "noshow", "new_patients", "visit_pct"])
 
-    curr_total = _totals(curr_appts)
-    prev_total = _totals(prev_appts)
-    summary    = dict(curr_total)
-    for key in ("total", "visits", "noshow", "new_patients", "visit_pct"):
-        d = _delta(curr_total[key], prev_total[key])
-        summary[f"{key}_delta_pct"] = d["delta_pct"]
-        summary[f"{key}_delta_dir"] = d["delta_dir"]
-
-    # По администраторам
     all_surnames = {a.administrator_surname for a in curr_appts if a.administrator_surname}
     by_admin = []
     for surname in sorted(all_surnames):
         curr_sub = [a for a in curr_appts if a.administrator_surname == surname]
         prev_sub = [a for a in prev_appts if a.administrator_surname == surname]
-        curr_s = _totals(curr_sub)
-        prev_s = _totals(prev_sub)
+        curr_s = _appts_totals(curr_sub)
+        prev_s = _appts_totals(prev_sub)
         group_info = settings.ADMIN_GROUPS.get(surname, {"group": "other", "label": "Прочие"})
-        row = {"name": surname, "group": group_info["group"],
-               "group_label": group_info["label"], **curr_s}
-        for key in ("total", "visits", "noshow", "new_patients", "visit_pct"):
-            d = _delta(curr_s[key], prev_s[key])
-            row[f"{key}_delta_pct"] = d["delta_pct"]
-            row[f"{key}_delta_dir"] = d["delta_dir"]
+        row = {
+            "name":        surname,
+            "group":       group_info["group"],
+            "group_label": group_info["label"],
+        }
+        row.update(add_deltas(curr_s, prev_s,
+                              ["total", "visits", "noshow", "new_patients", "visit_pct"]))
         by_admin.append(row)
 
     return {
