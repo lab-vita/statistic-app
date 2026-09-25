@@ -2,6 +2,12 @@ from sqlalchemy import String, Integer, DateTime, Boolean, Text, Date, ForeignKe
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from app.db.database import Base
+from app.core.constants import (
+    MEDODS_VISIT_STATUSES,
+    MEDODS_NOSHOW_STATUSES,
+    MEDODS_CANCEL_STATUSES,
+    MEDODS_PENDING_STATUSES,
+)
 
 
 class Appointment(Base):
@@ -13,23 +19,25 @@ class Appointment(Base):
     medods_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
 
     # Данные приёма
-    appointment_date: Mapped[date]     = mapped_column(Date, index=True)
-    appointment_time: Mapped[str]      = mapped_column(String(20))
-    status:           Mapped[int]      = mapped_column(Integer, index=True)
-    note:             Mapped[str | None] = mapped_column(Text, nullable=True)
-    new_patient:      Mapped[bool]     = mapped_column(Boolean, default=False)
+    appointment_date:  Mapped[date]          = mapped_column(Date, index=True)
+    appointment_time:  Mapped[str]           = mapped_column(String(20))
+    status:            Mapped[int]           = mapped_column(Integer, index=True)
+    note:              Mapped[str | None]    = mapped_column(Text, nullable=True)
+    new_patient:       Mapped[bool]          = mapped_column(Boolean, default=False)
     created_at_medods: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Клиент
-    client_id:      Mapped[int | None]  = mapped_column(Integer, nullable=True, index=True)
-    client_name:    Mapped[str | None]  = mapped_column(String, nullable=True)
-    client_surname: Mapped[str | None]  = mapped_column(String, nullable=True)
-    client_phone:   Mapped[str | None]  = mapped_column(String, nullable=True, index=True)
+    client_id:      Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    client_name:    Mapped[str | None] = mapped_column(String, nullable=True)
+    client_surname: Mapped[str | None] = mapped_column(String, nullable=True)
+    client_phone:   Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
     # Врач — FK на staff
-    doctor_id:   Mapped[int | None] = mapped_column(Integer, ForeignKey("staff.id", ondelete="SET NULL"), nullable=True, index=True)
-    doctor_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    doctor:      Mapped["Staff | None"] = relationship("Staff", lazy="select")
+    doctor_id:   Mapped[int | None]        = mapped_column(
+        Integer, ForeignKey("staff.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    doctor_name: Mapped[str | None]        = mapped_column(String, nullable=True)
+    doctor:      Mapped["Staff | None"]    = relationship("Staff", lazy="select")
 
     # Администратор (кто записал)
     administrator_id:      Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
@@ -40,29 +48,29 @@ class Appointment(Base):
     attraction_source_id:    Mapped[int | None] = mapped_column(Integer, nullable=True)
     attraction_source_title: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    # Услуги — JSON строка [{"title": "...", ...}, ...]
+    # Услуги — JSON строка
     services_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Предвычисленное поле: заполняется коллектором при сохранении
+    is_callcenter: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
     # Служебные
     collected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    # --- Properties (используют константы, а не magic numbers) ---
+
     @property
     def is_visit(self) -> bool:
-        return self.status in (6, 7, 8)
+        return self.status in MEDODS_VISIT_STATUSES
 
     @property
     def is_noshow(self) -> bool:
-        return self.status == 5
+        return self.status in MEDODS_NOSHOW_STATUSES
 
     @property
     def is_cancelled(self) -> bool:
-        return self.status == 4
+        return self.status in MEDODS_CANCEL_STATUSES
 
     @property
     def is_pending(self) -> bool:
-        return self.status in (2, 9)
-
-    @property
-    def is_callcenter(self) -> bool:
-        from app.core.config import settings
-        return self.administrator_surname in settings.CALLCENTER_SURNAMES
+        return self.status in MEDODS_PENDING_STATUSES
