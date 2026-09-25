@@ -3,11 +3,14 @@
 
 Логика:
 - Сегодняшний день (UTC+7) обновляется в 09:00, 12:00, 15:00, 18:00 по Кемерово
-- Предыдущие дни не трогаются — данные там полные
+- Каждый коллектор запускается параллельно в своей сессии через asyncio.gather
+- Ошибка одного коллектора не мешает остальным
 """
+import asyncio
 import logging
 from datetime import date
 from zoneinfo import ZoneInfo
+from typing import Callable, Awaitable
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -23,65 +26,50 @@ logger = logging.getLogger(__name__)
 
 TZ_KEMEROVO = ZoneInfo("Asia/Krasnoyarsk")  # UTC+7
 
+# Список коллекторов: (имя, функция(db, date_from, date_to))
+_COLLECTORS: list[tuple[str, Callable]] = [
+    ("звонки",           collect_calls),
+    ("записи",           collect_appointments),
+    ("revenue",          collect_revenue),
+    ("payment_details",  collect_payment_details),
+    ("sales",            collect_sales),
+]
+
+
+async def _run_collector(name: str, fn: Callable, today: date) -> None:
+    """Запускает один коллектор в отдельной сессии, логирует результат/ошибку."""
+    async with async_session_factory() as db:
+        try:
+            result = await fn(db, today, today)
+            logger.info("[scheduler] %s: %s", name, result)
+        except Exception as exc:
+            logger.error("[scheduler] Ошибка коллектора '%s': %s", name, exc, exc_info=True)
+
 
 async def _sync_today() -> None:
-    """Собирает данные за сегодня по Кемерово."""
+    """Запускает все коллекторы параллельно за сегодняшний день."""
     today = date.today()
-    logger.info(f"[scheduler] Запуск синхронизации за {today}")
+    logger.info("[scheduler] Запуск синхронизации за %s", today)
 
-    async with async_session_factory() as db:
-        try:
-            calls_count = await collect_calls(db, today, today)
-            logger.info(f"[scheduler] Звонки: +{calls_count} новых")
-        except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора звонков: {e}")
+    await asyncio.gather(*[
+        _run_collector(name, fn, today)
+        for name, fn in _COLLECTORS
+    ])
 
-    async with async_session_factory() as db:
-        try:
-            appt_count = await collect_appointments(db, today, today)
-            logger.info(f"[scheduler] Записи: +{appt_count} новых/обновлено")
-        except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора записей: {e}")
-
-    async with async_session_factory() as db:
-        try:
-            rev_results = await collect_revenue(db, today, today)
-            logger.info(f"[scheduler] Revenue: {rev_results}")
-        except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора revenue: {e}")
-
-    async with async_session_factory() as db:
-        try:
-            pd_stats = await collect_payment_details(db, today, today)
-            logger.info(f"[scheduler] PaymentDetails: {pd_stats}")
-        except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора payment_details: {e}")
-
-    async with async_session_factory() as db:
-        try:
-            sales_stats = await collect_sales(db, today, today)
-            logger.info(f"[scheduler] Sales: {sales_stats}")
-        except Exception as e:
-            logger.error(f"[scheduler] Ошибка сбора sales: {e}")
+    logger.info("[scheduler] Синхронизация завершена за %s", today)
 
 
 def create_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone=TZ_KEMEROVO)
 
-    trigger = CronTrigger(
-        hour="9,12,15,18",
-        minute=0,
-        timezone=TZ_KEMEROVO,
-    )
-
     scheduler.add_job(
         _sync_today,
-        trigger=trigger,
+        trigger=CronTrigger(hour="9,12,15,18", minute=0, timezone=TZ_KEMEROVO),
         id="sync_today",
         name="Синхронизация данных за сегодня",
         replace_existing=True,
         misfire_grace_time=300,
     )
 
-    logger.info("[scheduler] Планировщик настроен: 09:00, 12:00, 15:00, 18:00 (Кемерово)")
+    logger.info("[scheduler] Настроен: 09:00, 12:00, 15:00, 18:00 (Кемерово)")
     return scheduler
