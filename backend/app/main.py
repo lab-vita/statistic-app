@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import engine
-from app.api import calls, appointments, plans, revenue, sales, services, staff
+from app.api import calls, appointments, plans, revenue, sales, services, staff, payments
 from app.services.scheduler import create_scheduler
 
 logging.basicConfig(
@@ -18,12 +18,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Жизненный цикл приложения.
-
-    Создание таблиц — через Alembic (`alembic upgrade head` перед запуском).
-    Base.metadata.create_all здесь нет намеренно: в production авто-креат не обновляет схему.
-    """
     scheduler = create_scheduler()
     scheduler.start()
     logger.info("[main] Планировщик запущен")
@@ -50,6 +44,7 @@ app.include_router(revenue.router,      prefix="/api/revenue",       tags=["reve
 app.include_router(sales.router,        prefix="/api/sales",         tags=["sales"])
 app.include_router(services.router,     prefix="/api/services",      tags=["services"])
 app.include_router(staff.router,        prefix="/api/staff",         tags=["staff"])
+app.include_router(payments.router,     prefix="/api/payments",      tags=["payments"])
 
 
 @app.get("/")
