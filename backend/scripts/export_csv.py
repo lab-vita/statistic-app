@@ -8,7 +8,10 @@
     python scripts/export_csv.py --tables calls,appointments
     python scripts/export_csv.py --from 2026-01-01 --to 2026-09-01
 
-Файлы появятся в backend/exports/
+Доступные таблицы:
+    calls, appointments, revenue, sales, services, staff, payment_details
+
+Файлы появляются в backend/exports/
 """
 import asyncio
 import csv
@@ -20,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, ".")
 
 EXPORT_DIR = Path("exports")
+ALL_TABLES = ["calls", "appointments", "revenue", "sales", "services", "staff", "payment_details"]
 
 
 async def export_table(session_factory, filename: str, query, columns: list[str]):
@@ -37,8 +41,10 @@ async def export_table(session_factory, filename: str, query, columns: list[str]
 
 async def main():
     parser = argparse.ArgumentParser(description="Экспорт таблиц в CSV")
-    parser.add_argument("--tables", default="all",
-                        help="Какие таблицы экспортировать: all или через запятую (calls,appointments,revenue,sales,services)")
+    parser.add_argument(
+        "--tables", default="all",
+        help=f"Какие таблицы экспортировать: all или через запятую ({','.join(ALL_TABLES)})"
+    )
     parser.add_argument("--from", dest="date_from", default=None,
                         help="Фильтр от даты YYYY-MM-DD (для таблиц с датами)")
     parser.add_argument("--to", dest="date_to", default=None,
@@ -48,7 +54,15 @@ async def main():
     date_from = date.fromisoformat(args.date_from) if args.date_from else None
     date_to   = date.fromisoformat(args.date_to)   if args.date_to   else None
 
-    tables = set(args.tables.split(",")) if args.tables != "all" else None
+    if args.tables == "all":
+        tables = set(ALL_TABLES)
+    else:
+        tables = set(t.strip() for t in args.tables.split(","))
+        unknown = tables - set(ALL_TABLES)
+        if unknown:
+            print(f"Неизвестные таблицы: {', '.join(unknown)}")
+            print(f"Доступные: {', '.join(ALL_TABLES)}")
+            sys.exit(1)
 
     from sqlalchemy import select, and_
     from app.db.database import async_session_factory
@@ -57,6 +71,8 @@ async def main():
     from app.models.revenue import Revenue
     from app.models.sale import Sale
     from app.models.service import Service, ServiceCategory
+    from app.models.staff import Staff
+    from app.models.payment_detail import PaymentDetail
 
     print(f"=== ЭКСПОРТ CSV: {datetime.now():%Y-%m-%d %H:%M} ===")
     if date_from or date_to:
@@ -72,7 +88,7 @@ async def main():
         return and_(*filters) if filters else True
 
     # 1. Звонки
-    if tables is None or "calls" in tables:
+    if "calls" in tables:
         await export_table(
             async_session_factory,
             "calls.csv",
@@ -88,7 +104,7 @@ async def main():
         )
 
     # 2. Записи на приём
-    if tables is None or "appointments" in tables:
+    if "appointments" in tables:
         await export_table(
             async_session_factory,
             "appointments.csv",
@@ -111,7 +127,7 @@ async def main():
         )
 
     # 3. Revenue
-    if tables is None or "revenue" in tables:
+    if "revenue" in tables:
         await export_table(
             async_session_factory,
             "revenue.csv",
@@ -123,7 +139,7 @@ async def main():
         )
 
     # 4. Sales
-    if tables is None or "sales" in tables:
+    if "sales" in tables:
         await export_table(
             async_session_factory,
             "sales.csv",
@@ -137,7 +153,7 @@ async def main():
         )
 
     # 5. Справочник услуг
-    if tables is None or "services" in tables:
+    if "services" in tables:
         await export_table(
             async_session_factory,
             "services.csv",
@@ -148,7 +164,6 @@ async def main():
             ).order_by(Service.category_id, Service.title),
             ["id", "title", "category_id", "price", "kind", "unit", "deleted", "exclude_from_analytics"],
         )
-
         await export_table(
             async_session_factory,
             "service_categories.csv",
@@ -156,6 +171,46 @@ async def main():
                 ServiceCategory.id, ServiceCategory.title, ServiceCategory.parent_id,
             ).order_by(ServiceCategory.title),
             ["id", "title", "parent_id"],
+        )
+
+    # 6. Сотрудники
+    if "staff" in tables:
+        await export_table(
+            async_session_factory,
+            "staff.csv",
+            select(
+                Staff.id, Staff.username, Staff.surname, Staff.name, Staff.second_name,
+                Staff.full_name, Staff.short_name, Staff.phone, Staff.email,
+                Staff.user_status_id, Staff.status_title, Staff.deleted_at,
+                Staff.sex, Staff.birthdate, Staff.has_appointment,
+                Staff.availability_for_online_recording, Staff.specialties_titles,
+                Staff.role, Staff.synced_at,
+            ).order_by(Staff.surname, Staff.name),
+            ["id", "username", "surname", "name", "second_name", "full_name", "short_name",
+             "phone", "email", "user_status_id", "status_title", "deleted_at",
+             "sex", "birthdate", "has_appointment", "availability_for_online_recording",
+             "specialties_titles", "role", "synced_at"],
+        )
+
+    # 7. Детальные платежи
+    if "payment_details" in tables:
+        await export_table(
+            async_session_factory,
+            "payment_details.csv",
+            select(
+                PaymentDetail.id, PaymentDetail.medods_id, PaymentDetail.payment_date,
+                PaymentDetail.kind, PaymentDetail.by_cash, PaymentDetail.by_cashless,
+                PaymentDetail.by_card, PaymentDetail.by_balance, PaymentDetail.by_credit,
+                PaymentDetail.total_income, PaymentDetail.total_paid,
+                PaymentDetail.client_id, PaymentDetail.client_name, PaymentDetail.client_surname,
+                PaymentDetail.company_id, PaymentDetail.company_title,
+                PaymentDetail.order_id, PaymentDetail.order_sum, PaymentDetail.order_date,
+                PaymentDetail.doctor_id, PaymentDetail.doctor_name, PaymentDetail.doctor_surname,
+            ).where(date_filter(PaymentDetail.payment_date)).order_by(PaymentDetail.payment_date),
+            ["id", "medods_id", "payment_date", "kind", "by_cash", "by_cashless",
+             "by_card", "by_balance", "by_credit", "total_income", "total_paid",
+             "client_id", "client_name", "client_surname", "company_id", "company_title",
+             "order_id", "order_sum", "order_date", "doctor_id", "doctor_name", "doctor_surname"],
         )
 
     print(f"\n✅ Готово! Файлы в папке: {EXPORT_DIR.resolve()}")
