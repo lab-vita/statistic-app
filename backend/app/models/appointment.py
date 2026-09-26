@@ -32,7 +32,7 @@ class Appointment(Base):
     client_surname: Mapped[str | None] = mapped_column(String, nullable=True)
     client_phone:   Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
-    # Врач — без FK на staff (врач может быть уволен, но запись сохраняется)
+    # Врач — без FK на staff (врач может быть уволен)
     doctor_id:   Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     doctor_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
