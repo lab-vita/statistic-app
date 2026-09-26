@@ -11,7 +11,7 @@
     # Только звонки и записи
     python scripts/backfill.py --from 2026-01-01 --to 2026-09-01 --only calls,appointments
 
-    # Доступные сущности: calls, appointments, revenue, sales
+    # Доступные сущности: calls, appointments, revenue, sales, payment_details
 
 Примечание по sales:
     МедОДС возвращает агрегат за весь переданный период.
@@ -25,7 +25,7 @@ from datetime import date, timedelta
 
 sys.path.insert(0, ".")
 
-ALL_COLLECTORS = ["calls", "appointments", "revenue", "sales"]
+ALL_COLLECTORS = ["calls", "appointments", "revenue", "sales", "payment_details"]
 
 
 def _month_end(d: date) -> date:
@@ -42,8 +42,8 @@ def _next_month(d: date) -> date:
     return date(d.year, d.month + 1, 1)
 
 
-async def _run_by_month(name: str, fn, date_from: date, date_to: date):
-    """Сбор по месяцам (звонки, записи, revenue)."""
+async def _run_by_month(name: str, fn, date_from: date, date_to: date) -> int:
+    """Сбор по месяцам."""
     from app.db.database import async_session_factory
     current = date(date_from.year, date_from.month, 1)
     total = 0
@@ -62,7 +62,7 @@ async def _run_by_month(name: str, fn, date_from: date, date_to: date):
     return total
 
 
-async def _run_by_day(name: str, fn, date_from: date, date_to: date):
+async def _run_by_day(name: str, fn, date_from: date, date_to: date) -> int:
     """Сбор по дням (sales — каждый день отдельно)."""
     from app.db.database import async_session_factory
     current = date_from
@@ -85,6 +85,15 @@ async def run_backfill(collectors: list[str], date_from: date, date_to: date):
     from app.services.medods_collector import collect_appointments
     from app.services.revenue_collector import collect_revenue
     from app.services.sales_collector import collect_sales
+    from app.services.payment_detail_collector import collect_payment_details
+
+    COLLECTOR_MAP = {
+        "calls":           (collect_calls,           "month"),
+        "appointments":    (collect_appointments,    "month"),
+        "revenue":         (collect_revenue,         "month"),
+        "sales":           (collect_sales,           "day"),
+        "payment_details": (collect_payment_details, "month"),
+    }
 
     span = (date_to - date_from).days + 1
     print(f"=== BACKFILL: {date_from} — {date_to} ({span} дней) ===")
@@ -92,16 +101,12 @@ async def run_backfill(collectors: list[str], date_from: date, date_to: date):
     print()
 
     for name in collectors:
-        print(f"[→] {name} ...")
-        if name == "sales":
-            # Sales: подневно, т.к. МедОДС агрегирует за период
-            total = await _run_by_day(name, collect_sales, date_from, date_to)
-        elif name == "calls":
-            total = await _run_by_month(name, collect_calls, date_from, date_to)
-        elif name == "appointments":
-            total = await _run_by_month(name, collect_appointments, date_from, date_to)
-        elif name == "revenue":
-            total = await _run_by_month(name, collect_revenue, date_from, date_to)
+        fn, mode = COLLECTOR_MAP[name]
+        print(f"[→] {name} ({mode}) ...")
+        if mode == "day":
+            total = await _run_by_day(name, fn, date_from, date_to)
+        else:
+            total = await _run_by_month(name, fn, date_from, date_to)
         print(f"[✓] {name}: итого +{total}\n")
 
     print("✅ Бэкфилл завершён!")
