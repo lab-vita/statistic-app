@@ -1,15 +1,38 @@
-"""API эндпоинты для данных о выручке по типам оплат."""
+"""
+API детальных платежей (payment_details).
+
+Эндпоинты:
+  POST /api/payments/collect      — сбор за период
+  GET  /api/payments/stats        — агрегат по способам оплаты + дельты
+  GET  /api/payments/daily        — по дням
+  GET  /api/payments/daily-by-type — по дням с разбивкой по способам оплаты
+  GET  /api/payments/by-doctor    — по врачам
+  GET  /api/payments/by-client    — топ клиентов по сумме платежей
+"""
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.models.payment import Payment
-from app.services.payments_collector import collect_payments
+from app.models.payment_detail import PaymentDetail
+from app.services.payment_detail_collector import collect_payment_details
+from app.core.utils import prev_period, calc_delta
 
 router = APIRouter()
+
+KIND_LABELS = {6: "Обычный", 7: "Страховой", 2: "Возврат"}
+
+
+def _base_filter(date_from: date, date_to: date, kind: int | None = None):
+    f = and_(
+        PaymentDetail.payment_date >= date_from,
+        PaymentDetail.payment_date <= date_to,
+    )
+    if kind is not None:
+        f = and_(f, PaymentDetail.kind == kind)
+    return f
 
 
 @router.post("/collect")
@@ -18,106 +41,99 @@ async def collect(
     date_to:   date = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
-    """Запустить сбор выручки за период (итерация по дням)."""
-    if date_from > date_to:
-        raise HTTPException(400, "date_from не может быть позже date_to")
-    count = await collect_payments(db, date_from, date_to)
-    return {"collected": count, "date_from": date_from, "date_to": date_to}
+    result = await collect_payment_details(db, date_from, date_to)
+    return {"status": "ok", "date_from": date_from, "date_to": date_to, **result}
 
 
 @router.get("/stats")
 async def stats(
-    date_from: date = Query(...),
-    date_to:   date = Query(...),
+    date_from: date       = Query(...),
+    date_to:   date       = Query(...),
+    kind:      int | None = Query(default=None, description="6=обычный, 7=страховой, 2=возврат"),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Суммарная выручка по типам оплат за период.
+    prev_from, prev_to = prev_period(date_from, date_to)
 
-    Ответ:
-    {
-        "date_from": "2026-09-01",
-        "date_to":   "2026-09-17",
-        "total_sum":    2377006.0,
-        "total_amount": 875,
-        "by_type": [
-            {"payment_type": "Картой",    "amount": 614, "sum": 1709943.0, "percent": 71.94},
-            {"payment_type": "Наличными", "amount": 228, "sum": 623143.0,  "percent": 26.22},
-            {"payment_type": "Кредитом",  "amount": 33,  "sum": 43920.0,   "percent": 1.85},
-        ]
-    }
-    """
-    rows = (
-        await db.execute(
+    async def _totals(d_from: date, d_to: date) -> dict:
+        row = (await db.execute(
             select(
-                Payment.payment_type,
-                func.sum(Payment.amount).label("amount"),
-                func.sum(Payment.total_sum).label("total_sum"),
-            )
-            .where(and_(Payment.payment_date >= date_from, Payment.payment_date <= date_to))
-            .group_by(Payment.payment_type)
-            .order_by(func.sum(Payment.total_sum).desc())
-        )
-    ).all()
+                func.count(PaymentDetail.id).label("count"),
+                func.sum(PaymentDetail.total_paid).label("total_paid"),
+                func.sum(PaymentDetail.by_cash).label("by_cash"),
+                func.sum(PaymentDetail.by_card).label("by_card"),
+                func.sum(PaymentDetail.by_cashless).label("by_cashless"),
+                func.sum(PaymentDetail.by_credit).label("by_credit"),
+                func.sum(PaymentDetail.by_balance).label("by_balance"),
+            ).where(_base_filter(d_from, d_to, kind))
+        )).one()
+        return {
+            "count":       int(row.count or 0),
+            "total_paid":  int(row.total_paid or 0),
+            "by_cash":     int(row.by_cash or 0),
+            "by_card":     int(row.by_card or 0),
+            "by_cashless": int(row.by_cashless or 0),
+            "by_credit":   int(row.by_credit or 0),
+            "by_balance":  int(row.by_balance or 0),
+        }
 
-    grand_sum    = sum(r.total_sum for r in rows)
-    grand_amount = sum(r.amount    for r in rows)
+    curr = await _totals(date_from, date_to)
+    prev = await _totals(prev_from, prev_to)
+
+    delta_keys = ["count", "total_paid", "by_cash", "by_card", "by_cashless", "by_credit"]
+    result = dict(curr)
+    for key in delta_keys:
+        d = calc_delta(curr[key], prev[key])
+        result[f"{key}_delta_pct"] = d["delta_pct"]
+        result[f"{key}_delta_dir"] = d["delta_dir"]
 
     return {
-        "date_from":    date_from,
-        "date_to":      date_to,
-        "total_sum":    round(grand_sum, 2),
-        "total_amount": grand_amount,
-        "by_type": [
-            {
-                "payment_type": r.payment_type,
-                "amount":       r.amount,
-                "sum":          round(r.total_sum, 2),
-                "percent":      round(r.total_sum / grand_sum * 100, 2) if grand_sum else 0.0,
-            }
-            for r in rows
-        ],
+        "date_from": date_from, "date_to": date_to,
+        "prev_from": prev_from, "prev_to": prev_to,
+        "kind": kind, "kind_label": KIND_LABELS.get(kind, "Все") if kind else "Все",
+        **result,
     }
 
 
 @router.get("/daily")
 async def daily(
-    date_from: date = Query(...),
-    date_to:   date = Query(...),
+    date_from: date       = Query(...),
+    date_to:   date       = Query(...),
+    kind:      int | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Выручка по дням (все типы оплат суммированы).
-
-    Ответ:
-    {
-        "days": [
-            {"date": "2026-09-01", "sum": 89430.0, "amount": 31},
-            ...
-        ]
-    }
-    """
-    rows = (
-        await db.execute(
-            select(
-                Payment.payment_date,
-                func.sum(Payment.amount).label("amount"),
-                func.sum(Payment.total_sum).label("total_sum"),
-            )
-            .where(and_(Payment.payment_date >= date_from, Payment.payment_date <= date_to))
-            .group_by(Payment.payment_date)
-            .order_by(Payment.payment_date)
+    rows = (await db.execute(
+        select(
+            PaymentDetail.payment_date,
+            func.count(PaymentDetail.id).label("count"),
+            func.sum(PaymentDetail.total_paid).label("total_paid"),
+            func.sum(PaymentDetail.by_cash).label("by_cash"),
+            func.sum(PaymentDetail.by_card).label("by_card"),
+            func.sum(PaymentDetail.by_cashless).label("by_cashless"),
+            func.sum(PaymentDetail.by_credit).label("by_credit"),
         )
-    ).all()
+        .where(_base_filter(date_from, date_to, kind))
+        .group_by(PaymentDetail.payment_date)
+        .order_by(PaymentDetail.payment_date)
+    )).all()
 
-    return {
-        "date_from": date_from,
-        "date_to":   date_to,
-        "days": [
-            {"date": str(r.payment_date), "sum": round(r.total_sum, 2), "amount": r.amount}
-            for r in rows
-        ],
-    }
+    # Заполняем дни без данных нулями
+    by_date = {r.payment_date: r for r in rows}
+    days = []
+    current = date_from
+    while current <= date_to:
+        r = by_date.get(current)
+        days.append({
+            "date":        str(current),
+            "count":       int(r.count or 0)       if r else 0,
+            "total_paid":  int(r.total_paid or 0)  if r else 0,
+            "by_cash":     int(r.by_cash or 0)     if r else 0,
+            "by_card":     int(r.by_card or 0)     if r else 0,
+            "by_cashless": int(r.by_cashless or 0) if r else 0,
+            "by_credit":   int(r.by_credit or 0)   if r else 0,
+        })
+        current += timedelta(days=1)
+
+    return {"date_from": date_from, "date_to": date_to, "days": days}
 
 
 @router.get("/daily-by-type")
@@ -126,52 +142,35 @@ async def daily_by_type(
     date_to:   date = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Выручка по дням с разбивкой по типам оплат — для stacked-графика.
-
-    Ответ:
-    {
-        "days": ["2026-09-01", "2026-09-02", ...],
-        "series": [
-            {"payment_type": "Картой",    "values": [54000.0, 61000.0, ...]},
-            {"payment_type": "Наличными", "values": [12000.0, 15000.0, ...]},
-            {"payment_type": "Кредитом",  "values": [3500.0,  0.0,     ...]},
-        ]
-    }
-    """
-    rows = (
-        await db.execute(
-            select(
-                Payment.payment_date,
-                Payment.payment_type,
-                func.sum(Payment.total_sum).label("total_sum"),
-            )
-            .where(and_(Payment.payment_date >= date_from, Payment.payment_date <= date_to))
-            .group_by(Payment.payment_date, Payment.payment_type)
-            .order_by(Payment.payment_date, Payment.payment_type)
+    """Подневная выручка с разбивкой по способам оплаты — для stacked-графика."""
+    rows = (await db.execute(
+        select(
+            PaymentDetail.payment_date,
+            func.sum(PaymentDetail.by_cash).label("by_cash"),
+            func.sum(PaymentDetail.by_card).label("by_card"),
+            func.sum(PaymentDetail.by_cashless).label("by_cashless"),
+            func.sum(PaymentDetail.by_credit).label("by_credit"),
+            func.sum(PaymentDetail.by_balance).label("by_balance"),
         )
-    ).all()
+        .where(_base_filter(date_from, date_to, kind=6))  # Только обычные
+        .group_by(PaymentDetail.payment_date)
+        .order_by(PaymentDetail.payment_date)
+    )).all()
 
-    # Все дни в диапазоне (включая дни без данных)
-    days_list: list[date] = []
-    d = date_from
-    while d <= date_to:
-        days_list.append(d)
-        d += timedelta(days=1)
+    by_date = {r.payment_date: r for r in rows}
+    days_list = []
+    current = date_from
+    while current <= date_to:
+        days_list.append(current)
+        current += timedelta(days=1)
 
-    # Уникальные типы оплат в порядке первого появления
-    types_list: list[str] = []
-    seen: set[str] = set()
-    for r in rows:
-        if r.payment_type not in seen:
-            types_list.append(r.payment_type)
-            seen.add(r.payment_type)
-
-    # Быстрый поиск по (дата, тип)
-    index: dict[tuple, float] = {
-        (r.payment_date, r.payment_type): round(r.total_sum, 2)
-        for r in rows
-    }
+    TYPES = [
+        ("by_cash",     "Наличными"),
+        ("by_card",     "Картой"),
+        ("by_cashless", "Безналичными"),
+        ("by_credit",   "Кредитом"),
+        ("by_balance",  "С лицевого счёта"),
+    ]
 
     return {
         "date_from": date_from,
@@ -179,9 +178,95 @@ async def daily_by_type(
         "days":      [str(d) for d in days_list],
         "series": [
             {
-                "payment_type": pt,
-                "values": [index.get((d, pt), 0.0) for d in days_list],
+                "key":    key,
+                "label":  label,
+                "values": [int(getattr(by_date[d], key) or 0) if d in by_date else 0 for d in days_list],
             }
-            for pt in types_list
+            for key, label in TYPES
+        ],
+    }
+
+
+@router.get("/by-doctor")
+async def by_doctor(
+    date_from: date       = Query(...),
+    date_to:   date       = Query(...),
+    kind:      int | None = Query(default=6),
+    limit:     int        = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Выручка по врачам за период."""
+    rows = (await db.execute(
+        select(
+            PaymentDetail.doctor_id,
+            PaymentDetail.doctor_name,
+            PaymentDetail.doctor_surname,
+            func.count(PaymentDetail.id).label("count"),
+            func.sum(PaymentDetail.total_paid).label("total_paid"),
+        )
+        .where(_base_filter(date_from, date_to, kind))
+        .where(PaymentDetail.doctor_id.isnot(None))
+        .group_by(PaymentDetail.doctor_id, PaymentDetail.doctor_name, PaymentDetail.doctor_surname)
+        .order_by(func.sum(PaymentDetail.total_paid).desc())
+        .limit(limit)
+    )).all()
+
+    grand_total = sum(r.total_paid or 0 for r in rows)
+
+    return {
+        "date_from": date_from,
+        "date_to":   date_to,
+        "kind":      kind,
+        "doctors": [
+            {
+                "doctor_id":      r.doctor_id,
+                "doctor_name":    r.doctor_name,
+                "doctor_surname": r.doctor_surname,
+                "count":          int(r.count or 0),
+                "total_paid":     int(r.total_paid or 0),
+                "pct":            round(int(r.total_paid or 0) / grand_total * 100, 1) if grand_total else 0,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/by-client")
+async def by_client(
+    date_from: date       = Query(...),
+    date_to:   date       = Query(...),
+    kind:      int | None = Query(default=6),
+    limit:     int        = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Топ клиентов по сумме платежей за период."""
+    rows = (await db.execute(
+        select(
+            PaymentDetail.client_id,
+            PaymentDetail.client_name,
+            PaymentDetail.client_surname,
+            func.count(PaymentDetail.id).label("count"),
+            func.sum(PaymentDetail.total_paid).label("total_paid"),
+        )
+        .where(_base_filter(date_from, date_to, kind))
+        .where(PaymentDetail.client_id.isnot(None))
+        .group_by(PaymentDetail.client_id, PaymentDetail.client_name, PaymentDetail.client_surname)
+        .order_by(func.sum(PaymentDetail.total_paid).desc())
+        .limit(limit)
+    )).all()
+
+    return {
+        "date_from": date_from,
+        "date_to":   date_to,
+        "kind":      kind,
+        "clients": [
+            {
+                "client_id":      r.client_id,
+                "client_name":    r.client_name,
+                "client_surname": r.client_surname,
+                "count":          int(r.count or 0),
+                "total_paid":     int(r.total_paid or 0),
+            }
+            for r in rows
         ],
     }
