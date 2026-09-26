@@ -1,5 +1,5 @@
-from sqlalchemy import String, Integer, DateTime, Boolean, Text, Date, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import String, Integer, DateTime, Boolean, Text, Date
+from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, date
 from app.db.database import Base
 from app.core.constants import (
@@ -32,12 +32,9 @@ class Appointment(Base):
     client_surname: Mapped[str | None] = mapped_column(String, nullable=True)
     client_phone:   Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
-    # Врач — FK на staff
-    doctor_id:   Mapped[int | None]        = mapped_column(
-        Integer, ForeignKey("staff.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    doctor_name: Mapped[str | None]        = mapped_column(String, nullable=True)
-    doctor:      Mapped["Staff | None"]    = relationship("Staff", lazy="select")
+    # Врач — без FK на staff (врач может быть уволен, но запись сохраняется)
+    doctor_id:   Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    doctor_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Администратор (кто записал)
     administrator_id:      Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
@@ -56,8 +53,6 @@ class Appointment(Base):
 
     # Служебные
     collected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    # --- Properties (используют константы, а не magic numbers) ---
 
     @property
     def is_visit(self) -> bool:
