@@ -10,6 +10,11 @@
   6. message.data — строка JSON с {"batch": [...]}
   7. Конец — message.data == "eof" с meta.request_id
 
+Важно:
+  МедОДС агрегирует данные за весь переданный период.
+  Чтобы получить подневную разбивку — вызывать collect_sales за каждый день отдельно.
+  backfill.py и scheduler делают это автоматически (итерация по дням).
+
 Зависимости:
   pip install websockets
 """
@@ -32,8 +37,8 @@ from app.services.medods import login
 
 logger = logging.getLogger(__name__)
 
-_WS_TIMEOUT  = 120  # секунд ждать eof после POST
-_WS_URL_PATH = "/_ws"
+_WS_TIMEOUT   = 120   # секунд ждать eof после POST
+_WS_URL_PATH  = "/_ws"
 _READ_CHANNEL = "ReportChannel"  # UserChannel дублирует — читаем только один
 
 
@@ -46,15 +51,13 @@ def _fmt_period(d_from: date, d_to: date) -> str:
 
 
 def _ws_connect(ws_url: str, cookie_header: str):
-    """Совместимый вызов для разных версий websockets."""
-    ver = tuple(int(x) for x in websockets.__version__.split(".")[:2])
-    header_key = "additional_headers" if ver >= (10, 0) else "extra_headers"
+    """Подключение к WebSocket. websockets 13.x использует extra_headers."""
     return websockets.connect(
         ws_url,
+        extra_headers={"Cookie": cookie_header},
         ping_interval=20,
         ping_timeout=30,
         open_timeout=15,
-        **{header_key: {"Cookie": cookie_header}},
     )
 
 
@@ -89,11 +92,7 @@ async def _post_sales_report(client, date_from: date, date_to: date) -> str:
     return request_id
 
 
-async def _collect_via_websocket(
-    client,
-    date_from: date,
-    date_to: date,
-) -> list[dict]:
+async def _collect_via_websocket(client, date_from: date, date_to: date) -> list[dict]:
     """
     Полный цикл: открываем WS → handshake → POST → собираем батчи → eof.
     Возвращает список entry из type="data" батчей.
@@ -125,11 +124,11 @@ async def _collect_via_websocket(
             msg = m.get("message") or {}
             if isinstance(msg, dict) and msg.get("meta", {}).get("type") == "handshake":
                 handshake_count += 1
-                logger.info(f"[sales] Handshake получен, делаем POST")
+                logger.info("[sales] Handshake получен, делаем POST")
 
         # POST — только после handshake
         request_id = await _post_sales_report(client, date_from, date_to)
-        logger.info(f"[sales] request_id={request_id} за {date_from}–{date_to}")
+        logger.info("[sales] request_id=%s за %s–%s", request_id, date_from, date_to)
 
         # Собираем батчи до eof
         seen_eof = False
@@ -142,13 +141,13 @@ async def _collect_via_websocket(
             raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
             m = json.loads(raw)
 
-            # Пропускаем ping
             if m.get("type") == "ping":
                 continue
 
             # Читаем только ReportChannel чтобы не дублировать
-            if f'"channel": "{_READ_CHANNEL}"' not in m.get("identifier", "") \
-               and f'"channel":"{_READ_CHANNEL}"' not in m.get("identifier", ""):
+            identifier = m.get("identifier", "")
+            if f'"channel": "{_READ_CHANNEL}"' not in identifier \
+               and f'"channel":"{_READ_CHANNEL}"' not in identifier:
                 continue
 
             message = m.get("message")
@@ -159,10 +158,9 @@ async def _collect_via_websocket(
 
             # EOF
             if data == "eof":
-                meta = message.get("meta", {})
-                if meta.get("request_id") == request_id:
+                if message.get("meta", {}).get("request_id") == request_id:
                     seen_eof = True
-                    logger.info(f"[sales] EOF получен, всего entry: {len(entries)}")
+                    logger.info("[sales] EOF получен, всего entry: %d", len(entries))
                 continue
 
             # Батч — data это строка JSON
@@ -184,8 +182,9 @@ async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dic
     """
     Собирает продажи по номенклатуре за период через WebSocket.
 
-    Один запрос = весь период (данные агрегированы МедОДС).
-    Сохраняем с sale_date=date_from.
+    МедОДС возвращает агрегат за весь период — для подневной разбивки
+    вызывать этот метод за каждый день отдельно (date_from == date_to).
+    Записи сохраняются с sale_date=date_from.
 
     Возвращает: {"fetched": N, "created": N, "updated": N}
     """
@@ -198,7 +197,7 @@ async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dic
         await client.aclose()
 
     stats["fetched"] = len(entries)
-    logger.info(f"[sales] Получено {len(entries)} записей продаж")
+    logger.info("[sales] Получено %d записей за %s", len(entries), date_from)
 
     for entry in entries:
         title = (entry.get("title") or "").strip()
@@ -228,5 +227,5 @@ async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dic
             stats["created"] += 1
 
     await db.commit()
-    logger.info(f"[sales] Создано: {stats['created']}, Обновлено: {stats['updated']}")
+    logger.info("[sales] Создано: %d, Обновлено: %d", stats["created"], stats["updated"])
     return stats
