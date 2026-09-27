@@ -5,6 +5,7 @@
 """
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+import re
 
 TZ_LOCAL = ZoneInfo("Asia/Krasnoyarsk")  # UTC+7, Кемерово
 
@@ -61,3 +62,25 @@ def to_local(dt: datetime) -> datetime:
 def local_date(dt: datetime) -> date:
     """Возвращает локальную дату для datetime (UTC → UTC+7)."""
     return to_local(dt).date()
+
+
+def normalize_phone(phone: str | None) -> str | None:
+    """
+    Нормализует номер телефона к единому формату: 11 цифр без префикса.
+
+    Примеры:
+        +79991234567  →  79991234567
+        79991234567   →  79991234567
+        89991234567   →  79991234567
+        7 999 123-45-67 → 79991234567
+        None          →  None
+    """
+    if not phone:
+        return None
+    digits = re.sub(r"\D", "", phone)
+    if not digits:
+        return None
+    # Заменяем начальную 8 на 7 (российский формат)
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    return digits if len(digits) >= 10 else None
