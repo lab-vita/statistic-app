@@ -4,6 +4,8 @@ from sqlalchemy import select
 from app.services.bitrix import fetch_all_calls, classify_call
 from app.models.call import Call
 from app.core.config import settings
+from app.core.utils import normalize_phone
+
 
 async def collect_calls(db: AsyncSession, date_from: date, date_to: date) -> int:
     raw_calls = await fetch_all_calls(date_from, date_to)
@@ -30,7 +32,7 @@ async def collect_calls(db: AsyncSession, date_from: date, date_to: date) -> int
             call_duration    = int(raw.get("CALL_DURATION", 0) or 0),
             portal_number    = str(raw.get("PORTAL_NUMBER", "")),
             portal_user_id   = str(raw.get("PORTAL_USER_ID", "")),
-            phone_number     = str(raw.get("PHONE_NUMBER", "")),
+            phone_number     = normalize_phone(raw.get("PHONE_NUMBER", "")),
             crm_entity_type  = raw.get("CRM_ENTITY_TYPE"),
             crm_entity_id    = raw.get("CRM_ENTITY_ID"),
             call_record_url  = raw.get("CALL_RECORD_URL"),

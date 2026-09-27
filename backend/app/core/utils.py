@@ -3,11 +3,32 @@
 
 Используется во всех API-модулях, чтобы избежать дублирования логики.
 """
+import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-import re
 
 TZ_LOCAL = ZoneInfo("Asia/Krasnoyarsk")  # UTC+7, Кемерово
+
+
+def normalize_phone(phone: str | None) -> str | None:
+    """
+    Нормализует номер телефона к единому формату 79XXXXXXXXX.
+
+    Примеры:
+        +79991234567  ->  79991234567
+        89991234567   ->  79991234567
+        79991234567   ->  79991234567
+        9991234567    ->  79991234567
+        None          ->  None
+    """
+    if not phone:
+        return None
+    digits = re.sub(r"\D", "", str(phone))
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    elif len(digits) == 10:
+        digits = "7" + digits
+    return digits if len(digits) == 11 else None
 
 
 def prev_period(date_from: date, date_to: date) -> tuple[date, date]:
@@ -36,8 +57,6 @@ def calc_delta(current: float, previous: float) -> dict:
 def add_deltas(curr: dict, prev: dict, keys: list[str]) -> dict:
     """
     Добавляет дельты к словарю curr по заданным ключам.
-
-    Для каждого key добавляет {key}_delta_pct и {key}_delta_dir.
     """
     result = dict(curr)
     for key in keys:
@@ -50,9 +69,6 @@ def add_deltas(curr: dict, prev: dict, keys: list[str]) -> dict:
 def to_local(dt: datetime) -> datetime:
     """
     Переводит UTC datetime в локальное время (Кемерово, UTC+7).
-
-    Если datetime наивный (naive), считается UTC и прибавляется 7 часов.
-    Если aware — конвертируется через astimezone.
     """
     if dt.tzinfo is None:
         return dt + timedelta(hours=7)
@@ -60,27 +76,5 @@ def to_local(dt: datetime) -> datetime:
 
 
 def local_date(dt: datetime) -> date:
-    """Возвращает локальную дату для datetime (UTC → UTC+7)."""
+    """Возвращает локальную дату для datetime (UTC -> UTC+7)."""
     return to_local(dt).date()
-
-
-def normalize_phone(phone: str | None) -> str | None:
-    """
-    Нормализует номер телефона к единому формату: 11 цифр без префикса.
-
-    Примеры:
-        +79991234567  →  79991234567
-        79991234567   →  79991234567
-        89991234567   →  79991234567
-        7 999 123-45-67 → 79991234567
-        None          →  None
-    """
-    if not phone:
-        return None
-    digits = re.sub(r"\D", "", phone)
-    if not digits:
-        return None
-    # Заменяем начальную 8 на 7 (российский формат)
-    if len(digits) == 11 and digits.startswith("8"):
-        digits = "7" + digits[1:]
-    return digits if len(digits) >= 10 else None

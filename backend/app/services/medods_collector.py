@@ -10,11 +10,11 @@ from app.core.utils import normalize_phone
 
 def _parse_appointment(raw: dict) -> dict:
     """Парсит одну запись из ответа МедОДС."""
-    a        = raw.get("appointment", raw)
-    client   = a.get("client")        or {}
-    doctor   = a.get("doctor")        or {}
-    admin    = a.get("administrator") or {}
-    source   = a.get("attractionSource") or {}
+    a       = raw.get("appointment", raw)
+    client  = a.get("client")  or {}
+    doctor  = a.get("doctor")  or {}
+    admin   = a.get("administrator") or {}
+    source  = a.get("attractionSource") or {}
     services = [et["title"] for et in (a.get("entryTypes") or [])]
 
     appt_date = None
@@ -45,7 +45,7 @@ def _parse_appointment(raw: dict) -> dict:
         "client_id":               client.get("id"),
         "client_name":             client.get("name"),
         "client_surname":          client.get("surname"),
-        "client_phone":            normalize_phone(client.get("phone")),  # нормализация
+        "client_phone":            normalize_phone(client.get("phone")),
         "doctor_id":               doctor.get("id"),
         "doctor_name":             f"{doctor.get('surname','')} {doctor.get('name','')}".strip(),
         "administrator_id":        admin.get("id"),
