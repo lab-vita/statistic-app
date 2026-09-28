@@ -32,7 +32,9 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.utils import normalize_service_title
 from app.models.sale import Sale
+from app.models.service import Service
 from app.services.medods import login
 
 logger = logging.getLogger(__name__)
@@ -178,6 +180,30 @@ async def _collect_via_websocket(client, date_from: date, date_to: date) -> list
     return entries
 
 
+async def _resolve_service_id(db: AsyncSession, title_normalized: str) -> int | None:
+    """
+    Ищет service_id по нормализованному названию.
+    Сначала точное совпадение, затем совпадение после нормализации services.title.
+    """
+    # Точное совпадение (большинство случаев после нормализации)
+    row = await db.scalar(
+        select(Service).where(Service.title == title_normalized)
+    )
+    if row:
+        return row.id
+
+    # Нормализуем справочник на лету для оставшихся случаев
+    # (когда в services.title тоже есть пробел в конце или кириллица)
+    from sqlalchemy import func, text
+    result = await db.execute(
+        select(Service.id, Service.title)
+    )
+    for svc_id, svc_title in result:
+        if normalize_service_title(svc_title) == title_normalized:
+            return svc_id
+    return None
+
+
 async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dict:
     """
     Собирает продажи по номенклатуре за период через WebSocket.
@@ -200,9 +226,21 @@ async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dic
     logger.info("[sales] Получено %d записей за %s", len(entries), date_from)
 
     for entry in entries:
-        title = (entry.get("title") or "").strip()
-        if not title:
+        raw_title = (entry.get("title") or "").strip()
+        if not raw_title:
             continue
+
+        # Нормализуем перед сохранением и матчингом
+        title = normalize_service_title(raw_title)
+
+        # Ищем service_id по нормализованному названию
+        service_id = await _resolve_service_id(db, title)
+
+        # exclude_from_analytics: берём из services если нашли, иначе False
+        exclude = False
+        if service_id:
+            svc = await db.get(Service, service_id)
+            exclude = bool(svc.exclude_from_analytics) if svc else False
 
         existing = await db.scalar(
             select(Sale).where(
@@ -211,11 +249,13 @@ async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dic
         )
 
         vals = {
-            "amount":      int(entry.get("amount", 0) or 0),
-            "total_sum":   float(entry.get("sum", 0.0) or 0.0),
-            "final_sum":   float(entry.get("finalSum", 0.0) or 0.0),
-            "sum_percent": float(entry.get("sumPercent", 0.0) or 0.0),
-            "unit":        (entry.get("measureUnitShortTitle") or "").strip() or None,
+            "service_id":             service_id,
+            "exclude_from_analytics": exclude,
+            "amount":                 int(entry.get("amount", 0) or 0),
+            "total_sum":              float(entry.get("sum", 0.0) or 0.0),
+            "final_sum":              float(entry.get("finalSum", 0.0) or 0.0),
+            "sum_percent":            float(entry.get("sumPercent", 0.0) or 0.0),
+            "unit":                   (entry.get("measureUnitShortTitle") or "").strip() or None,
         }
 
         if existing:
