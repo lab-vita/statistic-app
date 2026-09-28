@@ -1,7 +1,7 @@
 """normalize phones in calls/appointments, add call_id to appointments
 
 Revision ID: 004
-Revises: 003
+Revises: 8583c464baf4
 Create Date: 2026-09-28
 
 Что делает эта миграция:
@@ -13,7 +13,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "004"
-down_revision = "003"
+down_revision = "8583c464baf4"
 branch_labels = None
 depends_on = None
 
