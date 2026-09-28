@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, DateTime, Boolean, Text, Date
+from sqlalchemy import String, Integer, DateTime, Boolean, Text, Date, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, date
 from app.db.database import Base
@@ -30,6 +30,7 @@ class Appointment(Base):
     client_id:      Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     client_name:    Mapped[str | None] = mapped_column(String, nullable=True)
     client_surname: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Телефон хранится в нормализованном формате: 79XXXXXXXXX (без +, без 8)
     client_phone:   Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
     # Врач — без FK на staff (врач может быть уволен)
@@ -50,6 +51,14 @@ class Appointment(Base):
 
     # Предвычисленное поле: заполняется коллектором при сохранении
     is_callcenter: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+    # Связь с входящим звонком (задача #2: матчинг звонок → запись)
+    # Заполняется скриптом match_calls.py: первый входящий звонок с тем же номером
+    # за 3 дня до даты записи. Без FK — звонок может быть удалён из Bitrix.
+    call_id: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, index=True,
+        comment="ID из таблицы calls — первый входящий звонок за 3 дня до записи"
+    )
 
     # Служебные
     collected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
