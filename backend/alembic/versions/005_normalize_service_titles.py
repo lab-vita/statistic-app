@@ -9,19 +9,13 @@ Create Date: 2026-09-28
    - strip() — убирает пробелы по краям
    - схлопывает двойные пробелы в одинарные
    - заменяет кириллические А→A, В→B, С→C в коде услуги
-2. Заполняет sales.service_id через JOIN с services по нормализованному title.
-   Покрывает ~183 из 192 уникальных несовпадений (~96% строк).
-3. Обновляет sales.exclude_from_analytics из services.exclude_from_analytics.
-
-Важно:
-   Перед нормализацией проверяем дубликаты — строки, которые после нормализации
-   стали бы одинаковыми (sale_date, service_title). Такие строки мержим:
-   суммируем amount/total_sum/final_sum, оставляем одну запись, удаляем остальные.
-   Это необходимо из-за уникального constraint uq_sale_date_service.
+2. Перед нормализацией мержит строки, которые после неё стали бы дубликатами
+   (суммирует amount/total_sum/final_sum, удаляет лишние).
+3. Заполняет sales.service_id через JOIN с services по нормализованному title.
+4. Обновляет sales.exclude_from_analytics из services.
 
 Примечание:
-   9 названий, которых нет в справочнике services, остаются с service_id=NULL.
-   Они будут обработаны отдельно через таблицу алиасов (задача #3b).
+   9 названий без совпадения в services остаются с service_id=NULL.
 """
 from alembic import op
 
@@ -32,53 +26,57 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── 0. Мержим строки, которые после нормализации стали бы дубликатами ────
+    # ── 0a. Сначала trim — это безопасно, не создаёт дублей само по себе ─────
+    op.execute("""
+        UPDATE sales
+        SET service_title = trim(service_title)
+        WHERE service_title != trim(service_title);
+    """)
+
+    # ── 0b. Мержим строки, которые после схлопывания пробелов стали бы дублями
+    #
+    # После trim могут остаться пары вида:
+    #   (2026-06-13, 'А16.07.051 Гигиена  зубов')   ← двойной пробел
+    #   (2026-06-13, 'А16.07.051 Гигиена зубов')    ← одиночный
+    # После regexp_replace они стали бы одинаковыми → UniqueViolationError.
     #
     # Алгоритм:
-    #   a) Вычисляем нормализованный title для каждой строки (trim + collapse spaces + translate)
-    #   b) Находим группы (sale_date, normalized_title) с COUNT > 1
-    #   c) В каждой группе оставляем строку с MIN(id), к ней прибавляем суммы остальных
-    #   d) Удаляем дублирующие строки (все кроме MIN(id))
-    #
-    # Нормализация здесь зеркальна шагам 1a-1c ниже.
+    #   1. Вычисляем norm_title = regexp_replace(service_title, ' +', ' ', 'g')
+    #   2. Группы (sale_date, norm_title) с COUNT > 1 — это будущие дубли
+    #   3. В каждой группе оставляем MIN(id), суммируем числа к нему
+    #   4. Удаляем остальные строки группы
 
     op.execute("""
         WITH normalized AS (
             SELECT
                 id,
                 sale_date,
-                trim(regexp_replace(
-                    translate(service_title, 'АВС', 'ABC'),
-                    ' +', ' ', 'g'
-                )) AS norm_title,
-                amount,
-                total_sum,
-                final_sum,
-                sum_percent
+                regexp_replace(service_title, ' +', ' ', 'g') AS norm_title,
+                amount, total_sum, final_sum, sum_percent
             FROM sales
         ),
-        groups AS (
+        dup_groups AS (
             SELECT sale_date, norm_title
             FROM normalized
             GROUP BY sale_date, norm_title
             HAVING COUNT(*) > 1
         ),
-        duplicates AS (
-            SELECT n.id, n.sale_date, n.norm_title,
-                   MIN(n.id) OVER (PARTITION BY n.sale_date, n.norm_title) AS keep_id
-            FROM normalized n
-            JOIN groups g ON g.sale_date = n.sale_date AND g.norm_title = n.norm_title
+        keep_ids AS (
+            SELECT sale_date, norm_title, MIN(id) AS keep_id
+            FROM normalized
+            WHERE (sale_date, norm_title) IN (SELECT sale_date, norm_title FROM dup_groups)
+            GROUP BY sale_date, norm_title
         ),
         agg AS (
             SELECT
-                keep_id,
-                SUM(n.amount)      AS total_amount,
-                SUM(n.total_sum)   AS total_total_sum,
-                SUM(n.final_sum)   AS total_final_sum,
-                MAX(n.sum_percent) AS max_sum_percent
-            FROM duplicates d
-            JOIN normalized n ON n.id = d.id
-            GROUP BY keep_id
+                k.keep_id,
+                SUM(n.amount)::int    AS total_amount,
+                SUM(n.total_sum)      AS total_total_sum,
+                SUM(n.final_sum)      AS total_final_sum,
+                MAX(n.sum_percent)    AS max_sum_percent
+            FROM keep_ids k
+            JOIN normalized n ON n.sale_date = k.sale_date AND n.norm_title = k.norm_title
+            GROUP BY k.keep_id
         )
         UPDATE sales s
         SET
@@ -90,58 +88,53 @@ def upgrade() -> None:
         WHERE s.id = agg.keep_id;
     """)
 
-    # Удаляем дублирующие строки (все кроме MIN(id) в каждой группе)
     op.execute("""
         WITH normalized AS (
             SELECT
                 id,
                 sale_date,
-                trim(regexp_replace(
-                    translate(service_title, 'АВС', 'ABC'),
-                    ' +', ' ', 'g'
-                )) AS norm_title
+                regexp_replace(service_title, ' +', ' ', 'g') AS norm_title
             FROM sales
         ),
-        groups AS (
+        dup_groups AS (
             SELECT sale_date, norm_title
             FROM normalized
             GROUP BY sale_date, norm_title
             HAVING COUNT(*) > 1
         ),
+        keep_ids AS (
+            SELECT sale_date, norm_title, MIN(id) AS keep_id
+            FROM normalized
+            WHERE (sale_date, norm_title) IN (SELECT sale_date, norm_title FROM dup_groups)
+            GROUP BY sale_date, norm_title
+        ),
         to_delete AS (
             SELECT n.id
             FROM normalized n
-            JOIN groups g ON g.sale_date = n.sale_date AND g.norm_title = n.norm_title
-            WHERE n.id != (
-                SELECT MIN(n2.id)
-                FROM normalized n2
-                WHERE n2.sale_date = n.sale_date AND n2.norm_title = n.norm_title
-            )
+            JOIN keep_ids k ON k.sale_date = n.sale_date AND k.norm_title = n.norm_title
+            WHERE n.id != k.keep_id
         )
         DELETE FROM sales WHERE id IN (SELECT id FROM to_delete);
     """)
 
     # ── 1. Нормализация sales.service_title ───────────────────────────────────
 
-    # a) Убираем пробелы по краям
-    op.execute("""
-        UPDATE sales
-        SET service_title = trim(service_title)
-        WHERE service_title != trim(service_title);
-    """)
-
-    # b) Схлопываем двойные пробелы
+    # b) Схлопываем двойные пробелы (дублей больше нет — безопасно)
     op.execute("""
         UPDATE sales
         SET service_title = regexp_replace(service_title, ' +', ' ', 'g')
-        WHERE service_title ~ '  ';
+        WHERE service_title LIKE '%  %';
     """)
 
     # c) Кириллица А/В/С → латиница A/B/C
-    #    translate() заменяет символы побайтово — безопаснее regexp для Unicode.
+    #    Используем replace() цепочкой — надёжнее translate() с многобайтными символами
     op.execute("""
         UPDATE sales
-        SET service_title = translate(service_title, 'АВС', 'ABC')
+        SET service_title = replace(replace(replace(
+            service_title,
+            chr(1040), 'A'),   -- А (U+0410) → A
+            chr(1042), 'B'),   -- В (U+0412) → B
+            chr(1057), 'C')    -- С (U+0421) → C
         WHERE service_title ~ '[АВС]';
     """)
 
@@ -154,11 +147,15 @@ def upgrade() -> None:
     op.execute("""
         UPDATE services
         SET title = regexp_replace(title, ' +', ' ', 'g')
-        WHERE title ~ '  ';
+        WHERE title LIKE '%  %';
     """)
     op.execute("""
         UPDATE services
-        SET title = translate(title, 'АВС', 'ABC')
+        SET title = replace(replace(replace(
+            title,
+            chr(1040), 'A'),
+            chr(1042), 'B'),
+            chr(1057), 'C')
         WHERE title ~ '[АВС]';
     """)
 
