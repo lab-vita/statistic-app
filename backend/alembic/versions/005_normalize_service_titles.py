@@ -5,12 +5,11 @@ Revises: 004
 Create Date: 2026-09-28
 
 Что делает эта миграция:
-1. Нормализует sales.service_title:
-   - strip() — убирает пробелы по краям
-   - схлопывает двойные пробелы в одинарные
-   - заменяет кириллические А→A, В→B, С→C в коде услуги
-2. Перед нормализацией мержит строки, которые после неё стали бы дубликатами
-   (суммирует amount/total_sum/final_sum, удаляет лишние).
+1. Полностью нормализует sales.service_title одним проходом:
+   - trim — пробелы по краям
+   - regexp_replace — двойные пробелы в одинарные
+   - replace(chr()) — кириллические А→A, В→B, С→C
+2. Перед нормализацией мержит все будущие дубли (суммирует числа, удаляет лишние).
 3. Заполняет sales.service_id через JOIN с services по нормализованному title.
 4. Обновляет sales.exclude_from_analytics из services.
 
@@ -24,34 +23,43 @@ down_revision = "004"
 branch_labels = None
 depends_on = None
 
+# SQL-функция полной нормализации — используется одинаково в шагах 0 и 1.
+# trim + схлопывание пробелов + кириллица А/В/С → A/B/C через chr().
+_NORM_EXPR = """
+    trim(
+        replace(replace(replace(
+            regexp_replace(service_title, ' +', ' ', 'g'),
+            chr(1040), 'A'),
+            chr(1042), 'B'),
+            chr(1057), 'C')
+    )
+""".strip()
+
+# То же для services.title
+_NORM_SVC_EXPR = """
+    trim(
+        replace(replace(replace(
+            regexp_replace(title, ' +', ' ', 'g'),
+            chr(1040), 'A'),
+            chr(1042), 'B'),
+            chr(1057), 'C')
+    )
+""".strip()
+
 
 def upgrade() -> None:
-    # ── 0a. Сначала trim — это безопасно, не создаёт дублей само по себе ─────
-    op.execute("""
-        UPDATE sales
-        SET service_title = trim(service_title)
-        WHERE service_title != trim(service_title);
-    """)
-
-    # ── 0b. Мержим строки, которые после схлопывания пробелов стали бы дублями
+    # ── 0. Мержим все строки, которые после полной нормализации стали бы дублями
     #
-    # После trim могут остаться пары вида:
-    #   (2026-06-13, 'А16.07.051 Гигиена  зубов')   ← двойной пробел
-    #   (2026-06-13, 'А16.07.051 Гигиена зубов')    ← одиночный
-    # После regexp_replace они стали бы одинаковыми → UniqueViolationError.
-    #
-    # Алгоритм:
-    #   1. Вычисляем norm_title = regexp_replace(service_title, ' +', ' ', 'g')
-    #   2. Группы (sale_date, norm_title) с COUNT > 1 — это будущие дубли
-    #   3. В каждой группе оставляем MIN(id), суммируем числа к нему
-    #   4. Удаляем остальные строки группы
+    # Один CTE считает norm_title для каждой строки используя _NORM_EXPR.
+    # Группы (sale_date, norm_title) с COUNT > 1 — это будущие дубли.
+    # В каждой группе: оставляем MIN(id), суммируем к нему числа, остальные удаляем.
 
-    op.execute("""
+    op.execute(f"""
         WITH normalized AS (
             SELECT
                 id,
                 sale_date,
-                regexp_replace(service_title, ' +', ' ', 'g') AS norm_title,
+                {_NORM_EXPR} AS norm_title,
                 amount, total_sum, final_sum, sum_percent
             FROM sales
         ),
@@ -70,10 +78,10 @@ def upgrade() -> None:
         agg AS (
             SELECT
                 k.keep_id,
-                SUM(n.amount)::int    AS total_amount,
-                SUM(n.total_sum)      AS total_total_sum,
-                SUM(n.final_sum)      AS total_final_sum,
-                MAX(n.sum_percent)    AS max_sum_percent
+                SUM(n.amount)::int AS total_amount,
+                SUM(n.total_sum)   AS total_total_sum,
+                SUM(n.final_sum)   AS total_final_sum,
+                MAX(n.sum_percent) AS max_sum_percent
             FROM keep_ids k
             JOIN normalized n ON n.sale_date = k.sale_date AND n.norm_title = k.norm_title
             GROUP BY k.keep_id
@@ -88,12 +96,9 @@ def upgrade() -> None:
         WHERE s.id = agg.keep_id;
     """)
 
-    op.execute("""
+    op.execute(f"""
         WITH normalized AS (
-            SELECT
-                id,
-                sale_date,
-                regexp_replace(service_title, ' +', ' ', 'g') AS norm_title
+            SELECT id, sale_date, {_NORM_EXPR} AS norm_title
             FROM sales
         ),
         dup_groups AS (
@@ -117,49 +122,21 @@ def upgrade() -> None:
         DELETE FROM sales WHERE id IN (SELECT id FROM to_delete);
     """)
 
-    # ── 1. Нормализация sales.service_title ───────────────────────────────────
-
-    # b) Схлопываем двойные пробелы (дублей больше нет — безопасно)
-    op.execute("""
+    # ── 1. Нормализуем service_title одним UPDATE (после удаления дублей) ────
+    op.execute(f"""
         UPDATE sales
-        SET service_title = regexp_replace(service_title, ' +', ' ', 'g')
-        WHERE service_title LIKE '%  %';
+        SET service_title = {_NORM_EXPR}
+        WHERE service_title != {_NORM_EXPR};
     """)
 
-    # c) Кириллица А/В/С → латиница A/B/C
-    #    Используем replace() цепочкой — надёжнее translate() с многобайтными символами
-    op.execute("""
-        UPDATE sales
-        SET service_title = replace(replace(replace(
-            service_title,
-            chr(1040), 'A'),   -- А (U+0410) → A
-            chr(1042), 'B'),   -- В (U+0412) → B
-            chr(1057), 'C')    -- С (U+0421) → C
-        WHERE service_title ~ '[АВС]';
+    # ── 2. Нормализуем services.title зеркально ───────────────────────────────
+    op.execute(f"""
+        UPDATE services
+        SET title = {_NORM_SVC_EXPR}
+        WHERE title != {_NORM_SVC_EXPR};
     """)
 
-    # ── 2. Нормализация services.title (зеркально, для корректного JOIN) ─────
-    op.execute("""
-        UPDATE services
-        SET title = trim(title)
-        WHERE title != trim(title);
-    """)
-    op.execute("""
-        UPDATE services
-        SET title = regexp_replace(title, ' +', ' ', 'g')
-        WHERE title LIKE '%  %';
-    """)
-    op.execute("""
-        UPDATE services
-        SET title = replace(replace(replace(
-            title,
-            chr(1040), 'A'),
-            chr(1042), 'B'),
-            chr(1057), 'C')
-        WHERE title ~ '[АВС]';
-    """)
-
-    # ── 3. Заполняем service_id по точному совпадению нормализованных title ──
+    # ── 3. Заполняем service_id + exclude_from_analytics ─────────────────────
     op.execute("""
         UPDATE sales s
         SET
@@ -172,8 +149,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Обратная нормализация невозможна — исходные грязные строки потеряны.
-    # Сбрасываем только service_id/exclude (их можно пересчитать).
+    # Обратная нормализация невозможна — исходные строки потеряны.
+    # Сбрасываем только вычислимые поля.
     op.execute("""
         UPDATE sales
         SET service_id = NULL, exclude_from_analytics = FALSE
