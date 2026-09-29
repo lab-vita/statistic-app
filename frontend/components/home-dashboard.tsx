@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Widget, DashboardConfig,
   loadDashboard, saveDashboard,
-  computeComposite, formatValue, getMetricFormat, getMetricLabel,
+  computeComposite, formatValue, getMetricFormat,
   SimpleWidgetConfig, CompositeWidgetConfig, DataSource,
   DEFAULT_DASHBOARD,
 } from "@/lib/dashboard";
@@ -12,7 +12,7 @@ import { WidgetEditor } from "@/components/widget-editor";
 import {
   fetchStats, fetchAppointmentStats, fetchPaymentStats,
   fetchHourly, fetchDaily, fetchAppointmentDaily, fetchPaymentDaily,
-  toDateStr, addDays, formatDuration,
+  toDateStr, addDays,
   StatsResponse, AppointmentStatsResponse, PaymentStatsResponse,
   HourlyResponse, DailyResponse, AppointmentDailyResponse, PaymentDailyResponse,
 } from "@/lib/api";
@@ -22,11 +22,64 @@ import {
 } from "recharts";
 import {
   Plus, Settings2, Trash2, GripVertical,
-  ChevronLeft, ChevronRight, RotateCcw, TrendingUp, TrendingDown,
+  ChevronLeft, ChevronRight, RotateCcw,
+  Phone, Calendar, Banknote, ShoppingBag, Sparkles,
 } from "lucide-react";
 import { Section } from "@/components/sidebar";
 
-// ─── Типы периода ────────────────────────────────────────────
+// ─── Цвета и иконки по источникам ────────────────────────────
+
+const SOURCE_STYLE: Record<DataSource, {
+  icon:    React.ElementType;
+  color:   string;  // text color
+  bg:      string;  // icon bg
+  accent:  string;  // chart / bar fill
+  border:  string;  // card left border
+  badge:   string;  // source badge bg
+}> = {
+  calls: {
+    icon:   Phone,
+    color:  "text-blue-600 dark:text-blue-400",
+    bg:     "bg-blue-500/10",
+    accent: "#3b82f6",
+    border: "border-l-blue-500",
+    badge:  "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  },
+  appointments: {
+    icon:   Calendar,
+    color:  "text-violet-600 dark:text-violet-400",
+    bg:     "bg-violet-500/10",
+    accent: "#8b5cf6",
+    border: "border-l-violet-500",
+    badge:  "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  },
+  revenue: {
+    icon:   Banknote,
+    color:  "text-emerald-600 dark:text-emerald-400",
+    bg:     "bg-emerald-500/10",
+    accent: "#22c55e",
+    border: "border-l-emerald-500",
+    badge:  "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  sales: {
+    icon:   ShoppingBag,
+    color:  "text-amber-600 dark:text-amber-400",
+    bg:     "bg-amber-500/10",
+    accent: "#f59e0b",
+    border: "border-l-amber-500",
+    badge:  "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+};
+
+const COMPOSITE_STYLE = {
+  icon:   Sparkles,
+  color:  "text-rose-600 dark:text-rose-400",
+  bg:     "bg-rose-500/10",
+  border: "border-l-rose-500",
+  badge:  "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+};
+
+// ─── Период ───────────────────────────────────────────────────
 
 type PeriodType = "day" | "week" | "month";
 
@@ -46,9 +99,9 @@ function getPeriodRange(type: PeriodType, offset: number) {
     };
   }
   if (type === "week") {
-    const dow     = now.getDay() === 0 ? 6 : now.getDay() - 1;
-    const monday  = addDays(now, -dow + offset * 7);
-    const sunday  = addDays(monday, 6);
+    const dow    = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const monday = addDays(now, -dow + offset * 7);
+    const sunday = addDays(monday, 6);
     return {
       from:  toDateStr(monday),
       to:    toDateStr(sunday),
@@ -64,16 +117,16 @@ function getPeriodRange(type: PeriodType, offset: number) {
   };
 }
 
-// ─── DataBag — все числа из API ───────────────────────────────
+// ─── DataBag ──────────────────────────────────────────────────
 
 interface DataBag {
-  calls:        Record<string, number>;
-  appointments: Record<string, number>;
-  revenue:      Record<string, number>;
-  sales:        Record<string, number>;
-  callsDaily?:      any[];
+  calls:              Record<string, number>;
+  appointments:       Record<string, number>;
+  revenue:            Record<string, number>;
+  sales:              Record<string, number>;
+  callsDaily?:        any[];
   appointmentsDaily?: any[];
-  revenueDaily?:    any[];
+  revenueDaily?:      any[];
 }
 
 function extractBag(
@@ -84,13 +137,14 @@ function extractBag(
   const c = calls?.operators["total"];
   return {
     calls: {
-      incoming:       c?.incoming        ?? 0,
-      outgoing:       c?.outgoing        ?? 0,
-      missed:         c?.missed          ?? 0,
-      total:          c?.total           ?? 0,
-      avg_duration:   c?.avg_duration    ?? 0,
-      callback_count: c?.callback_count  ?? 0,
-      callback_pct:   (c?.callback_pct ?? 0) / 100,
+      incoming:       c?.incoming       ?? 0,
+      outgoing:       c?.outgoing       ?? 0,
+      missed:         c?.missed         ?? 0,
+      total:          c?.total          ?? 0,
+      avg_duration:   c?.avg_duration   ?? 0,
+      callback_count: c?.callback_count ?? 0,
+      // API отдаёт уже в процентах (0-100), нормализуем в 0-1 для formatValue
+      callback_pct:   (c?.callback_pct  ?? 0) / 100,
     },
     appointments: {
       total:        appts?.total.total        ?? 0,
@@ -98,8 +152,8 @@ function extractBag(
       noshow:       appts?.total.noshow       ?? 0,
       cancels:      appts?.total.cancels      ?? 0,
       new_patients: appts?.total.new_patients ?? 0,
-      visit_pct:    (appts?.total.visit_pct  ?? 0) / 100,
-      noshow_pct:   (appts?.total.noshow_pct ?? 0) / 100,
+      visit_pct:    (appts?.total.visit_pct   ?? 0) / 100,
+      noshow_pct:   (appts?.total.noshow_pct  ?? 0) / 100,
     },
     revenue: {
       total_paid:  revenue?.total_paid  ?? 0,
@@ -112,142 +166,173 @@ function extractBag(
   };
 }
 
-// ─── Мини-график ─────────────────────────────────────────────
+// ─── Мини-график ──────────────────────────────────────────────
 
-function MiniChart({ data, metric, chartType }: {
-  data: any[]; metric: string; chartType: "bar" | "line" | "area";
+function MiniChart({ data, metric, chartType, color }: {
+  data:      any[];
+  metric:    string;
+  chartType: "bar" | "line" | "area";
+  color:     string;
 }) {
-  if (!data || data.length === 0) return null;
-  const color = "#6366f1";
+  if (!data || data.length === 0) return (
+    <div className="h-14 flex items-center justify-center text-[10px] text-muted-foreground/50">нет данных</div>
+  );
+
+  const tooltipStyle = {
+    fontSize: 10, borderRadius: 6,
+    border: "1px solid var(--border)",
+    background: "var(--card)",
+  };
 
   return (
-    <ResponsiveContainer width="100%" height={52}>
+    <ResponsiveContainer width="100%" height={56}>
       {chartType === "bar" ? (
         <BarChart data={data} margin={{ top: 2, bottom: 0, left: 0, right: 0 }}>
-          <Bar dataKey={metric} fill={color} opacity={0.8} radius={[2,2,0,0]} />
-          <Tooltip
-            contentStyle={{ fontSize: 10, borderRadius: 6, border: "1px solid var(--border)", background: "var(--card)" }}
-            labelFormatter={() => ""}
-            formatter={(v: number) => [v]}
-          />
+          <Bar dataKey={metric} fill={color} opacity={0.85} radius={[2,2,0,0]} />
+          <Tooltip contentStyle={tooltipStyle} labelFormatter={() => ""} formatter={(v: number) => [v, ""]} />
         </BarChart>
       ) : chartType === "area" ? (
         <AreaChart data={data} margin={{ top: 2, bottom: 0, left: 0, right: 0 }}>
           <defs>
-            <linearGradient id="mg" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`ag-${metric}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%"  stopColor={color} stopOpacity={0.3} />
               <stop offset="95%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <Area type="monotone" dataKey={metric} stroke={color} strokeWidth={1.5} fill="url(#mg)" dot={false} />
-          <Tooltip contentStyle={{ fontSize: 10, borderRadius: 6, border: "1px solid var(--border)", background: "var(--card)" }} labelFormatter={() => ""} formatter={(v: number) => [v]} />
+          <Area type="monotone" dataKey={metric} stroke={color} strokeWidth={1.5}
+            fill={`url(#ag-${metric})`} dot={false} />
+          <Tooltip contentStyle={tooltipStyle} labelFormatter={() => ""} formatter={(v: number) => [v, ""]} />
         </AreaChart>
       ) : (
         <LineChart data={data} margin={{ top: 2, bottom: 0, left: 0, right: 0 }}>
-          <Line type="monotone" dataKey={metric} stroke={color} strokeWidth={1.5} dot={false} />
-          <Tooltip contentStyle={{ fontSize: 10, borderRadius: 6, border: "1px solid var(--border)", background: "var(--card)" }} labelFormatter={() => ""} formatter={(v: number) => [v]} />
+          <Line type="monotone" dataKey={metric} stroke={color} strokeWidth={2} dot={false} />
+          <Tooltip contentStyle={tooltipStyle} labelFormatter={() => ""} formatter={(v: number) => [v, ""]} />
         </LineChart>
       )}
     </ResponsiveContainer>
   );
 }
 
-// ─── Один виджет ─────────────────────────────────────────────
+// ─── Карточка виджета ─────────────────────────────────────────
 
 function WidgetCard({
-  widget, bag, isEdit,
-  onEdit, onDelete,
-  dragHandleProps,
+  widget, bag, isEdit, onEdit, onDelete, dragProps,
 }: {
-  widget:          Widget;
-  bag:             DataBag;
-  isEdit:          boolean;
-  onEdit:          () => void;
-  onDelete:        () => void;
-  dragHandleProps: React.HTMLAttributes<HTMLDivElement>;
+  widget:    Widget;
+  bag:       DataBag;
+  isEdit:    boolean;
+  onEdit:    () => void;
+  onDelete:  () => void;
+  dragProps: React.HTMLAttributes<HTMLDivElement>;
 }) {
-  // Получаем значение
+  // Определяем стиль
+  const isComposite = widget.config.kind === "composite";
+  const source = isComposite ? null : (widget.config as SimpleWidgetConfig).source;
+  const style  = source ? SOURCE_STYLE[source] : COMPOSITE_STYLE;
+  const Icon   = style.icon;
+
+  // Значение
   let value: number | null = null;
-  let format = "number";
-  let deltaDir: "up" | "down" | null = null;
-  let deltaPct: number | null = null;
+  let fmt = "number";
 
-  if (widget.config.kind === "simple") {
+  if (!isComposite) {
     const cfg = widget.config as SimpleWidgetConfig;
-    value  = bag[cfg.source as DataSource]?.[cfg.metric] ?? null;
-    format = getMetricFormat(cfg.source, cfg.metric);
-
-    // Дельта из API (если есть)
-    // calls
-    // appointments
+    value = bag[cfg.source]?.[cfg.metric] ?? null;
+    fmt   = getMetricFormat(cfg.source, cfg.metric);
   } else {
     const cfg = widget.config as CompositeWidgetConfig;
-    value  = computeComposite(cfg.formula, bag);
-    format = cfg.formula.format;
+    value = computeComposite(cfg.formula, bag);
+    fmt   = cfg.formula.format;
   }
 
-  const displayValue = value !== null ? formatValue(value, format as any) : "—";
+  const displayValue = value !== null ? formatValue(value, fmt as any) : "—";
 
   // Данные для мини-графика
-  const chartData = (): any[] => {
-    if (widget.config.kind !== "simple") return [];
-    const cfg = widget.config as SimpleWidgetConfig;
-    if (cfg.source === "calls") return bag.callsDaily ?? [];
-    if (cfg.source === "appointments") return bag.appointmentsDaily ?? [];
-    if (cfg.source === "revenue") return bag.revenueDaily ?? [];
+  const chartData = () => {
+    if (isComposite) return [];
+    const s = (widget.config as SimpleWidgetConfig).source;
+    if (s === "calls")        return bag.callsDaily        ?? [];
+    if (s === "appointments") return bag.appointmentsDaily ?? [];
+    if (s === "revenue")      return bag.revenueDaily      ?? [];
     return [];
   };
 
-  const colSpan = widget.size === "large" ? "col-span-3" : widget.size === "medium" ? "col-span-2" : "col-span-1";
+  const chartMetric = isComposite ? "" : (widget.config as SimpleWidgetConfig).metric;
+  const accentColor = source ? SOURCE_STYLE[source].accent : "#f43f5e";
+
+  const colSpan = widget.size === "large" ? "col-span-3"
+    : widget.size === "medium" ? "col-span-2" : "col-span-1";
+
+  // Источник для бейджа
+  const sourceLabel = source ? {
+    calls: "Звонки", appointments: "Записи", revenue: "Выручка", sales: "Услуги",
+  }[source] : "Формула";
 
   return (
-    <div className={`${colSpan} group relative rounded-xl border border-border bg-card overflow-hidden`}>
-      {/* Drag handle + edit controls */}
+    <div className={`${colSpan} relative group rounded-2xl border border-border border-l-[3px] ${
+      style.border
+    } bg-card overflow-hidden transition-shadow hover:shadow-md`}>
+
+      {/* Оверлей редактирования */}
       {isEdit && (
-        <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[1px] flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
-          <div {...dragHandleProps} className="h-8 w-8 rounded-lg border border-border bg-card flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted/50">
-            <GripVertical className="h-4 w-4" />
+        <div className="absolute inset-0 z-20 rounded-2xl bg-background/70 backdrop-blur-[2px]
+          flex items-center justify-center gap-2
+          opacity-0 group-hover:opacity-100 transition-all duration-150">
+          <div {...dragProps}
+            className="h-9 w-9 rounded-xl border border-border bg-card shadow-sm
+              flex items-center justify-center cursor-grab active:cursor-grabbing
+              hover:bg-muted/60 transition-colors"
+            title="Перетащить">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
-          <button onClick={onEdit} className="h-8 w-8 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted/50 transition-colors">
-            <Settings2 className="h-3.5 w-3.5" />
+          <button onClick={onEdit}
+            className="h-9 w-9 rounded-xl border border-border bg-card shadow-sm
+              flex items-center justify-center hover:bg-muted/60 transition-colors"
+            title="Редактировать">
+            <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
-          <button onClick={onDelete} className="h-8 w-8 rounded-lg border border-red-500/30 bg-red-500/5 flex items-center justify-center hover:bg-red-500/10 transition-colors">
+          <button onClick={onDelete}
+            className="h-9 w-9 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 shadow-sm
+              flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
+            title="Удалить">
             <Trash2 className="h-3.5 w-3.5 text-red-500" />
           </button>
         </div>
       )}
 
       <div className="p-4">
-        <div className="text-[11px] text-muted-foreground mb-2 truncate">{widget.title}</div>
-
-        {widget.mode === "number" && (
-          <div className="text-2xl font-semibold">{displayValue}</div>
-        )}
-
-        {widget.mode === "card" && (
-          <div>
-            <div className="text-2xl font-semibold">{displayValue}</div>
-            {deltaPct !== null && deltaDir && (
-              <div className={`flex items-center gap-0.5 mt-1 text-xs ${
-                deltaDir === "up" ? "text-emerald-500" : "text-red-500"
-              }`}>
-                {deltaDir === "up" ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {deltaDir === "up" ? "+" : "−"}{deltaPct}%
-              </div>
-            )}
+        {/* Заголовок */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className={`h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 ${style.bg}`}>
+              <Icon className={`h-3.5 w-3.5 ${style.color}`} />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground truncate">{widget.title}</span>
           </div>
-        )}
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
+            isComposite ? COMPOSITE_STYLE.badge : SOURCE_STYLE[source!].badge
+          }`}>
+            {sourceLabel}
+          </span>
+        </div>
 
-        {widget.mode === "chart" && (
-          <div>
-            <div className="text-2xl font-semibold mb-2">{displayValue}</div>
-            {widget.config.kind === "simple" && (
-              <MiniChart
-                data={chartData()}
-                metric={(widget.config as SimpleWidgetConfig).metric}
-                chartType={widget.chartType ?? "bar"}
-              />
-            )}
+        {/* Значение */}
+        <div className={`text-2xl font-bold tracking-tight ${
+          isComposite ? COMPOSITE_STYLE.color
+            : SOURCE_STYLE[source!].color
+        }`}>
+          {displayValue}
+        </div>
+
+        {/* Мини-график */}
+        {widget.mode === "chart" && !isComposite && (
+          <div className="mt-3">
+            <MiniChart
+              data={chartData()}
+              metric={chartMetric}
+              chartType={widget.chartType ?? "bar"}
+              color={accentColor}
+            />
           </div>
         )}
       </div>
@@ -262,52 +347,43 @@ interface HomeDashboardProps {
 }
 
 export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
-  const [config, setConfig]       = useState<DashboardConfig | null>(null);
-  const [editMode, setEditMode]   = useState(false);
+  const [config, setConfig]         = useState<DashboardConfig | null>(null);
+  const [editMode, setEditMode]     = useState(false);
   const [editorWidget, setEditorWidget] = useState<Widget | null | "new">(null);
 
-  // Период
-  const [periodType, setPeriodType] = useState<PeriodType>("day");
+  const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [offset, setOffset]         = useState(0);
   const { from: dateFrom, to: dateTo, label: dateLabel } = getPeriodRange(periodType, offset);
 
-  // Данные
-  const [bag, setBag] = useState<DataBag>({
-    calls: {}, appointments: {}, revenue: {}, sales: {},
-  });
+  const [bag,     setBag]     = useState<DataBag>({ calls: {}, appointments: {}, revenue: {}, sales: {} });
   const [loading, setLoading] = useState(true);
 
-  // Drag & drop
-  const dragIndex  = useRef<number | null>(null);
+  const dragIndex = useRef<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
 
-  // Загружаем конфиг из localStorage
-  useEffect(() => {
-    setConfig(loadDashboard());
-  }, []);
+  useEffect(() => { setConfig(loadDashboard()); }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [calls, appts, rev, hourly, daily, apptDaily, revDaily] = await Promise.allSettled([
+    const results = await Promise.allSettled([
       fetchStats(dateFrom, dateTo),
       fetchAppointmentStats(dateFrom, dateTo),
       fetchPaymentStats(dateFrom, dateTo),
-      periodType === "day" ? fetchHourly(dateFrom, dateTo, 60) : Promise.resolve(null),
-      periodType !== "day" ? fetchDaily(dateFrom, dateTo)      : Promise.resolve(null),
+      periodType === "day" ? fetchHourly(dateFrom, dateTo, 60) : fetchDaily(dateFrom, dateTo),
       periodType !== "day" ? fetchAppointmentDaily(dateFrom, dateTo) : Promise.resolve(null),
       periodType !== "day" ? fetchPaymentDaily(dateFrom, dateTo)     : Promise.resolve(null),
     ]);
 
-    const c  = calls.status  === "fulfilled" ? calls.value  as StatsResponse            : null;
-    const a  = appts.status  === "fulfilled" ? appts.value  as AppointmentStatsResponse  : null;
-    const r  = rev.status    === "fulfilled" ? rev.value    as PaymentStatsResponse      : null;
-    const h  = hourly.status === "fulfilled" ? hourly.value as HourlyResponse | null     : null;
-    const d  = daily.status  === "fulfilled" ? daily.value  as DailyResponse | null      : null;
-    const ad = apptDaily.status === "fulfilled" ? apptDaily.value as AppointmentDailyResponse | null : null;
-    const rd = revDaily.status  === "fulfilled" ? revDaily.value  as PaymentDailyResponse | null     : null;
+    const c  = results[0].status === "fulfilled" ? results[0].value as StatsResponse : null;
+    const a  = results[1].status === "fulfilled" ? results[1].value as AppointmentStatsResponse : null;
+    const r  = results[2].status === "fulfilled" ? results[2].value as PaymentStatsResponse : null;
+    const cd = results[3].status === "fulfilled" ? results[3].value as HourlyResponse | DailyResponse | null : null;
+    const ad = results[4].status === "fulfilled" ? results[4].value as AppointmentDailyResponse | null : null;
+    const rd = results[5].status === "fulfilled" ? results[5].value as PaymentDailyResponse | null : null;
 
     const base = extractBag(c, a, r);
-    base.callsDaily        = h?.slots  ?? d?.days  ?? [];
+    // Унифицируем: hourly.slots или daily.days
+    base.callsDaily        = (cd as any)?.slots ?? (cd as any)?.days ?? [];
     base.appointmentsDaily = ad?.days ?? [];
     base.revenueDaily      = rd?.days ?? [];
 
@@ -317,17 +393,9 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
   useEffect(() => { load(); }, [load]);
 
-  function handlePeriodType(t: PeriodType) {
-    setPeriodType(t);
-    setOffset(0);
-  }
+  function handlePeriodType(t: PeriodType) { setPeriodType(t); setOffset(0); }
 
-  // ─── Сохранение конфига ────────────────────────────────────
-
-  function saveConfig(next: DashboardConfig) {
-    setConfig(next);
-    saveDashboard(next);
-  }
+  function saveConfig(next: DashboardConfig) { setConfig(next); saveDashboard(next); }
 
   function handleSaveWidget(w: Widget) {
     if (!config) return;
@@ -339,42 +407,28 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
     setEditorWidget(null);
   }
 
-  function handleDeleteWidget(id: string) {
+  function handleDelete(id: string) {
     if (!config) return;
     saveConfig({ ...config, widgets: config.widgets.filter(w => w.id !== id) });
   }
 
-  function handleReset() {
-    saveConfig(DEFAULT_DASHBOARD);
-  }
+  function handleReset() { saveConfig(DEFAULT_DASHBOARD); }
 
-  // ─── Drag & drop ───────────────────────────────────────────
-
-  function handleDragStart(i: number) {
-    dragIndex.current = i;
-  }
-
-  function handleDragEnter(i: number) {
-    setDragOver(i);
-  }
-
-  function handleDrop(i: number) {
+  // Drag & drop
+  function onDragStart(i: number) { dragIndex.current = i; }
+  function onDragEnter(i: number) { setDragOver(i); }
+  function onDrop(i: number) {
     if (!config || dragIndex.current === null || dragIndex.current === i) {
-      setDragOver(null);
-      return;
+      setDragOver(null); return;
     }
-    const widgets = [...config.widgets];
-    const [moved] = widgets.splice(dragIndex.current, 1);
-    widgets.splice(i, 0, moved);
-    saveConfig({ ...config, widgets });
+    const ws = [...config.widgets];
+    const [moved] = ws.splice(dragIndex.current, 1);
+    ws.splice(i, 0, moved);
+    saveConfig({ ...config, widgets: ws });
     dragIndex.current = null;
     setDragOver(null);
   }
-
-  function handleDragEnd() {
-    dragIndex.current = null;
-    setDragOver(null);
-  }
+  function onDragEnd() { dragIndex.current = null; setDragOver(null); }
 
   if (!config) return null;
 
@@ -390,12 +444,12 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
         <div className="flex items-center gap-2">
           {/* Период */}
-          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+          <div className="flex gap-1 rounded-xl border border-border bg-muted/30 p-1">
             {(["day", "week", "month"] as PeriodType[]).map(t => (
               <button key={t} onClick={() => handlePeriodType(t)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   periodType === t
-                    ? "bg-background border border-border text-foreground"
+                    ? "bg-background border border-border shadow-sm text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}>
                 {t === "day" ? "День" : t === "week" ? "Неделя" : "Месяц"}
@@ -406,22 +460,21 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
           {/* Навигация */}
           <div className="flex items-center gap-1">
             <button onClick={() => setOffset(o => o - 1)}
-              className="h-7 w-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted/40">
+              className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted/40 transition-colors">
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             <button onClick={() => setOffset(o => o + 1)} disabled={offset >= 0}
-              className="h-7 w-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted/40 disabled:opacity-40">
+              className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted/40 disabled:opacity-30 transition-colors">
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          {/* Режим редактирования */}
-          <button
-            onClick={() => setEditMode(e => !e)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+          {/* Настроить */}
+          <button onClick={() => setEditMode(e => !e)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all ${
               editMode
-                ? "border-foreground/40 bg-muted/60 text-foreground"
-                : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                ? "border-foreground bg-foreground text-background"
+                : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
             }`}>
             <Settings2 className="h-3.5 w-3.5" />
             {editMode ? "Готово" : "Настроить"}
@@ -431,71 +484,80 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
       {/* Панель редактирования */}
       {editMode && (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3">
-          <span className="text-xs text-muted-foreground flex-1">
-            Перетащите виджеты чтобы изменить порядок. Наведите на виджет для управления.
-          </span>
+        <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/20 px-5 py-3">
+          <div className="flex-1">
+            <p className="text-xs font-medium">Режим редактирования</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Наведите на виджет → появятся кнопки. Перетащите за <GripVertical className="h-3 w-3 inline" /> чтобы изменить порядок.
+            </p>
+          </div>
           <button onClick={() => setEditorWidget("new")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium hover:opacity-90 transition-opacity">
-            <Plus className="h-3.5 w-3.5" />Добавить виджет
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-foreground text-background text-xs font-medium hover:opacity-90 transition-opacity whitespace-nowrap">
+            <Plus className="h-3.5 w-3.5" /> Добавить виджет
           </button>
           <button onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
-            <RotateCcw className="h-3.5 w-3.5" />Сбросить
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:bg-muted/40 transition-colors whitespace-nowrap">
+            <RotateCcw className="h-3.5 w-3.5" /> Сбросить
           </button>
         </div>
       )}
 
-      {/* Сетка виджетов */}
-      <div className="grid grid-cols-3 gap-3">
-        {loading
-          ? [...Array(4)].map((_, i) => (
-              <div key={i} className="col-span-1 h-24 rounded-xl border border-border bg-card animate-pulse" />
-            ))
-          : config.widgets.map((widget, i) => (
-              <div
-                key={widget.id}
-                draggable={editMode}
-                onDragStart={() => handleDragStart(i)}
-                onDragEnter={() => handleDragEnter(i)}
-                onDragOver={e => e.preventDefault()}
-                onDrop={() => handleDrop(i)}
-                onDragEnd={handleDragEnd}
-                className={`transition-all duration-150 ${
-                  dragOver === i && dragIndex.current !== i ? "scale-[0.97] opacity-60" : ""
-                }`}
-              >
-                <WidgetCard
-                  widget={widget}
-                  bag={bag}
-                  isEdit={editMode}
-                  onEdit={() => setEditorWidget(widget)}
-                  onDelete={() => handleDeleteWidget(widget.id)}
-                  dragHandleProps={{
-                    draggable: true,
-                    onDragStart: (e: React.DragEvent) => {
-                      e.stopPropagation();
-                      handleDragStart(i);
-                    },
-                  }}
-                />
-              </div>
-            ))
-        }
-
-        {/* Кнопка добавить (если не в режиме редактирования) */}
-        {!editMode && config.widgets.length === 0 && (
-          <div className="col-span-3 rounded-xl border border-dashed border-border flex flex-col items-center justify-center py-16 gap-3">
-            <p className="text-sm text-muted-foreground">Нет виджетов</p>
-            <button onClick={() => { setEditMode(true); setEditorWidget("new"); }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90">
-              <Plus className="h-4 w-4" />Добавить виджет
-            </button>
+      {/* Сетка */}
+      {loading ? (
+        <div className="grid grid-cols-3 gap-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className={`${
+              i % 3 === 0 ? "col-span-1" : i % 3 === 1 ? "col-span-1" : "col-span-1"
+            } h-28 rounded-2xl border border-border bg-muted/20 animate-pulse`} />
+          ))}
+        </div>
+      ) : config.widgets.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center py-20 gap-4">
+          <div className="h-12 w-12 rounded-2xl bg-muted/40 flex items-center justify-center">
+            <Plus className="h-5 w-5 text-muted-foreground" />
           </div>
-        )}
-      </div>
+          <div className="text-center">
+            <p className="text-sm font-medium">Нет виджетов</p>
+            <p className="text-xs text-muted-foreground mt-1">Добавьте показатели которые хотите видеть</p>
+          </div>
+          <button onClick={() => { setEditMode(true); setEditorWidget("new"); }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background text-sm font-medium hover:opacity-90">
+            <Plus className="h-4 w-4" /> Добавить виджет
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          {config.widgets.map((widget, i) => (
+            <div
+              key={widget.id}
+              draggable={editMode}
+              onDragStart={() => onDragStart(i)}
+              onDragEnter={() => onDragEnter(i)}
+              onDragOver={e => e.preventDefault()}
+              onDrop={() => onDrop(i)}
+              onDragEnd={onDragEnd}
+              className={`transition-all duration-150 ${
+                dragOver === i && dragIndex.current !== i
+                  ? "scale-95 opacity-50" : ""
+              }`}
+            >
+              <WidgetCard
+                widget={widget}
+                bag={bag}
+                isEdit={editMode}
+                onEdit={() => setEditorWidget(widget)}
+                onDelete={() => handleDelete(widget.id)}
+                dragProps={{
+                  draggable: true,
+                  onDragStart: (e: React.DragEvent) => { e.stopPropagation(); onDragStart(i); },
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Редактор виджета */}
+      {/* Редактор */}
       {editorWidget && (
         <WidgetEditor
           initial={editorWidget === "new" ? undefined : editorWidget as Widget}
