@@ -6,125 +6,94 @@ import {
   fetchPaymentByDoctor, fetchSalesStats,
   toDateStr, addDays, formatMoney,
   PaymentStatsResponse, PaymentDailyResponse,
-  PaymentDailyByTypeResponse, PaymentByDoctorResponse, SalesStatsResponse,
-  DeltaDir,
+  PaymentDailyByTypeResponse, PaymentDoctorResponse,
+  SalesStatsResponse, DeltaDir,
 } from "@/lib/api";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Banknote, CreditCard, Receipt, Users } from "lucide-react";
 
-// ─── Вспомогательные компоненты ──────────────────────────────
+// ─── Вспомогательные ─────────────────────────────────────────
 
-function Delta({ pct, dir, invert }: { pct?: number | null; dir?: DeltaDir; invert?: boolean }) {
-  if (!dir || dir === "flat" || pct == null)
-    return <span className="text-xs text-muted-foreground flex items-center gap-0.5"><Minus className="h-3 w-3" />—</span>;
-  const good = invert ? dir === "down" : dir === "up";
+function fmt(n: number) {
+  return new Intl.NumberFormat("ru-RU").format(n);
+}
+
+function DeltaBadge({ pct, dir, invert }: { pct?: number | null; dir?: DeltaDir; invert?: boolean }) {
+  if (!dir || dir === "flat" || pct == null) return null;
+  const isGood = invert ? dir === "down" : dir === "up";
   return (
-    <span className={`text-xs font-medium flex items-center gap-0.5 ${
-      good ? "text-emerald-500" : "text-red-500"
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${
+      isGood ? "text-emerald-500" : "text-red-500"
     }`}>
-      {dir === "up" ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {dir === "up"
+        ? <TrendingUp className="h-3 w-3" />
+        : <TrendingDown className="h-3 w-3" />}
       {dir === "up" ? "+" : "−"}{pct}%
     </span>
   );
 }
 
-function StatCard({
-  label, value, sub, deltaPct, deltaDir, invert, color,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  deltaPct?: number | null;
-  deltaDir?: DeltaDir;
-  invert?: boolean;
-  color?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3 space-y-1.5">
-      <div className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</div>
-      <div className={`text-2xl font-semibold ${color ?? ""}`}>{value}</div>
-      <div className="flex items-center justify-between">
-        {sub && <span className="text-[11px] text-muted-foreground">{sub}</span>}
-        <Delta pct={deltaPct} dir={deltaDir} invert={invert} />
-      </div>
-    </div>
-  );
-}
+const TOOLTIP_STYLE = {
+  fontSize: 11, borderRadius: 8,
+  border: "1px solid var(--border)",
+  background: "var(--card)",
+  color: "var(--foreground)",
+};
 
 const TYPE_COLORS: Record<string, string> = {
   by_cash:     "#22c55e",
   by_card:     "#3b82f6",
-  by_cashless: "#a855f7",
-  by_credit:   "#f59e0b",
-  by_balance:  "#6b7280",
+  by_cashless: "#f59e0b",
+  by_credit:   "#a855f7",
+  by_balance:  "#64748b",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  by_cash:     "Наличными",
-  by_card:     "Картой",
-  by_cashless: "Безналичными",
-  by_credit:   "Кредитом",
-  by_balance:  "Лицевой счёт",
-};
-
-function fmtDate(d: string) {
+function formatDateTick(d: string) {
   return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+function formatTooltipLabel(d: string) {
+  return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 }
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse rounded-xl bg-muted/40 border border-border ${className}`} />
 );
 
-// ─── Пресеты периода ─────────────────────────────────────────
-
-type PeriodPreset = "week" | "month" | "quarter" | "custom";
-
-const PRESETS: { id: PeriodPreset; label: string }[] = [
-  { id: "week",    label: "7 дней"  },
-  { id: "month",   label: "30 дней" },
-  { id: "quarter", label: "90 дней" },
-  { id: "custom",  label: "Период"  },
-];
-
-function presetDates(p: PeriodPreset): { from: string; to: string } {
-  const to   = toDateStr(addDays(new Date(), -1));
-  const days = p === "week" ? 7 : p === "month" ? 30 : 90;
-  return { from: toDateStr(addDays(new Date(), -days)), to };
-}
-
 // ─── Основной компонент ──────────────────────────────────────
 
-export function RevenueDashboard() {
-  const [preset, setPreset]       = useState<PeriodPreset>("month");
-  const [customFrom, setFrom]     = useState(toDateStr(addDays(new Date(), -30)));
-  const [customTo,   setTo]       = useState(toDateStr(addDays(new Date(), -1)));
+interface RevenueDashboardProps {
+  dateFrom: string;
+  dateTo:   string;
+}
 
-  const dateFrom = preset === "custom" ? customFrom : presetDates(preset).from;
-  const dateTo   = preset === "custom" ? customTo   : presetDates(preset).to;
-
-  const [payStats,  setPayStats]  = useState<PaymentStatsResponse | null>(null);
-  const [payDaily,  setPayDaily]  = useState<PaymentDailyResponse | null>(null);
-  const [byType,    setByType]    = useState<PaymentDailyByTypeResponse | null>(null);
-  const [byDoctor,  setByDoctor]  = useState<PaymentByDoctorResponse | null>(null);
-  const [salesData, setSalesData] = useState<SalesStatsResponse | null>(null);
-  const [loading,   setLoading]   = useState(true);
+export function RevenueDashboard({ dateFrom, dateTo }: RevenueDashboardProps) {
+  const [stats,   setStats]   = useState<PaymentStatsResponse | null>(null);
+  const [daily,   setDaily]   = useState<PaymentDailyResponse | null>(null);
+  const [byType,  setByType]  = useState<PaymentDailyByTypeResponse | null>(null);
+  const [doctors, setDoctors] = useState<PaymentDoctorResponse | null>(null);
+  const [sales,   setSales]   = useState<SalesStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [ps, pd, bt, bd, sd] = await Promise.all([
-        fetchPaymentStats(dateFrom, dateTo, 6),   // только обычные
-        fetchPaymentDaily(dateFrom, dateTo, 6),
+      const [s, d, bt, doc, sl] = await Promise.all([
+        fetchPaymentStats(dateFrom, dateTo),
+        fetchPaymentDaily(dateFrom, dateTo),
         fetchPaymentDailyByType(dateFrom, dateTo),
         fetchPaymentByDoctor(dateFrom, dateTo, 15),
         fetchSalesStats(dateFrom, dateTo, 20),
       ]);
-      setPayStats(ps); setPayDaily(pd); setByType(bt); setByDoctor(bd); setSalesData(sd);
+      setStats(s); setDaily(d); setByType(bt);
+      setDoctors(doc); setSales(sl);
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally {
       setLoading(false);
     }
@@ -132,110 +101,129 @@ export function RevenueDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Данные для графика динамики (area)
-  const areaData = payDaily?.days.map(d => ({
-    date:        d.date,
-    total_paid:  Math.round(d.total_paid / 1000), // в тысячах
-  })) ?? [];
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-500">
+        {error}
+      </div>
+    );
+  }
 
-  // Данные для stacked bar (типы оплаты)
-  const stackData = byType
-    ? byType.days.map((day, i) => {
-        const obj: Record<string, number | string> = { date: day };
-        byType.series.forEach(s => { obj[s.key] = Math.round(s.values[i] / 1000); });
-        return obj;
+  const avgCheck = stats && stats.count > 0
+    ? Math.round(stats.total_paid / stats.count)
+    : 0;
+
+  // Для stacked area: преобразуем series в [{date, by_cash, by_card, ...}]
+  const stackedData = byType
+    ? byType.days.map((date, i) => {
+        const row: Record<string, string | number> = { date };
+        for (const s of byType.series) row[s.key] = s.values[i];
+        return row;
       })
     : [];
 
-  // Прячем нулевые типы
-  const activeTypes = byType?.series.filter(s => s.values.some(v => v > 0)) ?? [];
+  // Фильтруем нулевые серии (лицевой счёт)
+  const activeSeries = byType?.series.filter(s =>
+    s.values.some(v => v > 0)
+  ) ?? [];
 
-  const totalPaid   = payStats?.total_paid   ?? 0;
-  const avgPerDay   = payDaily && payDaily.days.length > 0
-    ? Math.round(totalPaid / payDaily.days.filter(d => d.total_paid > 0).length)
-    : 0;
-  const avgCheck    = payStats && payStats.count > 0
-    ? Math.round(totalPaid / payStats.count)
-    : 0;
+  const tickInterval = (daily?.days.length ?? 0) > 60 ? 6
+    : (daily?.days.length ?? 0) > 30 ? 2 : 0;
 
   return (
     <div className="space-y-5">
 
-      {/* Заголовок + выбор периода */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-base font-semibold">Выручка</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {new Date(dateFrom).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} —{" "}
-            {new Date(dateTo).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
-            {PRESETS.map(p => (
-              <button key={p.id} onClick={() => setPreset(p.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  preset === p.id
-                    ? "bg-background border border-border text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          {preset === "custom" && (
-            <div className="flex items-center gap-1.5">
-              <input type="date" value={customFrom} onChange={e => setFrom(e.target.value)}
-                className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none" />
-              <span className="text-xs text-muted-foreground">—</span>
-              <input type="date" value={customTo} onChange={e => setTo(e.target.value)}
-                className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none" />
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Карточки ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
-      {/* Карточки */}
-      {loading
-        ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
-        : payStats && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard
-              label="Выручка"
-              value={`${formatMoney(totalPaid)} ₽`}
-              sub={`${payStats.count} платежей`}
-              deltaPct={payStats.total_paid_delta_pct}
-              deltaDir={payStats.total_paid_delta_dir}
-              color="text-emerald-600 dark:text-emerald-400"
-            />
-            <StatCard
-              label="Средний чек"
-              value={`${formatMoney(avgCheck)} ₽`}
-              sub="за платёж"
-            />
-            <StatCard
-              label="В день (среднее)"
-              value={`${formatMoney(avgPerDay)} ₽`}
-              sub="рабочих дней"
-            />
-            <StatCard
-              label="Платежей"
-              value={String(payStats.count)}
-              deltaPct={payStats.count_delta_pct}
-              deltaDir={payStats.count_delta_dir}
-            />
+        {/* Выручка */}
+        {loading ? <Skeleton className="h-24" /> : (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <Banknote className="h-3.5 w-3.5 text-emerald-500" />
+              </div>
+              <span className="text-xs text-muted-foreground">Выручка</span>
+            </div>
+            <div className="text-2xl font-semibold">
+              {fmt(stats?.total_paid ?? 0)} ₽
+            </div>
+            <div className="mt-1">
+              <DeltaBadge pct={stats?.total_paid_delta_pct} dir={stats?.total_paid_delta_dir} />
+            </div>
           </div>
         )}
 
-      {/* График динамики */}
+        {/* Платежей */}
+        {loading ? <Skeleton className="h-24" /> : (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Receipt className="h-3.5 w-3.5 text-blue-500" />
+              </div>
+              <span className="text-xs text-muted-foreground">Платежей</span>
+            </div>
+            <div className="text-2xl font-semibold">{fmt(stats?.count ?? 0)}</div>
+            <div className="mt-1">
+              <DeltaBadge pct={stats?.count_delta_pct} dir={stats?.count_delta_dir} />
+            </div>
+          </div>
+        )}
+
+        {/* Средний чек */}
+        {loading ? <Skeleton className="h-24" /> : (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <CreditCard className="h-3.5 w-3.5 text-purple-500" />
+              </div>
+              <span className="text-xs text-muted-foreground">Средний чек</span>
+            </div>
+            <div className="text-2xl font-semibold">{fmt(avgCheck)} ₽</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">за визит</div>
+          </div>
+        )}
+
+        {/* Разбивка по способам */}
+        {loading ? <Skeleton className="h-24" /> : (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Users className="h-3.5 w-3.5 text-amber-500" />
+              </div>
+              <span className="text-xs text-muted-foreground">Способы оплаты</span>
+            </div>
+            {stats && stats.total_paid > 0 ? (
+              <div className="space-y-1.5">
+                {[
+                  { label: "Наличные", val: stats.by_cash,     color: "bg-emerald-500" },
+                  { label: "Карта",    val: stats.by_card,     color: "bg-blue-500" },
+                  { label: "Безнал",   val: stats.by_cashless, color: "bg-amber-500" },
+                ].filter(x => x.val > 0).map(({ label, val, color }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-1.5">
+                      <div className={`h-1.5 rounded-full ${color}`}
+                        style={{ width: `${Math.round(val / stats.total_paid * 100)}%`, minWidth: 4 }} />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground w-14 text-right">
+                      {label} {Math.round(val / stats.total_paid * 100)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">Нет данных</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Динамика выручки ── */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium">Динамика выручки</h3>
-          <span className="text-xs text-muted-foreground">тыс. руб.</span>
-        </div>
-        {loading ? <Skeleton className="h-48" /> : areaData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={190}>
-            <AreaChart data={areaData}>
+        <h3 className="text-sm font-medium mb-4">Динамика выручки</h3>
+        {loading ? <Skeleton className="h-52" /> : daily && daily.days.length > 0 ? (
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={daily.days}>
               <defs>
                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.3} />
@@ -243,149 +231,186 @@ export function RevenueDashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="date" tickFormatter={fmtDate}
+              <XAxis dataKey="date" tickFormatter={formatDateTick}
                 tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                axisLine={false} tickLine={false}
-                interval={areaData.length > 30 ? 6 : areaData.length > 14 ? 3 : 0} />
-              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                axisLine={false} tickLine={false} width={36}
-                tickFormatter={v => `${v}`} />
+                axisLine={false} tickLine={false} interval={tickInterval} />
+              <YAxis tickFormatter={v => formatMoney(v)}
+                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                axisLine={false} tickLine={false} width={48} />
               <Tooltip
-                contentStyle={{ fontSize: 11, borderRadius: 8,
-                  border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }}
-                labelFormatter={fmtDate}
-                formatter={(v: number) => [`${v} тыс. ₽`, "Выручка"]} />
+                contentStyle={TOOLTIP_STYLE}
+                labelFormatter={formatTooltipLabel}
+                formatter={(v: number) => [`${fmt(v)} ₽`, "Выручка"]} />
               <Area type="monotone" dataKey="total_paid" stroke="#22c55e" strokeWidth={2}
-                fill="url(#revGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                fill="url(#revGrad)" name="Выручка" />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">Нет данных</div>
+          <div className="h-52 flex items-center justify-center text-sm text-muted-foreground">
+            Нет данных за период
+          </div>
         )}
       </div>
 
-      {/* Stacked bar по типам оплаты */}
-      {activeTypes.length > 1 && (
+      {/* ── Способы оплаты по дням ── */}
+      {!loading && activeSeries.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium">По способам оплаты</h3>
-            <div className="flex flex-wrap gap-3">
-              {activeTypes.map(s => (
+            <h3 className="text-sm font-medium">Способы оплаты по дням</h3>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              {activeSeries.map(s => (
                 <span key={s.key} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="w-2 h-2 rounded-sm" style={{ background: TYPE_COLORS[s.key] }} />
+                  <span className="h-2 w-2 rounded-sm inline-block"
+                    style={{ background: TYPE_COLORS[s.key] ?? "#888" }} />
                   {s.label}
                 </span>
               ))}
             </div>
           </div>
-          {loading ? <Skeleton className="h-48" /> : stackData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={stackData} barCategoryGap="25%">
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={fmtDate}
-                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                  axisLine={false} tickLine={false}
-                  interval={stackData.length > 30 ? 6 : stackData.length > 14 ? 3 : 0} />
-                <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                  axisLine={false} tickLine={false} width={36} />
-                <Tooltip
-                  contentStyle={{ fontSize: 11, borderRadius: 8,
-                    border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }}
-                  labelFormatter={fmtDate}
-                  formatter={(v: number, name: string) => [
-                    `${v} тыс. ₽`, TYPE_LABELS[name] ?? name
-                  ]} />
-                {activeTypes.map(s => (
-                  <Bar key={s.key} dataKey={s.key} stackId="a"
-                    fill={TYPE_COLORS[s.key]} opacity={0.9}
-                    radius={s.key === activeTypes[activeTypes.length - 1].key ? [2,2,0,0] : [0,0,0,0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">Нет данных</div>
-          )}
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={stackedData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="date" tickFormatter={formatDateTick}
+                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                axisLine={false} tickLine={false} interval={tickInterval} />
+              <YAxis tickFormatter={v => formatMoney(v)}
+                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                axisLine={false} tickLine={false} width={48} />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelFormatter={formatTooltipLabel}
+                formatter={(v: number, name: string) => [
+                  `${fmt(v)} ₽`,
+                  activeSeries.find(s => s.key === name)?.label ?? name,
+                ]} />
+              {activeSeries.map(s => (
+                <Area key={s.key} type="monotone" dataKey={s.key}
+                  stackId="1"
+                  stroke={TYPE_COLORS[s.key] ?? "#888"}
+                  fill={TYPE_COLORS[s.key] ?? "#888"}
+                  fillOpacity={0.6} strokeWidth={1} />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       )}
 
-      {/* Нижняя строка: топ врачей + топ услуг */}
+      {/* ── Топ врачей + Топ услуг ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Топ врачей */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border">
+          <div className="px-5 py-4 border-b border-border">
             <h3 className="text-sm font-medium">Топ врачей по выручке</h3>
           </div>
           {loading ? (
-            <div className="p-4 space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
-          ) : byDoctor && byDoctor.doctors.length > 0 ? (
+            <div className="p-4 space-y-2">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-8" />)}
+            </div>
+          ) : doctors && doctors.doctors.length > 0 ? (
             <div className="divide-y divide-border">
-              {byDoctor.doctors.slice(0, 12).map((d, i) => (
-                <div key={d.doctor_id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+              {doctors.doctors.map((d, i) => (
+                <div key={d.doctor_id} className="px-5 py-3 flex items-center gap-3">
                   <span className="text-xs text-muted-foreground w-5 text-right">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {d.doctor_surname} {d.doctor_name}
+                      {d.doctor_surname} {d.doctor_name?.[0] ? `${d.doctor_name[0]}.` : ""}
                     </div>
-                    <div className="text-[11px] text-muted-foreground">{d.count} платежей</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {d.count} платежей
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-semibold">{formatMoney(d.total_paid)} ₽</div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold">{fmt(d.total_paid)} ₽</div>
                     <div className="text-[11px] text-muted-foreground">{d.pct}%</div>
                   </div>
                   {/* Полоска */}
-                  <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden flex-shrink-0">
-                    <div className="h-full rounded-full bg-emerald-500"
+                  <div className="w-16 h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-500/70"
                       style={{ width: `${d.pct}%` }} />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="px-5 py-8 text-center text-sm text-muted-foreground">Нет данных</div>
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+              Нет данных
+            </div>
           )}
         </div>
 
         {/* Топ услуг */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm font-medium">Топ услуг по продажам</h3>
-            {salesData && (
-              <span className="text-xs text-muted-foreground">
-                {formatMoney(salesData.total.final_sum)} ₽ итого
-              </span>
-            )}
+          <div className="px-5 py-4 border-b border-border">
+            <h3 className="text-sm font-medium">Топ услуг по выручке</h3>
           </div>
           {loading ? (
-            <div className="p-4 space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
-          ) : salesData && salesData.services.length > 0 ? (
+            <div className="p-4 space-y-2">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-8" />)}
+            </div>
+          ) : sales && sales.services.length > 0 ? (
             <div className="divide-y divide-border">
-              {salesData.services.slice(0, 12).map((s, i) => (
-                <div key={s.service_title} className="px-5 py-2.5 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+              {sales.services.map((s, i) => (
+                <div key={s.service_title} className="px-5 py-3 flex items-center gap-3">
                   <span className="text-xs text-muted-foreground w-5 text-right">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate" title={s.service_title}>
                       {s.service_title}
                     </div>
-                    <div className="text-[11px] text-muted-foreground">{s.amount} шт.</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {s.amount} шт
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-semibold">{formatMoney(s.final_sum)} ₽</div>
-                    <div className="text-[11px] text-muted-foreground">{s.pct_of_total}%</div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold">{fmt(Math.round(s.final_sum))} ₽</div>
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="text-[11px] text-muted-foreground">{s.pct_of_total}%</span>
+                      {s.delta_pct != null && s.delta_dir && s.delta_dir !== "flat" && (
+                        <span className={`text-[10px] font-medium ${
+                          s.delta_dir === "up" ? "text-emerald-500" : "text-red-500"
+                        }`}>
+                          {s.delta_dir === "up" ? "+" : "−"}{s.delta_pct}%
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {/* Полоска */}
-                  <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden flex-shrink-0">
-                    <div className="h-full rounded-full bg-blue-500"
+                  <div className="w-16 h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-500/70"
                       style={{ width: `${Math.min(s.pct_of_total * 3, 100)}%` }} />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="px-5 py-8 text-center text-sm text-muted-foreground">Нет данных</div>
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+              Нет данных
+            </div>
           )}
         </div>
       </div>
+
+      {/* ── Столбчатая детализация по дням ── */}
+      {!loading && daily && daily.days.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-medium mb-4">Платежи по дням (кол-во)</h3>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={daily.days} barCategoryGap="40%">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="date" tickFormatter={formatDateTick}
+                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                axisLine={false} tickLine={false} interval={tickInterval} />
+              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                axisLine={false} tickLine={false} width={28} />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelFormatter={formatTooltipLabel}
+                formatter={(v: number) => [v, "Платежей"]} />
+              <Bar dataKey="count" fill="#6366f1" opacity={0.8} radius={[3,3,0,0]} name="Платежей" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
     </div>
   );
 }

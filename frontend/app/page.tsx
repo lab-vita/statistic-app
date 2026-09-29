@@ -64,7 +64,7 @@ export default function DashboardPage() {
     fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
   }, []);
 
-  // Разделы без топбара (управляют периодом сами)
+  // Разделы без топбара (у них собственное управление периодом или его нет)
   const noTopbar = ["home", "reports", "plans", "revenue"];
 
   const load = useCallback(async () => {
@@ -147,6 +147,10 @@ export default function DashboardPage() {
     </div>
   );
 
+  // Период для RevenueDashboard — последние 30 дней
+  const revFrom = toDateStr(addDays(new Date(), -30));
+  const revTo   = toDateStr(addDays(new Date(), -1));
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar section={section} onSelectSection={handleSelectSection} />
@@ -180,10 +184,20 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {section === "home"     && <HomeDashboard onNavigate={handleSelectSection} />}
-          {section === "reports"  && <ReportsDashboard />}
-          {section === "plans"    && <PlansDashboard />}
-          {section === "revenue"  && <RevenueDashboard />}
+          {section === "home"    && <HomeDashboard onNavigate={handleSelectSection} />}
+          {section === "reports" && <ReportsDashboard />}
+          {section === "plans"   && <PlansDashboard />}
+          {section === "revenue" && (
+            <>
+              <div>
+                <h1 className="text-base font-semibold">Выручка</h1>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Последние 30 дней · только обычные платежи (исключены возвраты и страховые)
+                </p>
+              </div>
+              <RevenueDashboard dateFrom={revFrom} dateTo={revTo} />
+            </>
+          )}
 
           {section === "calls" && (
             <>
