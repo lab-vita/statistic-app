@@ -2,6 +2,18 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export type DeltaDir = "up" | "down" | "flat" | null;
 
+// Цвета для графика сравнения операторов
+export const OPERATOR_COLORS = [
+  { text: "#6366f1", bg: "bg-indigo-500"  },
+  { text: "#22c55e", bg: "bg-emerald-500" },
+  { text: "#f59e0b", bg: "bg-amber-500"   },
+  { text: "#ec4899", bg: "bg-pink-500"    },
+  { text: "#14b8a6", bg: "bg-teal-500"    },
+  { text: "#f97316", bg: "bg-orange-500"  },
+  { text: "#8b5cf6", bg: "bg-violet-500"  },
+  { text: "#06b6d4", bg: "bg-cyan-500"    },
+];
+
 export interface OperatorStats {
   name: string;
   incoming: number;
