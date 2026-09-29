@@ -77,8 +77,6 @@ export interface Admin {
   label:   string;
 }
 
-// ─── Конверсия ───────────────────────────────────────────────
-
 export interface ConversionOperator {
   operator_id:     string;
   name:            string;
@@ -97,6 +95,105 @@ export interface ConversionResponse {
     appointments:   number;
     conversion_pct: number;
   };
+}
+
+// ─── Выручка (payments) ──────────────────────────────────────
+
+export interface PaymentStatsResponse {
+  date_from: string;
+  date_to:   string;
+  prev_from: string;
+  prev_to:   string;
+  count:          number;
+  total_paid:     number;
+  by_cash:        number;
+  by_card:        number;
+  by_cashless:    number;
+  by_credit:      number;
+  by_balance:     number;
+  count_delta_pct:       number | null;
+  count_delta_dir:       DeltaDir;
+  total_paid_delta_pct:  number | null;
+  total_paid_delta_dir:  DeltaDir;
+  by_cash_delta_pct:     number | null;
+  by_cash_delta_dir:     DeltaDir;
+  by_card_delta_pct:     number | null;
+  by_card_delta_dir:     DeltaDir;
+  by_cashless_delta_pct: number | null;
+  by_cashless_delta_dir: DeltaDir;
+  by_credit_delta_pct:   number | null;
+  by_credit_delta_dir:   DeltaDir;
+}
+
+export interface PaymentDailyItem {
+  date:        string;
+  count:       number;
+  total_paid:  number;
+  by_cash:     number;
+  by_card:     number;
+  by_cashless: number;
+  by_credit:   number;
+}
+
+export interface PaymentDailyResponse {
+  date_from: string;
+  date_to:   string;
+  days:      PaymentDailyItem[];
+}
+
+export interface PaymentDailyByTypeSeries {
+  key:    string;
+  label:  string;
+  values: number[];
+}
+
+export interface PaymentDailyByTypeResponse {
+  date_from: string;
+  date_to:   string;
+  days:      string[];
+  series:    PaymentDailyByTypeSeries[];
+}
+
+export interface PaymentDoctor {
+  doctor_id:      number;
+  doctor_name:    string;
+  doctor_surname: string;
+  count:          number;
+  total_paid:     number;
+  pct:            number;
+}
+
+export interface PaymentByDoctorResponse {
+  date_from: string;
+  date_to:   string;
+  doctors:   PaymentDoctor[];
+}
+
+// ─── Продажи (sales) ─────────────────────────────────────────
+
+export interface SaleService {
+  service_title: string;
+  service_id:    number | null;
+  unit:          string | null;
+  amount:        number;
+  final_sum:     number;
+  total_sum:     number;
+  pct_of_total:  number;
+  delta_pct:     number | null;
+  delta_dir:     DeltaDir;
+}
+
+export interface SalesStatsResponse {
+  date_from: string;
+  date_to:   string;
+  prev_from: string;
+  prev_to:   string;
+  total: {
+    final_sum:  number;
+    delta_pct:  number | null;
+    delta_dir:  DeltaDir;
+  };
+  services: SaleService[];
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
@@ -147,6 +244,12 @@ export function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m > 0 ? `${m}м ${s}с` : `${s}с`;
+}
+
+export function formatMoney(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} млн`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(0)} тыс`;
+  return String(n);
 }
 
 export function toDateStr(d: Date): string {
@@ -352,4 +455,38 @@ export async function fillPlans(
   });
   if (!res.ok) throw new Error("Ошибка заполнения планов");
   return res.json();
+}
+
+// ─── Выручка API ─────────────────────────────────────────────
+
+export function fetchPaymentStats(
+  dateFrom: string, dateTo: string, kind?: number
+): Promise<PaymentStatsResponse> {
+  const q = kind !== undefined ? `&kind=${kind}` : "";
+  return apiFetch(`/api/payments/stats?date_from=${dateFrom}&date_to=${dateTo}${q}`);
+}
+
+export function fetchPaymentDaily(
+  dateFrom: string, dateTo: string, kind?: number
+): Promise<PaymentDailyResponse> {
+  const q = kind !== undefined ? `&kind=${kind}` : "";
+  return apiFetch(`/api/payments/daily?date_from=${dateFrom}&date_to=${dateTo}${q}`);
+}
+
+export function fetchPaymentDailyByType(
+  dateFrom: string, dateTo: string
+): Promise<PaymentDailyByTypeResponse> {
+  return apiFetch(`/api/payments/daily-by-type?date_from=${dateFrom}&date_to=${dateTo}`);
+}
+
+export function fetchPaymentByDoctor(
+  dateFrom: string, dateTo: string, limit = 20
+): Promise<PaymentByDoctorResponse> {
+  return apiFetch(`/api/payments/by-doctor?date_from=${dateFrom}&date_to=${dateTo}&limit=${limit}`);
+}
+
+export function fetchSalesStats(
+  dateFrom: string, dateTo: string, limit = 30
+): Promise<SalesStatsResponse> {
+  return apiFetch(`/api/sales/stats?date_from=${dateFrom}&date_to=${dateTo}&limit=${limit}`);
 }

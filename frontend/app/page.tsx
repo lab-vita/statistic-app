@@ -6,6 +6,7 @@ import { Topbar } from "@/components/topbar";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { ReportsDashboard } from "@/components/reports-dashboard";
 import { PlansDashboard } from "@/components/plans-dashboard";
+import { RevenueDashboard } from "@/components/revenue-dashboard";
 import { CardsOverview } from "@/components/cards-overview";
 import { HourlyChart } from "@/components/hourly-chart";
 import { DailyChart } from "@/components/daily-chart";
@@ -63,7 +64,8 @@ export default function DashboardPage() {
     fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
   }, []);
 
-  const noTopbar = ["home", "reports", "plans"];
+  // Разделы без топбара (управляют периодом сами)
+  const noTopbar = ["home", "reports", "plans", "revenue"];
 
   const load = useCallback(async () => {
     if (noTopbar.includes(section)) return;
@@ -178,9 +180,10 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {section === "home" && <HomeDashboard onNavigate={handleSelectSection} />}
-          {section === "reports" && <ReportsDashboard />}
-          {section === "plans" && <PlansDashboard />}
+          {section === "home"     && <HomeDashboard onNavigate={handleSelectSection} />}
+          {section === "reports"  && <ReportsDashboard />}
+          {section === "plans"    && <PlansDashboard />}
+          {section === "revenue"  && <RevenueDashboard />}
 
           {section === "calls" && (
             <>
@@ -209,7 +212,6 @@ export default function DashboardPage() {
               {!loading && !selectedOp && stats && (
                 <OperatorsTable operators={stats.operators} />
               )}
-              {/* Конверсия — только когда не выбран конкретный оператор */}
               {!loading && !selectedOp && (
                 <ConversionBlock dateFrom={dateFrom} dateTo={dateTo} />
               )}
