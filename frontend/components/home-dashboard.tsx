@@ -4,15 +4,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
   DragStartEvent,
+  DragMoveEvent,
   DragEndEvent,
+  useDraggable,
 } from "@dnd-kit/core";
-import { restrictToParentElement } from "@dnd-kit/modifiers";
-import { useDraggable } from "@dnd-kit/core";
 import {
   loadGrid, saveGrid, findFreeSlot, resizeWidget,
   WIDGET_TYPES, COLS, ROW_H, GAP,
@@ -30,20 +30,17 @@ import {
   StatsResponse, DailyResponse,
 } from "@/lib/api";
 import {
-  Plus, Settings2, ChevronLeft, ChevronRight,
-  Trash2, GripVertical, Maximize2,
+  Plus, Settings2, ChevronLeft, ChevronRight, Trash2, GripVertical,
 } from "lucide-react";
 import { Section } from "@/components/sidebar";
 
-// ─── Период ──────────────────────────────────────────────────
+// ─── Период ─────────────────────────────────────────────
 
 type PeriodType = "day" | "week" | "month";
-
 const MONTH_NAMES = [
   "Январь","Февраль","Март","Апрель","Май","Июнь",
   "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
 ];
-
 function getPeriod(type: PeriodType, offset: number) {
   const now = new Date();
   if (type === "day") {
@@ -52,13 +49,13 @@ function getPeriod(type: PeriodType, offset: number) {
       label: d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }) };
   }
   if (type === "week") {
-    const dow    = now.getDay() === 0 ? 6 : now.getDay() - 1;
-    const monday = addDays(now, -dow + offset * 7);
-    const sunday = addDays(monday, 6);
-    return { from: toDateStr(monday), to: toDateStr(sunday),
-      label: `${monday.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})} — ${sunday.toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"})}` };
+    const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const mon = addDays(now, -dow + offset * 7);
+    const sun = addDays(mon, 6);
+    return { from: toDateStr(mon), to: toDateStr(sun),
+      label: `${mon.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})} — ${sun.toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"})}` };
   }
-  const d    = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
   const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
   return { from: toDateStr(d), to: toDateStr(last),
     label: `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` };
@@ -66,13 +63,9 @@ function getPeriod(type: PeriodType, offset: number) {
 
 // ─── Контент виджета ─────────────────────────────────────────
 
-function WidgetContent({
-  pw, statsData, dailyData, loading,
-}: {
-  pw:        PlacedWidget;
-  statsData: StatsResponse | null;
-  dailyData: DailyResponse | null;
-  loading:   boolean;
+function WidgetContent({ pw, statsData, dailyData, loading }: {
+  pw: PlacedWidget; statsData: StatsResponse | null;
+  dailyData: DailyResponse | null; loading: boolean;
 }) {
   const total = statsData?.operators["total"] ?? null;
   switch (pw.type) {
@@ -81,71 +74,175 @@ function WidgetContent({
     case "calls_chart":     return <CallsChartWidget     stats={total} daily={dailyData?.days ?? []} loading={loading} />;
     case "calls_full":      return <CallsFullWidget      stats={total} daily={dailyData?.days ?? []} loading={loading} />;
     case "calls_operators": return <CallsOperatorsWidget operators={statsData?.operators ?? null} loading={loading} />;
-    default: return (
-      <div className="h-full rounded-2xl bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">
-        неизвестный виджет
-      </div>
-    );
+    default: return <div className="h-full rounded-2xl bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">неизвестный виджет</div>;
   }
 }
 
-// ─── Один перетаскиваемый виджет ─────────────────────────────
+// ─── Вспомогатель: px-ширина колонки и размеры виджета ─────────────
 
-function DraggableWidget({
-  pw, editMode, onDelete, onResizeStart,
-  statsData, dailyData, loading, colPx, isDragging,
-}: {
-  pw:            PlacedWidget;
-  editMode:      boolean;
-  onDelete:      (id: string) => void;
-  onResizeStart: (e: React.MouseEvent, pw: PlacedWidget) => void;
-  statsData:     StatsResponse | null;
-  dailyData:     DailyResponse | null;
-  loading:       boolean;
-  colPx:         string;
-  isDragging:    boolean;
+function getColPx(el: HTMLElement | null): number {
+  if (!el) return 0;
+  return (el.clientWidth - (COLS - 1) * GAP) / COLS;
+}
+function widgetPxW(colPx: number, w: number) { return w * colPx + (w - 1) * GAP; }
+function widgetPxH(h: number)                 { return h * ROW_H + (h - 1) * GAP; }
+
+// ─── Красивая сетка (точки + строки) ──────────────────────────
+
+function GridDots({ rows }: { rows: number }) {
+  const totalRows = Math.max(rows + 3, 5);
+  return (
+    <svg
+      className="absolute inset-0 w-full pointer-events-none"
+      style={{ height: totalRows * (ROW_H + GAP) }}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <pattern
+          id="grid-dots"
+          x="0" y="0"
+          width={`calc((100% + ${GAP}px) / ${COLS})`}
+          height={ROW_H + GAP}
+          patternUnits="userSpaceOnUse"
+        >
+          {/* Точка на пересечении */}
+          <circle cx="0" cy="0" r="1.5" fill="currentColor" opacity="0.2" />
+        </pattern>
+        {/* Горизонтальные линии строк */}
+        <pattern
+          id="grid-rows"
+          x="0" y="0"
+          width="100%"
+          height={ROW_H + GAP}
+          patternUnits="userSpaceOnUse"
+        >
+          <line
+            x1="0" y1={ROW_H + GAP} x2="100%" y2={ROW_H + GAP}
+            stroke="currentColor" strokeOpacity="0.06" strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid-rows)" className="text-foreground" />
+      <rect width="100%" height="100%" fill="url(#grid-dots)" className="text-foreground" />
+    </svg>
+  );
+}
+
+// ─── Drop-зона (подсветка куда встанет виджет) ──────────────────
+
+function DropZone({ colPx, x, y, w, h, canFit }: {
+  colPx: number; x: number; y: number; w: number; h: number; canFit: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  if (!colPx) return null;
+  return (
+    <div
+      className="absolute pointer-events-none rounded-2xl transition-all duration-100"
+      style={{
+        left:    x * (colPx + GAP),
+        top:     y * (ROW_H + GAP),
+        width:   widgetPxW(colPx, w),
+        height:  widgetPxH(h),
+        background: canFit
+          ? "color-mix(in srgb, #22c55e 12%, transparent)"
+          : "color-mix(in srgb, #ef4444 12%, transparent)",
+        border: `2px dashed ${ canFit ? "#22c55e" : "#ef4444" }`,
+        zIndex: 10,
+      }}
+    >
+      <div
+        className="absolute top-2 left-3 text-[10px] font-semibold"
+        style={{ color: canFit ? "#22c55e" : "#ef4444" }}
+      >
+        {canFit ? `${w}×${h}` : "нельзя"}
+      </div>
+    </div>
+  );
+}
+
+// ─── Resize preview ────────────────────────────────────────────────
+
+function ResizePreview({ colPx, x, y, w, h }: {
+  colPx: number; x: number; y: number; w: number; h: number;
+}) {
+  if (!colPx) return null;
+  return (
+    <div
+      className="absolute pointer-events-none rounded-2xl z-20"
+      style={{
+        left:    x * (colPx + GAP),
+        top:     y * (ROW_H + GAP),
+        width:   widgetPxW(colPx, w),
+        height:  widgetPxH(h),
+        background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+        border: "2px solid hsl(var(--primary) / 0.5)",
+      }}
+    >
+      {/* Размер в углу */}
+      <div className="absolute bottom-2 right-3 text-[11px] font-bold text-primary/80">
+        {w} кол × {h} стр
+      </div>
+      {/* Пиксельный размер */}
+      <div className="absolute top-2 left-3 text-[10px] text-primary/50">
+        {Math.round(widgetPxW(colPx, w))} × {widgetPxH(h)} px
+      </div>
+    </div>
+  );
+}
+
+// ─── Один виджет ───────────────────────────────────────────────
+
+function DraggableWidget({ pw, editMode, onDelete, onResizeStart, isDragging,
+  statsData, dailyData, loading, colPx,
+}: {
+  pw: PlacedWidget; editMode: boolean;
+  onDelete: (id: string) => void;
+  onResizeStart: (e: React.MouseEvent, pw: PlacedWidget) => void;
+  isDragging: boolean;
+  statsData: StatsResponse | null; dailyData: DailyResponse | null; loading: boolean;
+  colPx: number;
+}) {
+  const { attributes, listeners, setNodeRef } = useDraggable({
     id:       pw.id,
     disabled: !editMode,
   });
 
-  const style: React.CSSProperties = {
-    position: "absolute",
-    left:     `calc(${pw.x} * (${colPx} + ${GAP}px))`,
-    top:      pw.y * (ROW_H + GAP),
-    width:    `calc(${pw.w} * (${colPx} + ${GAP}px) - ${GAP}px)`,
-    height:   pw.h * (ROW_H + GAP) - GAP,
-    opacity:  isDragging ? 0.35 : 1,
-    transition: isDragging ? "none" : "top 0.15s, left 0.15s",
-    zIndex:   isDragging ? 0 : 1,
-  };
+  const pxW = widgetPxW(colPx, pw.w);
+  const pxH = widgetPxH(pw.h);
 
   return (
-    <div ref={setNodeRef} style={style} className="group">
+    <div
+      ref={setNodeRef}
+      className="absolute group"
+      style={{
+        left:    pw.x * (colPx + GAP),
+        top:     pw.y * (ROW_H + GAP),
+        width:   pxW,
+        height:  pxH,
+        opacity: isDragging ? 0 : 1,   // полностью скрываем исходнику во время drag
+        zIndex:  isDragging ? 0 : 1,
+      }}
+    >
       <WidgetContent pw={pw} statsData={statsData} dailyData={dailyData} loading={loading} />
 
       {editMode && (
         <div className="
-          absolute inset-0 rounded-2xl
-          ring-2 ring-primary/40
-          bg-background/40 backdrop-blur-[2px]
+          absolute inset-0 rounded-2xl z-10
+          ring-2 ring-primary/30
+          bg-background/50 backdrop-blur-[2px]
           flex items-center justify-center
           opacity-0 group-hover:opacity-100
           transition-opacity duration-150
         ">
-          {/* Drag handle — dnd-kit listeners */}
+          {/* Drag — dnd-kit */}
           <div
-            {...listeners}
-            {...attributes}
+            {...listeners} {...attributes}
             className="
-              h-10 w-10 rounded-xl
-              bg-background/80 border border-border shadow-lg
+              h-10 w-10 rounded-xl shadow-lg cursor-grab active:cursor-grabbing
+              bg-background border border-border
               flex items-center justify-center
-              cursor-grab active:cursor-grabbing
               hover:bg-muted transition-colors
             "
-            title="Перетащить"
           >
             <GripVertical className="h-5 w-5 text-foreground/60" />
           </div>
@@ -153,89 +250,27 @@ function DraggableWidget({
           {/* Удалить */}
           <button
             onClick={() => onDelete(pw.id)}
-            className="
-              absolute top-2 right-2 h-7 w-7 rounded-xl
-              bg-destructive flex items-center justify-center
-              hover:bg-destructive/80 transition-colors shadow
-            "
-            title="Удалить"
+            className="absolute top-2 right-2 h-7 w-7 rounded-xl bg-destructive shadow flex items-center justify-center hover:opacity-80 transition-opacity"
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive-foreground" />
           </button>
 
-          {/* Resize */}
+          {/* Resize handle */}
           <div
             onMouseDown={e => onResizeStart(e, pw)}
             className="
-              absolute bottom-2 right-2 h-7 w-7 rounded-xl
-              bg-background/80 border border-border shadow
-              flex items-center justify-center
-              cursor-se-resize hover:bg-muted transition-colors
+              absolute bottom-0 right-0 w-8 h-8 cursor-se-resize
+              flex items-end justify-end pb-2 pr-2
             "
-            title="Изменить размер"
           >
-            <Maximize2 className="h-3.5 w-3.5 text-foreground/50" />
+            {/* SVG-ручка ресайза */}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 10L10 2M6 10L10 6M10 10V10" stroke="currentColor"
+                strokeWidth="1.5" strokeLinecap="round" className="text-foreground/40" />
+            </svg>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Сетка ───────────────────────────────────────────────────
-
-function GridBackground({ editMode, rows }: { editMode: boolean; rows: number }) {
-  if (!editMode) return null;
-
-  const totalRows = Math.max(rows + 2, 4);
-  const colPx = `calc((100% - ${(COLS - 1) * GAP}px) / ${COLS})`;
-
-  return (
-    <div className="absolute inset-0 pointer-events-none" style={{ height: totalRows * (ROW_H + GAP) }}>
-      {/* Колонки */}
-      <div className="absolute inset-0 flex gap-[12px]">
-        {Array.from({ length: COLS }).map((_, i) => (
-          <div
-            key={i}
-            className="flex-1 rounded-xl"
-            style={{
-              background: "color-mix(in srgb, var(--primary) 4%, transparent)",
-              outline: "1px dashed color-mix(in srgb, var(--primary) 18%, transparent)",
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Горизонтальные линии строк */}
-      {Array.from({ length: totalRows }).map((_, row) => (
-        <div
-          key={row}
-          className="absolute left-0 right-0 flex items-center"
-          style={{ top: row * (ROW_H + GAP) + ROW_H - 1 }}
-        >
-          <div
-            className="w-full"
-            style={{
-              height: 1,
-              background: "color-mix(in srgb, var(--primary) 12%, transparent)",
-            }}
-          />
-        </div>
-      ))}
-
-      {/* Номера строк */}
-      {Array.from({ length: totalRows }).map((_, row) => (
-        <div
-          key={`label-${row}`}
-          className="absolute -left-5 text-[9px] font-mono"
-          style={{
-            top: row * (ROW_H + GAP) + ROW_H / 2 - 6,
-            color: "color-mix(in srgb, var(--primary) 30%, transparent)",
-          }}
-        >
-          {row + 1}
-        </div>
-      ))}
     </div>
   );
 }
@@ -250,7 +285,15 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
   const [widgets,     setWidgets]     = useState<PlacedWidget[]>([]);
   const [editMode,    setEditMode]    = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
-  const [activeId,    setActiveId]    = useState<string | null>(null);
+
+  // Drag state
+  const [activeId,   setActiveId]   = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ x: number; y: number; canFit: boolean } | null>(null);
+
+  // Resize state
+  const [resizePreview, setResizePreview] = useState<{
+    id: string; x: number; y: number; w: number; h: number;
+  } | null>(null);
 
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [offset,     setOffset]     = useState(0);
@@ -279,43 +322,68 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
   function save(next: PlacedWidget[]) { setWidgets(next); saveGrid(next); }
 
-  // ── dnd-kit ──────────────────────────────────────────────
+  // ── dnd-kit ───────────────────────────────────────────────
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
-  function getColPx(): number {
-    if (!containerRef.current) return 0;
-    return (containerRef.current.clientWidth - (COLS - 1) * GAP) / COLS;
-  }
+  function colPxNow() { return getColPx(containerRef.current); }
 
-  function handleDragStart(event: DragStartEvent) {
-    setActiveId(String(event.active.id));
-  }
+  // Вычисляем предполагаемую позицию drop по delta перемещения
+  function calcDrop(id: string, deltaX: number, deltaY: number): { x: number; y: number; canFit: boolean } {
+    const cp  = colPxNow();
+    const pw  = widgets.find(w => w.id === id);
+    if (!pw || !cp) return { x: 0, y: 0, canFit: false };
 
-  function handleDragEnd(event: DragEndEvent) {
-    setActiveId(null);
-    const { active, delta } = event;
-    if (!delta.x && !delta.y) return;
-
-    const colPx = getColPx();
-    if (!colPx) return;
-
-    const id = String(active.id);
-    const pw = widgets.find(w => w.id === id);
-    if (!pw) return;
-
-    const dx = Math.round(delta.x / (colPx + GAP));
-    const dy = Math.round(delta.y / (ROW_H + GAP));
-    if (!dx && !dy) return;
-
+    const dx = Math.round(deltaX / (cp + GAP));
+    const dy = Math.round(deltaY / (ROW_H + GAP));
     const nx = Math.min(Math.max(pw.x + dx, 0), COLS - pw.w);
     const ny = Math.max(pw.y + dy, 0);
 
-    save(widgets.map(w => w.id === id ? { ...w, x: nx, y: ny } : w));
+    // Проверяем пересечения с другими виджетами
+    const ghost = { ...pw, x: nx, y: ny };
+    const canFit = !widgets.some(w => {
+      if (w.id === id) return false;
+      return (
+        ghost.x < w.x + w.w && ghost.x + ghost.w > w.x &&
+        ghost.y < w.y + w.h && ghost.y + ghost.h > w.y
+      );
+    });
+    return { x: nx, y: ny, canFit };
   }
 
-  // ── Resize (mouse-based, по шагам сетки) ────────────────
+  function handleDragStart({ active }: DragStartEvent) {
+    setActiveId(String(active.id));
+    setDropTarget(null);
+  }
+
+  function handleDragMove({ active, delta }: DragMoveEvent) {
+    const drop = calcDrop(String(active.id), delta.x, delta.y);
+    setDropTarget(drop);
+  }
+
+  function handleDragEnd({ active, delta }: DragEndEvent) {
+    const id = String(active.id);
+    const cp = colPxNow();
+    if (cp && (delta.x || delta.y)) {
+      const pw = widgets.find(w => w.id === id);
+      if (pw) {
+        const dx = Math.round(delta.x / (cp + GAP));
+        const dy = Math.round(delta.y / (ROW_H + GAP));
+        const nx = Math.min(Math.max(pw.x + dx, 0), COLS - pw.w);
+        const ny = Math.max(pw.y + dy, 0);
+        if (nx !== pw.x || ny !== pw.y) {
+          save(widgets.map(w => w.id === id ? { ...w, x: nx, y: ny } : w));
+        }
+      }
+    }
+    setActiveId(null);
+    setDropTarget(null);
+  }
+
+  // ── Resize (live preview) ─────────────────────────────────────
+
   const resizeRef = useRef<{
     id: string; startX: number; startY: number; origW: number; origH: number;
   } | null>(null);
@@ -324,26 +392,44 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
     e.preventDefault();
     e.stopPropagation();
     resizeRef.current = { id: pw.id, startX: e.clientX, startY: e.clientY, origW: pw.w, origH: pw.h };
+    setResizePreview({ id: pw.id, x: pw.x, y: pw.y, w: pw.w, h: pw.h });
+
+    const def = WIDGET_TYPES.find(t => t.id === pw.type)!;
+
+    const onMove = (me: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const cp = colPxNow();
+      if (!cp) return;
+      const dw = Math.round((me.clientX - resizeRef.current.startX) / (cp + GAP));
+      const dh = Math.round((me.clientY - resizeRef.current.startY) / (ROW_H + GAP));
+      const nw = Math.min(Math.max(resizeRef.current.origW + dw, def.minW), def.maxW);
+      const nh = Math.min(Math.max(resizeRef.current.origH + dh, def.minH), def.maxH);
+      setResizePreview({ id: pw.id, x: pw.x, y: pw.y, w: nw, h: nh });
+    };
 
     const onUp = (ue: MouseEvent) => {
       if (!resizeRef.current) return;
-      const colPx = getColPx();
-      if (colPx) {
-        const dw = Math.round((ue.clientX - resizeRef.current.startX) / (colPx + GAP));
+      const cp = colPxNow();
+      if (cp) {
+        const dw = Math.round((ue.clientX - resizeRef.current.startX) / (cp + GAP));
         const dh = Math.round((ue.clientY - resizeRef.current.startY) / (ROW_H + GAP));
         if (dw || dh) {
           const target = widgets.find(w => w.id === resizeRef.current!.id)!;
-          const def    = WIDGET_TYPES.find(t => t.id === target.type)!;
           save(resizeWidget(widgets, target.id, target.w + dw, target.h + dh, def));
         }
       }
       resizeRef.current = null;
-      window.removeEventListener("mouseup", onUp);
+      setResizePreview(null);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup",   onUp);
     };
-    window.addEventListener("mouseup", onUp);
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup",   onUp);
   }
 
   // ── Helpers ──────────────────────────────────────────────
+
   function handleAdd(typeId: string) {
     const def = WIDGET_TYPES.find(t => t.id === typeId)!;
     const { x, y } = findFreeSlot(widgets, def.defaultW, def.defaultH);
@@ -351,10 +437,11 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
     setShowCatalog(false);
   }
 
-  const maxRow  = Math.max(0, ...widgets.map(w => w.y + w.h));
-  const canvasH = Math.max((maxRow + (editMode ? 2 : 0)) * (ROW_H + GAP), 320);
-  const colPx   = `calc((100% - ${(COLS - 1) * GAP}px) / ${COLS})`;
-  const activeWidget = activeId ? widgets.find(w => w.id === activeId) : null;
+  const activeWidget = activeId ? widgets.find(w => w.id === activeId) ?? null : null;
+  const maxRow   = Math.max(0, ...widgets.map(w => w.y + w.h));
+  const canvasH  = Math.max((maxRow + (editMode ? 3 : 0)) * (ROW_H + GAP), 320);
+  const colPx    = colPxNow();  // 0 на SSR, пересчитается через CSS
+  const colPxCSS = `calc((100% - ${(COLS - 1) * GAP}px) / ${COLS})`;
 
   return (
     <div className="min-h-full">
@@ -366,46 +453,34 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
             <h1 className="text-base font-semibold">Сводка</h1>
             <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
           </div>
-
           <div className="flex items-center gap-2">
-            {/* Период */}
             <div className="flex gap-1 rounded-xl border border-border bg-muted/30 p-1">
               {(["day","week","month"] as PeriodType[]).map(t => (
                 <button key={t} onClick={() => { setPeriodType(t); setOffset(0); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    periodType === t
-                      ? "bg-background border border-border shadow-sm text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                    periodType === t ? "bg-background border border-border shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}>
                   {t === "day" ? "День" : t === "week" ? "Неделя" : "Месяц"}
                 </button>
               ))}
             </div>
-
-            {/* Навигация */}
             <div className="flex gap-1">
               <button onClick={() => setOffset(o => o - 1)}
-                className="h-8 w-8 rounded-xl border border-border hover:bg-muted/40 flex items-center justify-center transition-colors">
+                className="h-8 w-8 rounded-xl border border-border hover:bg-muted/40 flex items-center justify-center">
                 <ChevronLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               <button onClick={() => setOffset(o => o + 1)} disabled={offset >= 0}
-                className="h-8 w-8 rounded-xl border border-border hover:bg-muted/40 flex items-center justify-center transition-colors disabled:opacity-30">
+                className="h-8 w-8 rounded-xl border border-border hover:bg-muted/40 flex items-center justify-center disabled:opacity-30">
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
-
-            {/* Добавить */}
             <button onClick={() => setShowCatalog(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-colors">
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold">
               <Plus className="h-3.5 w-3.5" /> Добавить
             </button>
-
-            {/* Настроить */}
             <button onClick={() => setEditMode(e => !e)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                editMode
-                  ? "bg-muted border-border text-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                editMode ? "bg-muted border-border" : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/40"
               }`}>
               <Settings2 className="h-3.5 w-3.5" />
               {editMode ? "Готово" : "Настроить"}
@@ -413,15 +488,12 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
           </div>
         </div>
 
-        {/* Подсказка */}
+        {/* Хинт режима */}
         {editMode && (
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-2.5">
-            <div className="h-5 w-5 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <GripVertical className="h-3 w-3 text-primary" />
-            </div>
+            <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Наведите на виджет и тяните за <span className="text-foreground font-medium">⠿</span> для перемещения.
-              Тяните за <span className="text-foreground font-medium">⤡</span> в углу для изменения размера.
+              Тяните виджет для перемещения · Зелёная зона — можно поставить, красная — нет · Угол право вниз — изменить размер
             </p>
           </div>
         )}
@@ -429,17 +501,37 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         {/* Канвас */}
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
         >
           <div
             ref={containerRef}
-            className="relative w-full"
+            className="relative w-full select-none"
             style={{ minHeight: canvasH }}
           >
-            {/* Красивая сетка */}
-            <GridBackground editMode={editMode} rows={maxRow} />
+            {/* Точечная сетка */}
+            {editMode && <GridDots rows={maxRow} />}
+
+            {/* Drop-зона */}
+            {editMode && activeId && dropTarget && activeWidget && (
+              <DropZone
+                colPx={colPxNow()}
+                x={dropTarget.x} y={dropTarget.y}
+                w={activeWidget.w} h={activeWidget.h}
+                canFit={dropTarget.canFit}
+              />
+            )}
+
+            {/* Resize preview */}
+            {editMode && resizePreview && (
+              <ResizePreview
+                colPx={colPxNow()}
+                x={resizePreview.x} y={resizePreview.y}
+                w={resizePreview.w} h={resizePreview.h}
+              />
+            )}
 
             {/* Виджеты */}
             {widgets.length === 0 ? (
@@ -452,41 +544,35 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                   <p className="text-xs text-muted-foreground mt-1">Нажмите «Добавить» чтобы начать</p>
                 </div>
               </div>
-            ) : (
-              widgets.map(pw => (
-                <DraggableWidget
-                  key={pw.id}
-                  pw={pw}
-                  editMode={editMode}
-                  onDelete={id => save(widgets.filter(w => w.id !== id))}
-                  onResizeStart={startResize}
-                  statsData={statsData}
-                  dailyData={dailyData}
-                  loading={loading}
-                  colPx={colPx}
-                  isDragging={pw.id === activeId}
-                />
-              ))
-            )}
+            ) : widgets.map(pw => (
+              <DraggableWidget
+                key={pw.id}
+                pw={pw}
+                editMode={editMode}
+                onDelete={id => save(widgets.filter(w => w.id !== id))}
+                onResizeStart={startResize}
+                isDragging={pw.id === activeId}
+                statsData={statsData} dailyData={dailyData} loading={loading}
+                colPx={colPxNow()}
+              />
+            ))}
 
-            {/* DragOverlay — полупрозрачный призрак */}
-            <DragOverlay dropAnimation={null}>
+            {/* DragOverlay: реальный размер виджета, полная непрозрачность */}
+            <DragOverlay dropAnimation={{ duration: 150, easing: "ease" }}>
               {activeWidget ? (
                 <div
                   style={{
-                    width:   `calc(${activeWidget.w} * (${colPx} + ${GAP}px) - ${GAP}px)`,
-                    height:  activeWidget.h * (ROW_H + GAP) - GAP,
-                    opacity: 0.85,
+                    width:        widgetPxW(colPxNow(), activeWidget.w),
+                    height:       widgetPxH(activeWidget.h),
                     borderRadius: 16,
-                    overflow: "hidden",
-                    boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+                    overflow:     "hidden",
+                    boxShadow:    "0 24px 64px rgba(0,0,0,0.25)",
+                    opacity:      0.95,
                   }}
                 >
                   <WidgetContent
                     pw={activeWidget}
-                    statsData={statsData}
-                    dailyData={dailyData}
-                    loading={loading}
+                    statsData={statsData} dailyData={dailyData} loading={loading}
                   />
                 </div>
               ) : null}
@@ -496,10 +582,7 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
       </div>
 
       {showCatalog && (
-        <WidgetCatalog
-          onAdd={handleAdd}
-          onClose={() => setShowCatalog(false)}
-        />
+        <WidgetCatalog onAdd={handleAdd} onClose={() => setShowCatalog(false)} />
       )}
     </div>
   );
