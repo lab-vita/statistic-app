@@ -320,19 +320,32 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
   }
 
   function handleDragEnd({active,delta}:DragEndEvent) {
-    cancelAnimationFrame(rafDrop.current);
-    const id=String(active.id), cp=cpx();
-    if (cp&&rowH&&(delta.x||delta.y)) {
-      const pw=widgets.find(w=>w.id===id);
-      if (pw) {
-        const nx=Math.min(Math.max(pw.x+Math.round(delta.x/(cp+GAP)),0),COLS-pw.w);
-        const ny=Math.max(pw.y+Math.round(delta.y/(rowH+GAP)),0);
-        if (nx!==pw.x||ny!==pw.y)
+  cancelAnimationFrame(rafDrop.current);
+  const id=String(active.id), cp=cpx();
+
+  if (cp&&rowH&&(delta.x||delta.y)) {
+    const pw=widgets.find(w=>w.id===id);
+    if (pw) {
+      const nx=Math.min(Math.max(pw.x+Math.round(delta.x/(cp+GAP)),0),COLS-pw.w);
+      const ny=Math.max(pw.y+Math.round(delta.y/(rowH+GAP)),0);
+
+      if (nx!==pw.x||ny!==pw.y) {
+        // Проверяем коллизии с другими виджетами
+        const ghost={...pw,x:nx,y:ny};
+        const hasCollision=widgets.some(w=>w.id!==id&&
+          ghost.x<w.x+w.w&&ghost.x+ghost.w>w.x&&
+          ghost.y<w.y+w.h&&ghost.y+ghost.h>w.y);
+
+        if (!hasCollision) {
           save(widgets.map(w=>w.id===id?{...w,x:nx,y:ny}:w));
+        }
+        // Если коллизия — виджет просто возвращается на место (dnd-kit делает это автоматически)
       }
     }
-    setActiveId(null); setDropSnap(null); dropRef.current=null;
   }
+
+  setActiveId(null); setDropSnap(null); dropRef.current=null;
+}
 
   function startResize(e:React.MouseEvent, pw:PlacedWidget) {
     e.preventDefault(); e.stopPropagation();
