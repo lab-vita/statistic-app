@@ -74,54 +74,30 @@ function pxH(rowH: number, h: number)  { return h*rowH  + (h-1)*GAP; }
 // ─ Grid background — пунктирные линии ───────────────────────────
 function GridBackground({ rows, rowH }: { rows: number; rowH: number }) {
   if (!rowH) return null;
-  const totalRows = Math.max(rows+3, 5);
-  const h = totalRows*(rowH+GAP);
-
-  const dashV = `repeating-linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--foreground) 14%, transparent) 0px,
-    color-mix(in srgb, var(--foreground) 14%, transparent) 4px,
-    transparent 4px,
-    transparent 10px
-  )`;
-  const dashH = `repeating-linear-gradient(
-    to right,
-    color-mix(in srgb, var(--foreground) 14%, transparent) 0px,
-    color-mix(in srgb, var(--foreground) 14%, transparent) 4px,
-    transparent 4px,
-    transparent 10px
-  )`;
+  const totalRows = Math.max(rows + 3, 5);
+  const colExpr = `calc((100% - ${(COLS - 1) * GAP}px) / ${COLS})`;
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0" style={{height:h}}>
-
-      {/* Вертикальные пунктиры между колонками */}
-      <div className="absolute inset-0 flex" style={{gap:GAP}}>
-        {Array.from({length:COLS}).map((_,i) => (
-          <div key={i} className="flex-1 relative">
-            {i < COLS-1 && (
-              <div
-                className="absolute top-0 bottom-0 right-0"
-                style={{width:1, background:dashV, marginRight:-GAP/2}}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Горизонтальные пунктиры между строками */}
-      {Array.from({length:totalRows-1}).map((_,row) => (
-        <div
-          key={row}
-          aria-hidden
-          className="absolute left-0 right-0"
-          style={{
-            top:    (row+1)*(rowH+GAP) - GAP/2,
-            height: 1,
-            background: dashH,
-          }}
-        />
-      ))}
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0"
+      style={{ height: totalRows * (rowH + GAP) }}
+    >
+      {Array.from({ length: totalRows }).map((_, row) =>
+        Array.from({ length: COLS }).map((_, col) => (
+          <div
+            key={`${row}-${col}`}
+            className="absolute rounded-2xl"
+            style={{
+              left:   `calc(${col} * (${colExpr} + ${GAP}px))`,
+              top:    row * (rowH + GAP),
+              width:  colExpr,
+              height: rowH,
+              border: "1.5px dashed color-mix(in srgb, var(--foreground) 13%, transparent)",
+            }}
+          />
+        ))
+      )}
     </div>
   );
 }
