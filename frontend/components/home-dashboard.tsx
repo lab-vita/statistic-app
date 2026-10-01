@@ -8,7 +8,7 @@ import {
 } from "@dnd-kit/core";
 import {
   loadGrid, saveGrid, findFreeSlot, resizeWidget,
-  WIDGET_TYPES, COLS, ROW_H, GAP, PlacedWidget, newId,
+  WIDGET_TYPES, COLS, GAP, PlacedWidget, newId,
 } from "@/lib/grid";
 import { WidgetCatalog } from "@/components/widget-catalog";
 import { CallsSingleWidget    } from "@/components/widgets/calls-single";
@@ -23,7 +23,7 @@ import {
 import { Plus, Settings2, ChevronLeft, ChevronRight, GripVertical, X } from "lucide-react";
 import { Section } from "@/components/sidebar";
 
-// ─ Period ──────────────────────────────────────────────────────
+// ─ Period ───────────────────────────────────────────────────────
 type PeriodType = "day" | "week" | "month";
 const MONTH_RU = ["Январь","Февраль","Март","Апрель","Май","Июнь",
   "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
@@ -33,11 +33,11 @@ function getPeriod(type: PeriodType, offset: number) {
   if (type === "day") {
     const d = addDays(now, offset);
     return { from: toDateStr(d), to: toDateStr(d),
-      label: d.toLocaleDateString("ru-RU", {day:"numeric",month:"long",year:"numeric"}) };
+      label: d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}) };
   }
   if (type === "week") {
     const dow = now.getDay()===0 ? 6 : now.getDay()-1;
-    const mon = addDays(now, -dow+offset*7), sun = addDays(mon, 6);
+    const mon = addDays(now,-dow+offset*7), sun = addDays(mon,6);
     return { from: toDateStr(mon), to: toDateStr(sun),
       label: `${mon.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})} — ${sun.toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"})}` };
   }
@@ -47,7 +47,7 @@ function getPeriod(type: PeriodType, offset: number) {
     label: `${MONTH_RU[d.getMonth()]} ${d.getFullYear()}` };
 }
 
-// ─ Widget content ───────────────────────────────────────────────
+// ─ Widget content ────────────────────────────────────────────────
 function WidgetContent({ pw, statsData, dailyData, loading }: {
   pw: PlacedWidget; statsData: StatsResponse|null;
   dailyData: DailyResponse|null; loading: boolean;
@@ -63,52 +63,74 @@ function WidgetContent({ pw, statsData, dailyData, loading }: {
   }
 }
 
-// ─ Grid helpers ─────────────────────────────────────────────────
+// ─ Grid helpers ──────────────────────────────────────────────────
 function colPxOf(el: HTMLElement|null) {
   if (!el) return 0;
   return (el.clientWidth - (COLS-1)*GAP) / COLS;
 }
 function pxW(colPx: number, w: number) { return w*colPx + (w-1)*GAP; }
-function pxH(h: number)                 { return h*ROW_H  + (h-1)*GAP; }
+function pxH(rowH: number, h: number)  { return h*rowH  + (h-1)*GAP; }
 
-// ─ Dot grid via CSS background-image ───────────────────────────
-// Работает без фиксированной ширины контейнера.
-// radial-gradient рисует точки на пересечениях колонок и строк.
-function GridBackground({ rows }: { rows: number }) {
+// ─ Grid background — пунктирные линии ───────────────────────────
+function GridBackground({ rows, rowH }: { rows: number; rowH: number }) {
+  if (!rowH) return null;
   const totalRows = Math.max(rows+3, 5);
-  const h = totalRows*(ROW_H+GAP);
-  const colStep = `calc((100% + ${GAP}px) / ${COLS})`;
-  const rowStep = `${ROW_H+GAP}px`;
+  const h = totalRows*(rowH+GAP);
+
+  const dashV = `repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--foreground) 14%, transparent) 0px,
+    color-mix(in srgb, var(--foreground) 14%, transparent) 4px,
+    transparent 4px,
+    transparent 10px
+  )`;
+  const dashH = `repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--foreground) 14%, transparent) 0px,
+    color-mix(in srgb, var(--foreground) 14%, transparent) 4px,
+    transparent 4px,
+    transparent 10px
+  )`;
+
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0"
-      style={{
-        height: h,
-        backgroundImage: [
-          `radial-gradient(circle, color-mix(in srgb,currentColor 20%,transparent) 1.5px, transparent 1.5px)`,
-          `repeating-linear-gradient(to bottom,
-            transparent 0px,
-            transparent ${ROW_H-1}px,
-            color-mix(in srgb,currentColor 6%,transparent) ${ROW_H-1}px,
-            color-mix(in srgb,currentColor 6%,transparent) ${ROW_H}px,
-            transparent ${ROW_H}px,
-            transparent ${ROW_H+GAP}px
-          )`,
-        ].join(","),
-        backgroundSize: `${colStep} ${rowStep}, 100% ${rowStep}`,
-        backgroundPosition: "0 0, 0 0",
-        color: "var(--foreground)",
-      }}
-    />
+    <div aria-hidden className="pointer-events-none absolute inset-0" style={{height:h}}>
+
+      {/* Вертикальные пунктиры между колонками */}
+      <div className="absolute inset-0 flex" style={{gap:GAP}}>
+        {Array.from({length:COLS}).map((_,i) => (
+          <div key={i} className="flex-1 relative">
+            {i < COLS-1 && (
+              <div
+                className="absolute top-0 bottom-0 right-0"
+                style={{width:1, background:dashV, marginRight:-GAP/2}}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Горизонтальные пунктиры между строками */}
+      {Array.from({length:totalRows-1}).map((_,row) => (
+        <div
+          key={row}
+          aria-hidden
+          className="absolute left-0 right-0"
+          style={{
+            top:    (row+1)*(rowH+GAP) - GAP/2,
+            height: 1,
+            background: dashH,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
-// ─ Drop highlight ───────────────────────────────────────────────
-function DropHighlight({ colPx, x, y, w, h, ok }: {
-  colPx:number; x:number; y:number; w:number; h:number; ok:boolean;
+// ─ Drop highlight ────────────────────────────────────────────────
+function DropHighlight({ colPx, rowH, x, y, w, h, ok }: {
+  colPx:number; rowH:number; x:number; y:number; w:number; h:number; ok:boolean;
 }) {
-  if (!colPx) return null;
+  if (!colPx||!rowH) return null;
   const color = ok ? "#22c55e" : "#ef4444";
   return (
     <div
@@ -116,9 +138,9 @@ function DropHighlight({ colPx, x, y, w, h, ok }: {
       className="pointer-events-none absolute rounded-2xl z-10 transition-[left,top] duration-75"
       style={{
         left:   x*(colPx+GAP),
-        top:    y*(ROW_H+GAP),
+        top:    y*(rowH+GAP),
         width:  pxW(colPx,w),
-        height: pxH(h),
+        height: pxH(rowH,h),
         background: `${color}18`,
         border: `2px dashed ${color}`,
       }}
@@ -126,20 +148,20 @@ function DropHighlight({ colPx, x, y, w, h, ok }: {
   );
 }
 
-// ─ Resize ghost ─────────────────────────────────────────────────
-function ResizeGhost({ colPx, x, y, w, h }: {
-  colPx:number; x:number; y:number; w:number; h:number;
+// ─ Resize ghost ──────────────────────────────────────────────────
+function ResizeGhost({ colPx, rowH, x, y, w, h }: {
+  colPx:number; rowH:number; x:number; y:number; w:number; h:number;
 }) {
-  if (!colPx) return null;
+  if (!colPx||!rowH) return null;
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute rounded-2xl z-20 ring-2 ring-primary/40"
       style={{
         left:       x*(colPx+GAP),
-        top:        y*(ROW_H+GAP),
+        top:        y*(rowH+GAP),
         width:      pxW(colPx,w),
-        height:     pxH(h),
+        height:     pxH(rowH,h),
         background: "color-mix(in srgb, var(--primary) 6%, transparent)",
       }}
     >
@@ -150,15 +172,15 @@ function ResizeGhost({ colPx, x, y, w, h }: {
   );
 }
 
-// ─ Draggable widget ─────────────────────────────────────────────
+// ─ Draggable widget ──────────────────────────────────────────────
 function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
-  isDragging, statsData, dailyData, loading, colPx }: {
+  isDragging, statsData, dailyData, loading, colPx, rowH }: {
   pw: PlacedWidget; editMode: boolean;
   onDelete: (id:string)=>void;
   onResizeStart: (e:React.MouseEvent, pw:PlacedWidget)=>void;
   isDragging: boolean;
   statsData: StatsResponse|null; dailyData: DailyResponse|null;
-  loading: boolean; colPx: number;
+  loading: boolean; colPx: number; rowH: number;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: pw.id, disabled: !editMode,
@@ -170,9 +192,9 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
       className="absolute group"
       style={{
         left:    pw.x*(colPx+GAP),
-        top:     pw.y*(ROW_H+GAP),
+        top:     pw.y*(rowH+GAP),
         width:   pxW(colPx,pw.w),
-        height:  pxH(pw.h),
+        height:  pxH(rowH,pw.h),
         opacity: isDragging ? 0 : 1,
         zIndex:  isDragging ? 0 : 1,
         willChange: "transform",
@@ -189,7 +211,6 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
           opacity-0 group-hover:opacity-100
           transition-opacity duration-150
         ">
-          {/* Drag handle */}
           <div
             {...listeners} {...attributes}
             title="Переместить"
@@ -200,7 +221,6 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
             <GripVertical className="h-5 w-5 text-foreground/50" />
           </div>
 
-          {/* Delete — маленький × в углу */}
           <button
             onClick={() => onDelete(pw.id)}
             title="Удалить"
@@ -217,9 +237,8 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
             <X className="h-3.5 w-3.5" />
           </button>
 
-          {/* Resize handle */}
           <div
-            onMouseDown={e => onResizeStart(e, pw)}
+            onMouseDown={e => onResizeStart(e,pw)}
             title="Изменить размер"
             className="absolute bottom-1.5 right-1.5 cursor-se-resize p-1.5
               text-muted-foreground hover:text-foreground transition-colors"
@@ -235,21 +254,21 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
   );
 }
 
-// ─ Main ─────────────────────────────────────────────────────────
+// ─ Main ──────────────────────────────────────────────────────────
 export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) {
   const [widgets,     setWidgets]     = useState<PlacedWidget[]>([]);
   const [editMode,    setEditMode]    = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [activeId,    setActiveId]    = useState<string|null>(null);
+  const [rowH,        setRowH]        = useState(120);
 
-  // Drop target: ref для вычислений, state только при смене снапа
-  const dropRef  = useRef<{x:number;y:number;ok:boolean}|null>(null);
+  const dropRef    = useRef<{x:number;y:number;ok:boolean}|null>(null);
   const [dropSnap, setDropSnap] = useState<{x:number;y:number;ok:boolean}|null>(null);
-  const rafDrop  = useRef<number>(0);
+  const rafDrop    = useRef<number>(0);
 
   const [resizePrev, setResizePrev] = useState<{id:string;x:number;y:number;w:number;h:number}|null>(null);
-  const resizeRef = useRef<{id:string;sx:number;sy:number;ow:number;oh:number}|null>(null);
-  const rafResize = useRef<number>(0);
+  const resizeRef  = useRef<{id:string;sx:number;sy:number;ow:number;oh:number}|null>(null);
+  const rafResize  = useRef<number>(0);
 
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [offset,     setOffset]     = useState(0);
@@ -261,7 +280,21 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Загрузка сетки
   useEffect(() => { setWidgets(loadGrid()); }, []);
+
+  // ResizeObserver — квадратные ячейки
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(entries => {
+      const w = entries[0].contentRect.width;
+      const colPx = (w - (COLS-1)*GAP) / COLS;
+      setRowH(Math.round(colPx));
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -281,9 +314,9 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
   function snapDrop(id:string, dx:number, dy:number) {
     const cp=cpx(), pw=widgets.find(w=>w.id===id);
-    if (!cp||!pw) return null;
+    if (!cp||!pw||!rowH) return null;
     const nx=Math.min(Math.max(pw.x+Math.round(dx/(cp+GAP)),0),COLS-pw.w);
-    const ny=Math.max(pw.y+Math.round(dy/(ROW_H+GAP)),0);
+    const ny=Math.max(pw.y+Math.round(dy/(rowH+GAP)),0);
     const ghost={...pw,x:nx,y:ny};
     const ok=!widgets.some(w=>w.id!==id&&
       ghost.x<w.x+w.w&&ghost.x+ghost.w>w.x&&
@@ -297,7 +330,6 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
   }
 
   function handleDragMove({active,delta}:DragMoveEvent) {
-    // rAF throttle: вычисляем снап раз в кадр, setDropSnap только при реальном изменении
     cancelAnimationFrame(rafDrop.current);
     const id=String(active.id), dx=delta.x, dy=delta.y;
     rafDrop.current = requestAnimationFrame(() => {
@@ -314,11 +346,11 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
   function handleDragEnd({active,delta}:DragEndEvent) {
     cancelAnimationFrame(rafDrop.current);
     const id=String(active.id), cp=cpx();
-    if (cp&&(delta.x||delta.y)) {
+    if (cp&&rowH&&(delta.x||delta.y)) {
       const pw=widgets.find(w=>w.id===id);
       if (pw) {
         const nx=Math.min(Math.max(pw.x+Math.round(delta.x/(cp+GAP)),0),COLS-pw.w);
-        const ny=Math.max(pw.y+Math.round(delta.y/(ROW_H+GAP)),0);
+        const ny=Math.max(pw.y+Math.round(delta.y/(rowH+GAP)),0);
         if (nx!==pw.x||ny!==pw.y)
           save(widgets.map(w=>w.id===id?{...w,x:nx,y:ny}:w));
       }
@@ -335,11 +367,11 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
     function onMove(me:MouseEvent) {
       cancelAnimationFrame(rafResize.current);
       const mx=me.clientX, my=me.clientY;
-      rafResize.current=requestAnimationFrame(()=>{
-        const r=resizeRef.current; if (!r) return;
+      rafResize.current=requestAnimationFrame(() => {
+        const r=resizeRef.current; if (!r||!rowH) return;
         const cp=cpx(); if (!cp) return;
         const nw=Math.min(Math.max(r.ow+Math.round((mx-r.sx)/(cp+GAP)),def.minW),def.maxW);
-        const nh=Math.min(Math.max(r.oh+Math.round((my-r.sy)/(ROW_H+GAP)),def.minH),def.maxH);
+        const nh=Math.min(Math.max(r.oh+Math.round((my-r.sy)/(rowH+GAP)),def.minH),def.maxH);
         setResizePrev(p=>p&&(p.w!==nw||p.h!==nh)?{...p,w:nw,h:nh}:p);
       });
     }
@@ -347,9 +379,9 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
       cancelAnimationFrame(rafResize.current);
       const r=resizeRef.current; if (!r) return;
       const cp=cpx();
-      if (cp) {
+      if (cp&&rowH) {
         const dw=Math.round((ue.clientX-r.sx)/(cp+GAP));
-        const dh=Math.round((ue.clientY-r.sy)/(ROW_H+GAP));
+        const dh=Math.round((ue.clientY-r.sy)/(rowH+GAP));
         if (dw||dh) {
           const t=widgets.find(w=>w.id===r.id)!;
           save(resizeWidget(widgets,t.id,t.w+dw,t.h+dh,def));
@@ -370,10 +402,10 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
     setShowCatalog(false);
   }
 
-  const activeWidget=activeId?widgets.find(w=>w.id===activeId)??null:null;
-  const maxRow =Math.max(0,...widgets.map(w=>w.y+w.h));
-  const canvasH=Math.max((maxRow+(editMode?3:0))*(ROW_H+GAP),320);
-  const colPx  =cpx();
+  const activeWidget = activeId ? widgets.find(w=>w.id===activeId)??null : null;
+  const maxRow  = Math.max(0,...widgets.map(w=>w.y+w.h));
+  const canvasH = Math.max((maxRow+(editMode?3:0))*(rowH+GAP), rowH*4);
+  const colPx   = cpx();
 
   return (
     <div className="min-h-full">
@@ -390,7 +422,9 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
               {(["day","week","month"] as PeriodType[]).map(t=>(
                 <button key={t} onClick={()=>{setPeriodType(t);setOffset(0);}}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    periodType===t?"bg-background border border-border shadow-sm":"text-muted-foreground hover:text-foreground"
+                    periodType===t
+                      ?"bg-background border border-border shadow-sm"
+                      :"text-muted-foreground hover:text-foreground"
                   }`}>
                   {t==="day"?"День":t==="week"?"Неделя":"Месяц"}
                 </button>
@@ -412,7 +446,9 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
             </button>
             <button onClick={()=>setEditMode(e=>!e)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                editMode?"bg-muted border-border":"border-border text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                editMode
+                  ?"bg-muted border-border"
+                  :"border-border text-muted-foreground hover:text-foreground hover:bg-muted/40"
               }`}>
               <Settings2 className="h-3.5 w-3.5"/> {editMode?"Готово":"Настроить"}
             </button>
@@ -434,25 +470,38 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
         )}
 
         {/* Canvas */}
-        <DndContext sensors={sensors} collisionDetection={pointerWithin}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}>
-          <div ref={containerRef} className="relative w-full select-none" style={{minHeight:canvasH}}>
-
-            {editMode && <GridBackground rows={maxRow}/>}
+          onDragEnd={handleDragEnd}
+        >
+          <div
+            ref={containerRef}
+            className="relative w-full select-none"
+            style={{minHeight: canvasH}}
+          >
+            {editMode && <GridBackground rows={maxRow} rowH={rowH}/>}
 
             {editMode&&activeId&&dropSnap&&activeWidget&&(
-              <DropHighlight colPx={colPx} x={dropSnap.x} y={dropSnap.y}
-                w={activeWidget.w} h={activeWidget.h} ok={dropSnap.ok}/>
+              <DropHighlight
+                colPx={colPx} rowH={rowH}
+                x={dropSnap.x} y={dropSnap.y}
+                w={activeWidget.w} h={activeWidget.h}
+                ok={dropSnap.ok}
+              />
             )}
 
             {editMode&&resizePrev&&(
-              <ResizeGhost colPx={colPx} x={resizePrev.x} y={resizePrev.y}
-                w={resizePrev.w} h={resizePrev.h}/>
+              <ResizeGhost
+                colPx={colPx} rowH={rowH}
+                x={resizePrev.x} y={resizePrev.y}
+                w={resizePrev.w} h={resizePrev.h}
+              />
             )}
 
-            {widgets.length===0?(
+            {widgets.length===0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 min-h-[320px]">
                 <div className="h-14 w-14 rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
                   <Plus className="h-6 w-6 text-muted-foreground/40"/>
@@ -462,27 +511,31 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
                   <p className="text-xs text-muted-foreground mt-1">Нажмите «Добавить» чтобы начать</p>
                 </div>
               </div>
-            ):widgets.map(pw=>(
-              <DraggableWidget key={pw.id} pw={pw}
+            ) : widgets.map(pw=>(
+              <DraggableWidget
+                key={pw.id} pw={pw}
                 editMode={editMode}
                 onDelete={id=>save(widgets.filter(w=>w.id!==id))}
                 onResizeStart={startResize}
                 isDragging={pw.id===activeId}
                 statsData={statsData} dailyData={dailyData} loading={loading}
-                colPx={colPx}
+                colPx={colPx} rowH={rowH}
               />
             ))}
 
             <DragOverlay dropAnimation={{duration:120,easing:"ease"}}>
               {activeWidget&&(
                 <div style={{
-                  width:pxW(colPx,activeWidget.w),
-                  height:pxH(activeWidget.h),
-                  borderRadius:16, overflow:"hidden",
-                  boxShadow:"0 20px 60px rgba(0,0,0,0.22)",
+                  width:   pxW(colPx,activeWidget.w),
+                  height:  pxH(rowH,activeWidget.h),
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
                 }}>
-                  <WidgetContent pw={activeWidget} statsData={statsData}
-                    dailyData={dailyData} loading={loading}/>
+                  <WidgetContent
+                    pw={activeWidget}
+                    statsData={statsData} dailyData={dailyData} loading={loading}
+                  />
                 </div>
               )}
             </DragOverlay>
@@ -490,7 +543,9 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
         </DndContext>
       </div>
 
-      {showCatalog&&<WidgetCatalog onAdd={handleAdd} onClose={()=>setShowCatalog(false)}/>}
+      {showCatalog && (
+        <WidgetCatalog onAdd={handleAdd} onClose={()=>setShowCatalog(false)}/>
+      )}
     </div>
   );
 }

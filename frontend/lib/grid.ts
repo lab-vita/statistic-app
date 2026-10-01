@@ -5,7 +5,6 @@
 // Сетка хранится в localStorage как массив PlacedWidget.
 
 export const COLS    = 12;
-export const ROW_H   = 120; // px на одну строку
 export const GAP     = 12;  // px между ячейками
 
 // ─── Тип виджета ─────────────────────────────────────────────
