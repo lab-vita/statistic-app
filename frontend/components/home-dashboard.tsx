@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import { Plus, Settings2, ChevronLeft, ChevronRight, GripVertical, X } from "lucide-react";
 import { Section } from "@/components/sidebar";
+import { CallsSingleMetric } from "@/components/widgets/calls-single";
 
 // ─ Period ───────────────────────────────────────────────────────
 type PeriodType = "day" | "week" | "month";
@@ -54,12 +55,26 @@ function WidgetContent({ pw, statsData, dailyData, loading }: {
 }) {
   const total = statsData?.operators["total"] ?? null;
   switch (pw.type) {
-    case "calls_single":    return <CallsSingleWidget    stats={total} loading={loading} />;
-    case "calls_trio":      return <CallsTrioWidget      stats={total} loading={loading} />;
-    case "calls_chart":     return <CallsChartWidget     stats={total} daily={dailyData?.days??[]} loading={loading} />;
-    case "calls_full":      return <CallsFullWidget      stats={total} daily={dailyData?.days??[]} loading={loading} />;
-    case "calls_operators": return <CallsOperatorsWidget operators={statsData?.operators??null} loading={loading} />;
-    default: return <div className="h-full rounded-2xl bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">неизвестный</div>;
+    case "calls_single":
+      return <CallsSingleWidget
+        stats={total}
+        loading={loading}
+        metric={(pw.config?.metric as CallsSingleMetric) ?? "incoming"}
+      />;
+    case "calls_trio":
+      return <CallsTrioWidget stats={total} loading={loading} />;
+    case "calls_chart":
+      return <CallsChartWidget stats={total} daily={dailyData?.days??[]} loading={loading} />;
+    case "calls_full":
+      return <CallsFullWidget stats={total} daily={dailyData?.days??[]} loading={loading} />;
+    case "calls_operators":
+      return <CallsOperatorsWidget operators={statsData?.operators??null} loading={loading} />;
+    default:
+      return (
+        <div className="h-full rounded-2xl bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">
+          неизвестный
+        </div>
+      );
   }
 }
 
@@ -384,12 +399,12 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
     window.addEventListener("mouseup",onUp);
   }
 
-  function handleAdd(typeId:string) {
-    const def=WIDGET_TYPES.find(t=>t.id===typeId)!;
-    const {x,y}=findFreeSlot(widgets,def.defaultW,def.defaultH);
-    save([...widgets,{id:newId(),type:typeId as any,x,y,w:def.defaultW,h:def.defaultH}]);
-    setShowCatalog(false);
-  }
+  function handleAdd(typeId: string, config?: Record<string, string>) {
+  const def = WIDGET_TYPES.find(t => t.id === typeId)!;
+  const { x, y } = findFreeSlot(widgets, def.defaultW, def.defaultH);
+  save([...widgets, { id: newId(), type: typeId as any, x, y, w: def.defaultW, h: def.defaultH, config }]);
+  setShowCatalog(false);
+}
 
   const activeWidget = activeId ? widgets.find(w=>w.id===activeId)??null : null;
   const maxRow  = Math.max(0,...widgets.map(w=>w.y+w.h));

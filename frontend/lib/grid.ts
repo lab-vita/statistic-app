@@ -78,6 +78,7 @@ export interface PlacedWidget {
   y:    number; // строка  (0-based)
   w:    number; // ширина в колонках
   h:    number; // высота в строках
+  config?: Record<string, string>; // произвольные настройки виджета
 }
 
 // ─── localStorage ────────────────────────────────────────────
