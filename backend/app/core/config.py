@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     MEDODS_PASSWORD: str = ""
     MEDODS_CLINIC_ID: int = 1
 
+    # Авторизация через Битрикс24 (приложение открывается только внутри портала)
+    BITRIX_PORTAL_DOMAIN: str = ""      # например: mfk-sfera.bitrix24.ru (БЕЗ https://)
+    SESSION_SECRET: str = ""            # секрет подписи токенов: openssl rand -hex 32
+    SESSION_TTL_HOURS: int = 8          # сколько живёт токен после входа
+    OWNER_BITRIX_USER_ID: str = ""      # ID владельца в Битрикс24 — первый вход создаёт его запись
+    AUTH_DISABLED: bool = False         # ТОЛЬКО для локальной разработки!
+
     # CORS — через запятую, например: http://localhost:3000,https://stats.labvita.ru
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 

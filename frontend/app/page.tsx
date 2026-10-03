@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Sidebar, Section } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
+import { AuthGate } from "@/components/auth-gate";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { ReportsDashboard } from "@/components/reports-dashboard";
 import { PlansDashboard } from "@/components/plans-dashboard";
@@ -30,7 +31,7 @@ import {
 } from "@/lib/api";
 import { Period, PeriodType, getDefaultPeriod } from "@/lib/periods";
 
-export default function DashboardPage() {
+function DashboardPage() {
   const [section, setSection]             = useState<Section>("home");
   const [operators, setOperators]         = useState<Operator[]>([]);
   const [admins, setAdmins]               = useState<Admin[]>([]);
@@ -257,5 +258,13 @@ export default function DashboardPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <AuthGate>
+      <DashboardPage />
+    </AuthGate>
   );
 }

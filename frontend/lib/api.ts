@@ -1,3 +1,4 @@
+import { authFetch } from "./auth";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export type DeltaDir = "up" | "down" | "flat" | null;
@@ -203,7 +204,7 @@ export interface SalesStatsResponse {
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
+  const res = await authFetch(`${API_URL}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Ошибка загрузки данных");
   return res.json();
 }
@@ -237,7 +238,7 @@ export function fetchConversion(dateFrom: string, dateTo: string): Promise<Conve
 }
 
 export async function collectCalls(dateFrom: string, dateTo: string) {
-  const res = await fetch(
+  const res = await authFetch(
     `${API_URL}/api/calls/collect?date_from=${dateFrom}&date_to=${dateTo}`,
     { method: "POST" }
   );
@@ -387,7 +388,7 @@ export function fetchAppointmentDaily(
 }
 
 export async function collectAppointments(dateFrom: string, dateTo: string) {
-  const res = await fetch(
+  const res = await authFetch(
     `${API_URL}/api/appointments/collect?date_from=${dateFrom}&date_to=${dateTo}`,
     { method: "POST" }
   );
@@ -469,7 +470,7 @@ export function fetchPlanRange(dateFrom: string, dateTo: string): Promise<PlanRa
 }
 
 export async function upsertPlans(items: PlanUpsertItem[]) {
-  const res = await fetch(`${API_URL}/api/plans/upsert`, {
+  const res = await authFetch(`${API_URL}/api/plans/upsert`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ items }),
@@ -483,7 +484,7 @@ export async function fillPlans(
   metric: string, value: number,
   skipWeekends = true,
 ) {
-  const res = await fetch(`${API_URL}/api/plans/fill`, {
+  const res = await authFetch(`${API_URL}/api/plans/fill`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({
