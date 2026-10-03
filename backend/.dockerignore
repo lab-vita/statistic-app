@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+exports/
+all_staff.json
+*.dump
+.git
+.idea

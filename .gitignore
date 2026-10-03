@@ -39,3 +39,9 @@ Thumbs.db
 node_modules/
 .next/
 dist/
+
+# Персональные данные и дампы — не коммитить
+backend/exports/
+backend/all_staff.json
+*.dump
+*.sql

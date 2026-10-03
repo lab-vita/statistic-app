@@ -1,0 +1,53 @@
+# Продакшен: docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+# Наружу ничего не публикуется, кроме localhost-портов для Apache.
+name: labvita-stats
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stats-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: labvita
+      POSTGRES_USER: labvita
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задай POSTGRES_PASSWORD в .env}
+    volumes:
+      - stats_pgdata:/var/lib/postgresql/data
+    # порт НЕ публикуется — база доступна только контейнерам этого проекта
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U labvita -d labvita"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: stats-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://labvita:${POSTGRES_PASSWORD}@postgres:5432/labvita
+      ALLOWED_ORIGINS: '["https://${DOMAIN}"]'
+      TZ: Asia/Krasnoyarsk
+    ports:
+      - "127.0.0.1:8100:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ""
+    container_name: stats-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3000"
+    depends_on:
+      - backend
+
+volumes:
+  stats_pgdata:
