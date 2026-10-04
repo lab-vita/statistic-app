@@ -55,8 +55,8 @@ function formatDateTick(d: string) {
   return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 }
 
-function formatTooltipLabel(d: string) {
-  return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+function formatTooltipLabel(d: unknown) {
+  return new Date(String(d)).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 }
 
 const Skeleton = ({ className }: { className?: string }) => (
@@ -240,7 +240,7 @@ export function RevenueDashboard({ dateFrom, dateTo }: RevenueDashboardProps) {
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 labelFormatter={formatTooltipLabel}
-                formatter={(v: number) => [`${fmt(v)} ₽`, "Выручка"]} />
+                formatter={(v) => [`${fmt(Number(v))} ₽`, "Выручка"]} />
               <Area type="monotone" dataKey="total_paid" stroke="#22c55e" strokeWidth={2}
                 fill="url(#revGrad)" name="Выручка" />
             </AreaChart>
@@ -279,8 +279,8 @@ export function RevenueDashboard({ dateFrom, dateTo }: RevenueDashboardProps) {
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 labelFormatter={formatTooltipLabel}
-                formatter={(v: number, name: string) => [
-                  `${fmt(v)} ₽`,
+                formatter={(v, name) => [
+                  `${fmt(Number(v))} ₽`,
                   activeSeries.find(s => s.key === name)?.label ?? name,
                 ]} />
               {activeSeries.map(s => (
@@ -404,7 +404,7 @@ export function RevenueDashboard({ dateFrom, dateTo }: RevenueDashboardProps) {
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 labelFormatter={formatTooltipLabel}
-                formatter={(v: number) => [v, "Платежей"]} />
+                formatter={(v) => [Number(v), "Платежей"]} />
               <Bar dataKey="count" fill="#6366f1" opacity={0.8} radius={[3,3,0,0]} name="Платежей" />
             </BarChart>
           </ResponsiveContainer>

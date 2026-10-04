@@ -20,6 +20,9 @@ const SECTION_LABELS: Record<Section, string> = {
   home:         "Главная",
   calls:        "Звонки",
   appointments: "Записи",
+  revenue:      "Выручка",
+  reports:      "Отчёты",
+  plans:        "Планы",
 };
 
 interface TopbarProps {

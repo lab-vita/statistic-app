@@ -1,5 +1,14 @@
-import { SuspiciousItem } from "@/lib/api";
 import { AlertTriangle } from "lucide-react";
+
+export interface SuspiciousItem {
+  medods_id: number | string;
+  client: string;
+  date: string;
+  time: string;
+  admin: string;
+  status: string;
+  reasons: string[];
+}
 
 interface SuspiciousListProps {
   items: SuspiciousItem[];

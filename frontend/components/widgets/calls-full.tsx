@@ -65,7 +65,7 @@ export function CallsFullWidget({ stats, daily, loading }: {
                 tickFormatter={d=>new Date(d).toLocaleDateString("ru-RU",{day:"numeric",month:"short"})}
                 tick={{fontSize:9,fill:tickC}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
               <Tooltip contentStyle={{fontSize:11,borderRadius:8,border:`1px solid ${ttBor}`,background:ttBg,color:ttCol}}
-                labelFormatter={d=>new Date(d).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}/>
+                labelFormatter={d=>new Date(String(d)).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}/>
               <Legend wrapperStyle={{fontSize:10,color:tickC,paddingTop:4}}
                 formatter={v=>v==="incoming"?"Вход.":v==="outgoing"?"Исход.":"Проп."}/>
               <Bar dataKey="incoming" fill="#3b82f6" opacity={0.85} radius={[2,2,0,0]}/>

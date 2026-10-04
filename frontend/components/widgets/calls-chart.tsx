@@ -67,8 +67,8 @@ export function CallsChartWidget({ stats, daily, loading }: {
                 tick={{fontSize:9,fill:tickC}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
               <Tooltip
                 contentStyle={{fontSize:11,borderRadius:8,border:`1px solid ${ttBord}`,background:ttBg,color:ttColor}}
-                labelFormatter={d=>new Date(d).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}
-                formatter={(v:number)=>[v.toLocaleString("ru-RU"),"Входящие"]}/>
+                labelFormatter={d=>new Date(String(d)).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}
+                formatter={(v)=>[Number(v).toLocaleString("ru-RU"),"Входящие"]}/>
               <Area type="monotone" dataKey="incoming" stroke="#3b82f6" strokeWidth={2} fill="url(#cg)" dot={false}/>
             </AreaChart>
           </ResponsiveContainer>

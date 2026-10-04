@@ -515,7 +515,7 @@ export function ReportsDashboard() {
                   axisLine={false} tickLine={false} width={28} />
                 <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8,
                   border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }}
-                  labelFormatter={d => formatDateTick(d, config.breakdown)} />
+                  labelFormatter={d => formatDateTick(String(d), config.breakdown)} />
                 {metrics.map(m => (
                   <Bar key={m} dataKey={m} fill={METRIC_COLORS[m]} opacity={0.85}
                     radius={[2,2,0,0]}
@@ -532,7 +532,7 @@ export function ReportsDashboard() {
                   axisLine={false} tickLine={false} width={28} />
                 <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8,
                   border: "1px solid var(--border)", background: "var(--card)", color: "var(--foreground)" }}
-                  labelFormatter={d => formatDateTick(d, config.breakdown)} />
+                  labelFormatter={d => formatDateTick(String(d), config.breakdown)} />
                 <Legend formatter={v =>
                   <span style={{ fontSize: 11 }}>
                     {config.source === "calls" ? CALL_METRIC_LABELS[v as CallMetric] : APPT_METRIC_LABELS[v as ApptMetric]}
