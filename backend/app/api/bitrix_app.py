@@ -23,9 +23,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.permissions import ALL_PERMISSIONS
 from app.core.security import create_token
 from app.db.database import get_db
-from app.models.app_user import AppUser
+from app.models.app_user import AccessRequest, AppUser
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -107,13 +108,34 @@ async def handler(request: Request, db: AsyncSession = Depends(get_db)):
     user = await db.get(AppUser, uid)
     # Самый первый вход владельца: создаём ему запись автоматически
     if user is None and settings.OWNER_BITRIX_USER_ID and uid == settings.OWNER_BITRIX_USER_ID:
-        user = AppUser(bitrix_user_id=uid, name=name, role="owner", is_active=True)
+        user = AppUser(bitrix_user_id=uid, name=name, role="owner",
+                       permissions=sorted(ALL_PERMISSIONS), is_active=True)
         db.add(user)
         logger.info("[bitrix_app] создан владелец: id=%s", uid)
 
-    if user is None or not user.is_active:
-        logger.warning("[bitrix_app] отказ: id=%s (%s) нет в списке доступа", uid, name)
-        return _denied("Нет доступа", "Вас нет в списке пользователей приложения. Обратитесь к администратору.")
+    if user is None:
+        # Личность подтверждена порталом, но в списке доступа человека нет:
+        # оставляем запрос — владелец увидит его в админ-панели и сможет разрешить.
+        now = datetime.now(timezone.utc)
+        req = await db.get(AccessRequest, uid)
+        if req is None:
+            db.add(AccessRequest(bitrix_user_id=uid, name=name,
+                                 first_requested_at=now, last_requested_at=now))
+        else:
+            req.last_requested_at = now
+            if name:
+                req.name = name
+        await db.commit()
+        logger.warning("[bitrix_app] запрос доступа: id=%s (%s)", uid, name)
+        return _denied(
+            "Нет доступа",
+            "Вас нет в списке пользователей приложения. "
+            "Запрос на доступ отправлен администратору.",
+        )
+
+    if not user.is_active:
+        logger.warning("[bitrix_app] отказ: id=%s (%s) отключён", uid, name)
+        return _denied("Доступ отключён", "Ваш доступ к приложению отключён. Обратитесь к администратору.")
 
     user.last_login_at = datetime.now(timezone.utc)
     if not user.name:

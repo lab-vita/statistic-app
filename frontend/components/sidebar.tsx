@@ -1,9 +1,11 @@
 "use client";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LayoutDashboard, Phone, Calendar, BarChart2, Target, Banknote } from "lucide-react";
+import { LayoutDashboard, Phone, Calendar, BarChart2, Target, Banknote, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/components/auth-gate";
+import { ROLE_LABELS, type Section } from "@/lib/permissions";
 
-export type Section = "home" | "calls" | "appointments" | "revenue" | "reports" | "plans";
+export type { Section };
 
 interface SidebarProps {
   section: Section;
@@ -17,9 +19,11 @@ const SECTIONS = [
   { id: "revenue"      as Section, label: "Выручка",  icon: Banknote        },
   { id: "reports"      as Section, label: "Отчёты",   icon: BarChart2       },
   { id: "plans"        as Section, label: "Планы",    icon: Target          },
+  { id: "admin"        as Section, label: "Доступ",   icon: ShieldCheck     },
 ];
 
 export function Sidebar({ section, onSelectSection }: SidebarProps) {
+  const { user, canSee } = useAuth();
   return (
     <aside className="w-[180px] flex-shrink-0 border-r border-border bg-muted/20 flex flex-col">
       <div className="h-14 flex flex-col justify-center px-4 border-b border-border">
@@ -28,7 +32,7 @@ export function Sidebar({ section, onSelectSection }: SidebarProps) {
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5">
-        {SECTIONS.map(({ id, label, icon: Icon }) => (
+        {SECTIONS.filter(({ id }) => canSee(id)).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => onSelectSection(id)}
@@ -43,6 +47,11 @@ export function Sidebar({ section, onSelectSection }: SidebarProps) {
           </button>
         ))}
       </nav>
+
+      <div className="border-t border-border px-4 py-2.5">
+        <div className="truncate text-xs font-medium" title={user.name}>{user.name || `ID ${user.id}`}</div>
+        <div className="text-[11px] text-muted-foreground">{ROLE_LABELS[user.role] ?? user.role}</div>
+      </div>
 
       <div className="border-t border-border px-4 py-3 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">Тема</span>

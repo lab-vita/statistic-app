@@ -19,6 +19,7 @@ from app.db.database import get_db
 from app.models.payment_detail import PaymentDetail
 from app.services.payment_detail_collector import collect_payment_details
 from app.core.utils import prev_period, calc_delta
+from app.core.auth import require_any
 
 router = APIRouter()
 
@@ -35,7 +36,7 @@ def _base_filter(date_from: date, date_to: date, kind: int | None = None):
     return f
 
 
-@router.post("/collect")
+@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
 async def collect(
     date_from: date = Query(...),
     date_to:   date = Query(...),

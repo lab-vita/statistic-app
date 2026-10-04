@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth-gate";
 import { useState, useEffect, useCallback } from "react";
 import {
   fetchPlanMonth, upsertPlans, fillPlans,
@@ -280,6 +281,8 @@ function PlanCard({ title, icon, accent, value, sub, clickable, onClick }: PlanC
 // ─── Главный компонент ────────────────────────────────────────
 
 export function PlansDashboard() {
+  const { can } = useAuth();
+  const canEdit = can("plans:edit");
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -365,12 +368,12 @@ export function PlansDashboard() {
           <PlanCard
             title="Входящие" icon={<PhoneIncoming className="h-4 w-4 text-emerald-500" />}
             accent="text-emerald-500" value={totals.calls_incoming}
-            sub="план на месяц" clickable onClick={() => setOpenMetric("calls_incoming")}
+            sub="план на месяц" clickable={canEdit} onClick={() => canEdit && setOpenMetric("calls_incoming")}
           />
           <PlanCard
             title="Исходящие" icon={<PhoneOutgoing className="h-4 w-4 text-blue-500" />}
             accent="text-blue-500" value={totals.calls_outgoing}
-            sub="план на месяц" clickable onClick={() => setOpenMetric("calls_outgoing")}
+            sub="план на месяц" clickable={canEdit} onClick={() => canEdit && setOpenMetric("calls_outgoing")}
           />
           <PlanCard
             title="Общий план" icon={<Phone className="h-4 w-4 text-muted-foreground" />}
@@ -380,7 +383,7 @@ export function PlansDashboard() {
           <PlanCard
             title="Пропущенные ≤" icon={<PhoneMissed className="h-4 w-4 text-red-500" />}
             accent="text-red-500" value={`${missedPct}%`}
-            sub="допустимый порог" clickable onClick={() => setOpenMissed(true)}
+            sub="допустимый порог" clickable={canEdit} onClick={() => canEdit && setOpenMissed(true)}
           />
         </div>
       </div>
@@ -392,7 +395,7 @@ export function PlansDashboard() {
           <PlanCard
             title="Записей в день" icon={<CalendarCheck className="h-4 w-4 text-purple-500" />}
             accent="text-purple-500" value={totals.appt_count}
-            sub="суммарный план на месяц" clickable onClick={() => setOpenMetric("appt_count")}
+            sub="суммарный план на месяц" clickable={canEdit} onClick={() => canEdit && setOpenMetric("appt_count")}
           />
         </div>
       </div>

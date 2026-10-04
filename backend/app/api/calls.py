@@ -16,6 +16,7 @@ from app.services.analytics.call_stats import (
 from app.core.config import settings
 from app.core.utils import prev_period, to_local, local_date
 from app.core.constants import DAY_NAMES_RU
+from app.core.auth import require_any
 
 router = APIRouter()
 
@@ -41,7 +42,7 @@ def _filter_by_operator(calls: list, operator_id: Optional[str]) -> list:
     return calls
 
 
-@router.post("/collect")
+@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
 async def collect(
     date_from: date = Query(default=None),
     date_to:   date = Query(default=None),

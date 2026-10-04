@@ -1,5 +1,5 @@
 import { authFetch } from "./auth";
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export type DeltaDir = "up" | "down" | "flat" | null;
 
@@ -494,4 +494,16 @@ export async function fillPlans(
   });
   if (!res.ok) throw new Error("Ошибка заполнения планов");
   return res.json();
+}
+
+// ─── Кто вошёл и что ему можно ────────────────────────────────
+export interface Me {
+  id: string;
+  name: string;
+  role: string;
+  permissions: string[];
+}
+
+export function fetchMe() {
+  return apiFetch<Me>("/api/auth/me");
 }

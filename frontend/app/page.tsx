@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Sidebar, Section } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
-import { AuthGate } from "@/components/auth-gate";
+import { AuthGate, useAuth } from "@/components/auth-gate";
+import { AdminPanel } from "@/components/admin-panel";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { ReportsDashboard } from "@/components/reports-dashboard";
 import { PlansDashboard } from "@/components/plans-dashboard";
@@ -32,6 +33,7 @@ import {
 import { Period, PeriodType, getDefaultPeriod } from "@/lib/periods";
 
 function DashboardPage() {
+  const { can, canSee } = useAuth();
   const [section, setSection]             = useState<Section>("home");
   const [operators, setOperators]         = useState<Operator[]>([]);
   const [admins, setAdmins]               = useState<Admin[]>([]);
@@ -61,12 +63,17 @@ function DashboardPage() {
   const dateTo   = period.type === "custom" ? customTo   : toDateStr(period.dateTo);
 
   useEffect(() => {
-    fetchOperators().then(r => setOperators(r.operators)).catch(() => {});
-    fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
-  }, []);
+    // Списки для фильтров запрашиваем только если данные доступны (иначе сервер ответит 403)
+    if (can("view:calls") || can("view:reports")) {
+      fetchOperators().then(r => setOperators(r.operators)).catch(() => {});
+    }
+    if (can("view:appointments") || can("view:reports")) {
+      fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
+    }
+  }, [can]);
 
   // Разделы без топбара (у них собственное управление периодом или его нет)
-  const noTopbar = ["home", "reports", "plans", "revenue"];
+  const noTopbar = ["home", "reports", "plans", "revenue", "admin"];
 
   const load = useCallback(async () => {
     if (noTopbar.includes(section)) return;
@@ -114,8 +121,11 @@ function DashboardPage() {
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      if (section === "calls") await collectCalls(dateFrom, dateTo);
-      else if (section === "appointments") await collectAppointments(dateFrom, dateTo);
+      // Сбор данных из Битрикс24/МедОДС — только с правом data:collect; остальным кнопка просто перечитывает данные
+      if (can("data:collect")) {
+        if (section === "calls") await collectCalls(dateFrom, dateTo);
+        else if (section === "appointments") await collectAppointments(dateFrom, dateTo);
+      }
       await load();
     } finally {
       setRefreshing(false);
@@ -123,6 +133,7 @@ function DashboardPage() {
   }
 
   function handleSelectSection(s: Section) {
+    if (!canSee(s)) return;
     setSection(s);
     setSelectedOp(null);
     setSelectedAdmin(null);
@@ -185,10 +196,20 @@ function DashboardPage() {
             </div>
           )}
 
-          {section === "home"    && <HomeDashboard onNavigate={handleSelectSection} />}
-          {section === "reports" && <ReportsDashboard />}
-          {section === "plans"   && <PlansDashboard />}
-          {section === "revenue" && (
+          {section === "home" && (
+            can("view:calls")
+              ? <HomeDashboard onNavigate={handleSelectSection} />
+              : (
+                <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                  Виджеты главной строятся на данных по звонкам, а доступа к ним у вас нет.
+                  Выберите раздел в меню слева.
+                </div>
+              )
+          )}
+          {section === "reports" && canSee("reports") && <ReportsDashboard />}
+          {section === "plans"   && canSee("plans")   && <PlansDashboard />}
+          {section === "admin"   && canSee("admin")   && <AdminPanel />}
+          {section === "revenue" && canSee("revenue") && (
             <>
               <div>
                 <h1 className="text-base font-semibold">Выручка</h1>
@@ -200,7 +221,7 @@ function DashboardPage() {
             </>
           )}
 
-          {section === "calls" && (
+          {section === "calls" && canSee("calls") && (
             <>
               {loading ? <Skeleton /> : displayCalls ? (
                 <CardsOverview stats={displayCalls} dateFrom={dateFrom} dateTo={dateTo} />
@@ -233,7 +254,7 @@ function DashboardPage() {
             </>
           )}
 
-          {section === "appointments" && (
+          {section === "appointments" && canSee("appointments") && (
             <>
               {loading ? <Skeleton /> : apptStats ? (
                 <AppointmentCards

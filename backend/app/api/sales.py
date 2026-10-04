@@ -22,6 +22,7 @@ from app.models.sale import Sale
 from app.models.service import Service
 from app.services.sales_collector import collect_sales
 from app.core.utils import prev_period, calc_delta
+from app.core.auth import require_any
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -89,7 +90,7 @@ async def _run_match(db: AsyncSession) -> dict:
 # Эндпоинты
 # ──────────────────────────────────────────────────────────────────────
 
-@router.post("/collect")
+@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
 async def collect(
     date_from: date = Query(...),
     date_to:   date = Query(...),
@@ -103,7 +104,7 @@ async def collect(
     return {"status": "ok", "date_from": str(date_from), "date_to": str(date_to), **stats}
 
 
-@router.post("/match")
+@router.post("/match", dependencies=[Depends(require_any("data:collect"))])
 async def match_services(db: AsyncSession = Depends(get_db)):
     """Матчинг названий из sales со справочником services."""
     stats = await _run_match(db)

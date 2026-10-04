@@ -6,6 +6,7 @@ from calendar import monthrange
 from pydantic import BaseModel
 from app.db.database import get_db
 from app.models.plan import Plan
+from app.core.auth import require_any
 
 router = APIRouter()
 
@@ -106,7 +107,7 @@ async def get_range(date_from: date, date_to: date, db: AsyncSession = Depends(g
     }
 
 
-@router.post("/upsert")
+@router.post("/upsert", dependencies=[Depends(require_any("plans:edit"))])
 async def upsert(body: BulkUpsert, db: AsyncSession = Depends(get_db)):
     """Сохранить/обновить планы (bulk)."""
     for item in body.items:
@@ -119,7 +120,7 @@ async def upsert(body: BulkUpsert, db: AsyncSession = Depends(get_db)):
     return {"status": "ok", "saved": len(body.items)}
 
 
-@router.post("/fill")
+@router.post("/fill", dependencies=[Depends(require_any("plans:edit"))])
 async def fill(body: BulkFill, db: AsyncSession = Depends(get_db)):
     """Заполнить диапазон дат одним значением — для быстрого ввода плана."""
     from datetime import timedelta

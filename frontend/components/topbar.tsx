@@ -23,6 +23,7 @@ const SECTION_LABELS: Record<Section, string> = {
   revenue:      "Выручка",
   reports:      "Отчёты",
   plans:        "Планы",
+  admin:        "Доступ",
 };
 
 interface TopbarProps {

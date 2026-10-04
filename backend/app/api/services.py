@@ -15,12 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.models.service import Service, ServiceCategory
 from app.services.service_collector import collect_services
+from app.core.auth import require_any
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/sync")
+@router.post("/sync", dependencies=[Depends(require_any("data:collect"))])
 async def sync(db: AsyncSession = Depends(get_db)):
     """Синхронизировать справочник услуг с МедОДС."""
     stats = await collect_services(db)

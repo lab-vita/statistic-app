@@ -18,6 +18,7 @@ from app.db.database import get_db
 from app.models.revenue import Revenue
 from app.services.revenue_collector import collect_revenue
 from app.core.utils import prev_period, calc_delta
+from app.core.auth import require_any
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -40,7 +41,7 @@ async def _total_by_period(db: AsyncSession, date_from: date, date_to: date) -> 
     }
 
 
-@router.post("/collect")
+@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
 async def collect(
     date_from: date = Query(...),
     date_to:   date = Query(...),

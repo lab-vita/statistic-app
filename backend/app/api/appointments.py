@@ -15,6 +15,7 @@ from app.services.analytics.appt_stats import (
 )
 from app.core.utils import prev_period, add_deltas
 from app.core.config import settings
+from app.core.auth import require_any
 
 router = APIRouter()
 
@@ -36,7 +37,7 @@ async def _load_appts(
     return list(await db.scalars(q))
 
 
-@router.post("/collect")
+@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
 async def collect(
     date_from: date = Query(default=None),
     date_to:   date = Query(default=None),
