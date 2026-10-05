@@ -16,7 +16,7 @@ interface ComparisonChartProps {
 
 const METRICS: { value: ComparisonMetric; label: string }[] = [
   { value: "total",    label: "Все"         },
-  { value: "incoming", label: "Входящие"    },
+  { value: "incoming", label: "Принятые"    },
   { value: "outgoing", label: "Исходящие"   },
   { value: "missed",   label: "Пропущенные" },
 ];

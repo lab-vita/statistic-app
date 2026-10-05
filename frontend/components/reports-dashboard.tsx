@@ -132,7 +132,7 @@ const PRESETS: Preset[] = [
 // ─── Вспомогательные константы ───────────────────────────────
 
 const CALL_METRIC_LABELS: Record<CallMetric, string> = {
-  incoming: "Входящие",
+  incoming: "Принятые",
   outgoing: "Исходящие",
   missed:   "Пропущенные",
   total:    "Всего",
@@ -567,7 +567,7 @@ export function ReportsDashboard() {
                 {config.source === "calls" && (() => {
                   const s = summaryStats as any;
                   return [
-                    { label: "Входящие",       val: s.incoming,      pct: s.incoming_delta_pct,     dir: s.incoming_delta_dir },
+                    { label: "Принятые",        val: s.incoming,      pct: s.incoming_delta_pct,     dir: s.incoming_delta_dir },
                     { label: "Исходящие",       val: s.outgoing,      pct: s.outgoing_delta_pct,     dir: s.outgoing_delta_dir },
                     { label: "Пропущенные",     val: s.missed,        pct: s.missed_delta_pct,       dir: s.missed_delta_dir,       inv: true },
                     { label: "Всего",           val: s.total,         pct: s.total_delta_pct,        dir: s.total_delta_dir },

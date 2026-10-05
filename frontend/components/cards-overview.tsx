@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { OperatorStats, formatDuration, fetchPlanRange, PlanRangeResponse } from "@/lib/api";
 import { StatCard } from "@/components/stat-card";
+import { formatPct } from "@/lib/call-metrics";
 import { PhoneIncoming, PhoneOutgoing, PhoneMissed, Clock, Timer, PhoneCall, Zap } from "lucide-react";
 
 interface CardsOverviewProps {
@@ -18,7 +19,8 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
     fetchPlanRange(dateFrom, dateTo).then(setPlan).catch(() => {});
   }, [dateFrom, dateTo]);
 
-  const missedPct = s.incoming > 0 ? Math.round(s.missed / s.incoming * 100) : 0;
+  // Доля пропущенных = пропущено ÷ поступило (принятые + пропущенные). Считает сервер.
+  const missedPct = s.missed_pct;
 
   // % выполнения плана
   const incomingPlanTotal = plan?.totals.calls_incoming ?? 0;
@@ -28,7 +30,7 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
   const incomingPlanPct = incomingPlanTotal > 0 ? Math.round(s.incoming / incomingPlanTotal * 100) : null;
   const outgoingPlanPct = outgoingPlanTotal > 0 ? Math.round(s.outgoing / outgoingPlanTotal * 100) : null;
   // Для пропущенных: факт% <= план% — хорошо
-  const missedFactPct   = s.incoming > 0 ? Math.round(s.missed / s.incoming * 100) : 0;
+  const missedFactPct   = s.missed_pct;
   const missedPlanPctVal = missedFactPct > 0
     ? Math.round(missedFactPct / missedPlanPct * 100)
     : 0;
@@ -37,7 +39,7 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
     <div className="space-y-3">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          title="Входящие" value={s.incoming} sub="успешно принятые"
+          title="Принятые" value={s.incoming} sub={`из ${s.received.toLocaleString("ru-RU")} поступивших`}
           accent="green" icon={<PhoneIncoming className="h-4 w-4 text-emerald-500" />}
           deltaPct={s.incoming_delta_pct} deltaDir={s.incoming_delta_dir}
           planValue={incomingPlanTotal}
@@ -53,7 +55,7 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
           planPct={outgoingPlanPct}
         />
         <StatCard
-          title="Пропущенные" value={s.missed} sub={`${missedPct}% от входящих`}
+          title="Пропущенные" value={s.missed} sub={`${formatPct(missedPct)} от поступивших`}
           accent="red" icon={<PhoneMissed className="h-4 w-4 text-red-500" />}
           deltaPct={s.missed_delta_pct} deltaDir={s.missed_delta_dir}
           deltaInvert

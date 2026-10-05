@@ -17,12 +17,14 @@ import { CallsChartWidget     } from "@/components/widgets/calls-chart";
 import { CallsFullWidget      } from "@/components/widgets/calls-full";
 import { CallsOperatorsWidget } from "@/components/widgets/calls-operators";
 import {
-  fetchStats, fetchDaily, toDateStr, addDays,
+  fetchStats, fetchDaily, fetchConversion, toDateStr, addDays,
   StatsResponse, DailyResponse,
 } from "@/lib/api";
+import { conversionValue } from "@/lib/call-metrics";
 import { Plus, Settings2, ChevronLeft, ChevronRight, GripVertical, X } from "lucide-react";
 import { Section } from "@/components/sidebar";
 import { CallsSingleMetric } from "@/components/widgets/calls-single";
+import type { ConversionValue } from "@/lib/call-metrics";
 
 // ─ Period ───────────────────────────────────────────────────────
 type PeriodType = "day" | "week" | "month";
@@ -49,9 +51,9 @@ function getPeriod(type: PeriodType, offset: number) {
 }
 
 // ─ Widget content ────────────────────────────────────────────────
-function WidgetContent({ pw, statsData, dailyData, loading }: {
+function WidgetContent({ pw, statsData, dailyData, conversion, loading }: {
   pw: PlacedWidget; statsData: StatsResponse|null;
-  dailyData: DailyResponse|null; loading: boolean;
+  dailyData: DailyResponse|null; conversion: ConversionValue|null; loading: boolean;
 }) {
   const total = statsData?.operators["total"] ?? null;
   switch (pw.type) {
@@ -60,6 +62,7 @@ function WidgetContent({ pw, statsData, dailyData, loading }: {
         stats={total}
         loading={loading}
         metric={(pw.config?.metric as CallsSingleMetric) ?? "incoming"}
+        conversion={conversion}
       />;
     case "calls_trio":
       return <CallsTrioWidget stats={total} loading={loading} />;
@@ -165,12 +168,12 @@ function ResizeGhost({ colPx, rowH, x, y, w, h }: {
 
 // ─ Draggable widget ──────────────────────────────────────────────
 function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
-  isDragging, statsData, dailyData, loading, colPx, rowH }: {
+  isDragging, statsData, dailyData, conversion, loading, colPx, rowH }: {
   pw: PlacedWidget; editMode: boolean;
   onDelete: (id:string)=>void;
   onResizeStart: (e:React.MouseEvent, pw:PlacedWidget)=>void;
   isDragging: boolean;
-  statsData: StatsResponse|null; dailyData: DailyResponse|null;
+  statsData: StatsResponse|null; dailyData: DailyResponse|null; conversion: ConversionValue|null;
   loading: boolean; colPx: number; rowH: number;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({
@@ -191,7 +194,7 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
         willChange: "transform",
       }}
     >
-      <WidgetContent pw={pw} statsData={statsData} dailyData={dailyData} loading={loading} />
+      <WidgetContent pw={pw} statsData={statsData} dailyData={dailyData} conversion={conversion} loading={loading} />
 
       {editMode && (
         <div className="
@@ -267,6 +270,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
   const [statsData, setStatsData] = useState<StatsResponse|null>(null);
   const [dailyData, setDailyData] = useState<DailyResponse|null>(null);
+  const [conversion, setConversion] = useState<ConversionValue|null>(null);
   const [loading,   setLoading]   = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -289,9 +293,22 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s,d] = await Promise.allSettled([fetchStats(df,dt), fetchDaily(df,dt)]);
+    const [s,d,cv] = await Promise.allSettled([fetchStats(df,dt), fetchDaily(df,dt), fetchConversion(df,dt)]);
     setStatsData(s.status==="fulfilled" ? s.value : null);
     setDailyData(d.status==="fulfilled" ? d.value : null);
+
+    // Конверсия: то же число, что на странице «Звонки»; для дельты берём прошлый период из ответа /stats
+    let conv: ConversionValue|null = null;
+    if (cv.status==="fulfilled") {
+      let prevPct: number|null = null;
+      if (s.status==="fulfilled") {
+        try {
+          prevPct = (await fetchConversion(s.value.prev_from, s.value.prev_to)).total.conversion_pct;
+        } catch { /* без дельты */ }
+      }
+      conv = conversionValue(cv.value.total.conversion_pct, prevPct);
+    }
+    setConversion(conv);
     setLoading(false);
   }, [df,dt]);
 
@@ -522,7 +539,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
                 onDelete={id=>save(widgets.filter(w=>w.id!==id))}
                 onResizeStart={startResize}
                 isDragging={pw.id===activeId}
-                statsData={statsData} dailyData={dailyData} loading={loading}
+                statsData={statsData} dailyData={dailyData} conversion={conversion} loading={loading}
                 colPx={colPx} rowH={rowH}
               />
             ))}
@@ -538,7 +555,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
                 }}>
                   <WidgetContent
                     pw={activeWidget}
-                    statsData={statsData} dailyData={dailyData} loading={loading}
+                    statsData={statsData} dailyData={dailyData} conversion={conversion} loading={loading}
                   />
                 </div>
               )}

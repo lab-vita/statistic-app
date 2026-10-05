@@ -17,9 +17,14 @@ export const OPERATOR_COLORS = [
 
 export interface OperatorStats {
   name: string;
+  /** Принятые входящие (отвеченные). Пропущенные сюда НЕ входят. */
   incoming: number;
   outgoing: number;
   missed: number;
+  /** Поступило звонков = принятые + пропущенные. */
+  received: number;
+  /** Доля пропущенных среди поступивших, % (пропущено ÷ поступило). */
+  missed_pct: number;
   total: number;
   avg_duration: number;
   avg_wait_time: number;
@@ -34,6 +39,12 @@ export interface OperatorStats {
   outgoing_delta_dir:     DeltaDir;
   missed_delta_pct:       number | null;
   missed_delta_dir:       DeltaDir;
+  received_delta_pct:     number | null;
+  received_delta_dir:     DeltaDir;
+  missed_pct_delta_pct:   number | null;
+  missed_pct_delta_dir:   DeltaDir;
+  callback_count_delta_pct: number | null;
+  callback_count_delta_dir: DeltaDir;
   total_delta_pct:        number | null;
   total_delta_dir:        DeltaDir;
   avg_duration_delta_pct: number | null;
@@ -70,6 +81,10 @@ export interface DailyItem {
   incoming: number;
   outgoing: number;
   missed:   number;
+  /** Поступило = принятые + пропущенные. */
+  received: number;
+  /** Доля пропущенных среди поступивших, %. */
+  missed_pct: number;
   total:    number;
 }
 

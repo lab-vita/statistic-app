@@ -18,10 +18,32 @@ def _operator_surname(uid: str) -> str | None:
     return full.split()[0] if full else None
 
 
-def calc_callbacks(calls: list) -> list:
-    """Для каждого пропущенного звонка определяет, был ли сделан обратный звонок."""
+def received_count(incoming: int, missed: int) -> int:
+    """
+    Сколько звонков ПОСТУПИЛО = принятые + пропущенные.
+
+    Важно: «incoming» в базе — это только ПРИНЯТЫЕ входящие (код 200),
+    пропущенные (код 304) — отдельная категория и в «incoming» не входят.
+    """
+    return incoming + missed
+
+
+def missed_share(incoming: int, missed: int) -> float:
+    """Доля пропущенных среди поступивших, % (пропущено ÷ поступило, один знак после запятой)."""
+    received = received_count(incoming, missed)
+    return round(missed / received * 100, 1) if received else 0.0
+
+
+def calc_callbacks(calls: list, pool: list | None = None) -> list:
+    """
+    Для каждого пропущенного звонка из calls определяет, был ли сделан обратный звонок.
+
+    pool — где искать исходящие. Это звонки периода плюс ещё MAX_CALLBACK_HOURS часов
+    после его конца: пропущенный в последний вечер периода мог быть перезвонен уже на
+    следующий день, и это не должно считаться «не перезвонили».
+    """
     missed = [c for c in calls if c.is_missed]
-    outgoing = [c for c in calls if c.is_outgoing]
+    outgoing = [c for c in (pool if pool is not None else calls) if c.is_outgoing]
 
     out_by_phone: dict[str, list] = {}
     for c in outgoing:
@@ -59,9 +81,14 @@ def callback_stats(callback_results: list) -> dict:
     }
 
 
-def operator_stats(calls: list) -> dict:
-    """Статистика по каждому оператору + ИТОГО."""
-    all_callbacks = calc_callbacks(calls)
+def operator_stats(calls: list, pool: list | None = None) -> dict:
+    """
+    Статистика по каждому оператору + ИТОГО.
+
+    calls — звонки периода (считаются только они);
+    pool  — те же звонки + запас вперёд для поиска обратных звонков (см. calc_callbacks).
+    """
+    all_callbacks = calc_callbacks(calls, pool)
     result: dict = {}
 
     for uid, name in settings.LABVITA_OPERATORS.items():
@@ -70,12 +97,15 @@ def operator_stats(calls: list) -> dict:
         wait_times = [c.call_duration for c in op if c.is_missed and c.call_duration > 0]
         op_cb = [r for r in all_callbacks if r["missed"].portal_user_id == uid]
         cb = callback_stats(op_cb)
+        op_in, op_miss = sum(1 for c in op if c.is_incoming), sum(1 for c in op if c.is_missed)
 
         result[uid] = {
             "name":          name,
-            "incoming":      sum(1 for c in op if c.is_incoming),
+            "incoming":      op_in,
             "outgoing":      sum(1 for c in op if c.is_outgoing),
-            "missed":        sum(1 for c in op if c.is_missed),
+            "missed":        op_miss,
+            "received":      received_count(op_in, op_miss),
+            "missed_pct":    missed_share(op_in, op_miss),
             "total":         len(op),
             "avg_duration":  sum(durations)  // len(durations)  if durations  else 0,
             "avg_wait_time": sum(wait_times) // len(wait_times) if wait_times else 0,
@@ -85,11 +115,14 @@ def operator_stats(calls: list) -> dict:
     all_dur   = [c.call_duration for c in calls if c.call_duration > 0]
     all_waits = [c.call_duration for c in calls if c.is_missed and c.call_duration > 0]
     cb_total  = callback_stats(all_callbacks)
+    all_in, all_miss = sum(1 for c in calls if c.is_incoming), sum(1 for c in calls if c.is_missed)
     result["total"] = {
         "name":          "ИТОГО",
-        "incoming":      sum(1 for c in calls if c.is_incoming),
+        "incoming":      all_in,
         "outgoing":      sum(1 for c in calls if c.is_outgoing),
-        "missed":        sum(1 for c in calls if c.is_missed),
+        "missed":        all_miss,
+        "received":      received_count(all_in, all_miss),
+        "missed_pct":    missed_share(all_in, all_miss),
         "total":         len(calls),
         "avg_duration":  sum(all_dur)   // len(all_dur)   if all_dur   else 0,
         "avg_wait_time": sum(all_waits) // len(all_waits) if all_waits else 0,
@@ -98,13 +131,21 @@ def operator_stats(calls: list) -> dict:
     return result
 
 
-STATS_DELTA_KEYS = ("incoming", "outgoing", "missed", "total", "avg_duration", "callback_pct")
+STATS_DELTA_KEYS = (
+    "incoming", "outgoing", "missed", "received", "missed_pct", "total",
+    "avg_duration", "callback_count", "callback_pct",
+)
 
 
-def operator_stats_with_deltas(curr_calls: list, prev_calls: list) -> dict:
+def operator_stats_with_deltas(
+    curr_calls: list,
+    prev_calls: list,
+    curr_pool: list | None = None,
+    prev_pool: list | None = None,
+) -> dict:
     """Статистика по операторам с дельтами относительно предыдущего периода."""
-    curr_ops = operator_stats(curr_calls)
-    prev_ops = operator_stats(prev_calls)
+    curr_ops = operator_stats(curr_calls, curr_pool)
+    prev_ops = operator_stats(prev_calls, prev_pool)
     return {
         key: add_deltas(stats, prev_ops.get(key, {}), list(STATS_DELTA_KEYS))
         for key, stats in curr_ops.items()

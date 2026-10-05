@@ -89,6 +89,7 @@ export function WidgetCatalog({ onAdd, onClose }: WidgetCatalogProps) {
         const selected = selectedMetric === m.key;
         const COLORS: Record<string, { from: string; to: string }> = {
           incoming:       { from: "#2563eb", to: "#1d4ed8" },
+          received:       { from: "#0891b2", to: "#0e7490" },
           outgoing:       { from: "#7c3aed", to: "#6d28d9" },
           missed:         { from: "#dc2626", to: "#b91c1c" },
           missed_pct:     { from: "#e11d48", to: "#be123c" },
@@ -99,9 +100,10 @@ export function WidgetCatalog({ onAdd, onClose }: WidgetCatalogProps) {
         };
         const EXAMPLE: Record<string, string> = {
           incoming:       "2 239",
+          received:       "2 507",
           outgoing:       "3 099",
           missed:         "268",
-          missed_pct:     "12%",
+          missed_pct:     "10,7%",
           callback_count: "214",
           callback_pct:   "79.9%",
           avg_duration:   "3м 12с",

@@ -43,14 +43,14 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     id:          "calls_trio",
     group:       "Звонки",
     name:        "Три показателя",
-    description: "Входящие · Пропущенные · Конверсия в одной строке с дельтами к предыдущему периоду.",
+    description: "Принятые · Пропущенные · Исходящие в одной строке с изменением к предыдущему периоду.",
     defaultW: 6, defaultH: 1, minW: 6, minH: 1, maxW: 12, maxH: 2,
   },
   {
     id:          "calls_chart",
     group:       "Звонки",
     name:        "Динамика",
-    description: "Входящие звонки за период с мини-графиком по дням. Сразу виден тренд.",
+    description: "Принятые звонки за период с мини-графиком по дням и долей пропущенных. Сразу виден тренд.",
     defaultW: 6, defaultH: 2, minW: 4, minH: 2, maxW: 12, maxH: 3,
   },
   {

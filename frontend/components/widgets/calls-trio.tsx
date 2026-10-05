@@ -1,33 +1,38 @@
 "use client";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { OperatorStats } from "@/lib/api";
+import { deltaIsGood } from "@/lib/call-metrics";
 
 const ITEMS = [
   {
     key:      "incoming" as const,
-    label:    "Входящие",
+    label:    "Принятые",
     from:     "#2563eb", to: "#1d4ed8",
     deltaK:   "incoming_delta",
+    invert:   false,
   },
   {
     key:      "missed" as const,
     label:    "Пропущенные",
     from:     "#dc2626", to: "#b91c1c",
     deltaK:   "missed_delta",
+    invert:   true,            // рост пропущенных — это плохо
   },
   {
     key:      "outgoing" as const,
     label:    "Исходящие",
     from:     "#7c3aed", to: "#6d28d9",
     deltaK:   "outgoing_delta",
+    invert:   false,
   },
 ];
 
-function MetricBlock({ label, value, from, to, deltaPct, deltaDir }: {
+function MetricBlock({ label, value, from, to, deltaPct, deltaDir, invert }: {
   label: string; value: string;
   from: string; to: string;
-  deltaPct: number|null; deltaDir: string|null;
+  deltaPct: number|null; deltaDir: string|null; invert: boolean;
 }) {
+  const good = deltaIsGood(deltaDir, invert);
   return (
     <div
       className="relative flex flex-col justify-between p-4 rounded-2xl overflow-hidden h-full"
@@ -47,7 +52,7 @@ function MetricBlock({ label, value, from, to, deltaPct, deltaDir }: {
       <div className="z-10">
         {deltaPct !== null && deltaDir && deltaDir !== "flat"
           ? <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
-              deltaDir === "up" ? "text-emerald-200" : "text-red-200"
+              good ? "text-emerald-200" : "text-red-200"
             }`}>
               {deltaDir === "up"
                 ? <TrendingUp className="h-3 w-3"/>
@@ -83,6 +88,7 @@ export function CallsTrioWidget({ stats, loading }: {
             to={item.to}
             deltaPct={deltaPct}
             deltaDir={deltaDir}
+            invert={item.invert}
           />
         );
       })}

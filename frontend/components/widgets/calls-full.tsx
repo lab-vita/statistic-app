@@ -1,19 +1,21 @@
 "use client";
 import { Phone, TrendingUp, TrendingDown } from "lucide-react";
 import { OperatorStats, DailyItem } from "@/lib/api";
+import { deltaIsGood } from "@/lib/call-metrics";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useTheme } from "next-themes";
 
-function Metric({ label,value,pct,dir,light,dark: dc }: {
-  label:string; value:string; pct:number|null; dir:string|null; light:string; dark:string;
+function Metric({ label,value,pct,dir,light,dark: dc,invert=false }: {
+  label:string; value:string; pct:number|null; dir:string|null; light:string; dark:string; invert?:boolean;
 }) {
+  const good = deltaIsGood(dir, invert);
   return (
     <div>
       <div className="text-[11px] text-muted-foreground mb-0.5">{label}</div>
       <div className={`text-2xl font-bold ${light} dark:${dc}`}>{value}</div>
       {pct!==null&&dir&&dir!=="flat"
         ? <div className={`flex items-center gap-0.5 text-[10px] font-medium mt-0.5 ${
-            dir==="up"?"text-emerald-600 dark:text-emerald-400":"text-red-600 dark:text-red-400"}`}>
+            good?"text-emerald-600 dark:text-emerald-400":"text-red-600 dark:text-red-400"}`}>
             {dir==="up"?<TrendingUp className="h-2.5 w-2.5"/>:<TrendingDown className="h-2.5 w-2.5"/>}
             {dir==="up"?"+":"−"}{pct}%
           </div>
@@ -46,13 +48,13 @@ export function CallsFullWidget({ stats, daily, loading }: {
         </div>
         <div>
           <div className="text-sm font-semibold">Звонки · полная сводка</div>
-          <div className="text-[11px] text-muted-foreground">входящие, исходящие, пропущенные, ср. длительность</div>
+          <div className="text-[11px] text-muted-foreground">принятые, исходящие, пропущенные, ср. длительность</div>
         </div>
       </div>
       <div className="grid grid-cols-4 gap-6 mb-5">
-        <Metric label="Входящие"  value={fmt(stats?.incoming??0)} pct={stats?.incoming_delta_pct??null} dir={stats?.incoming_delta_dir??null} light="text-blue-700"   dark="text-blue-300"/>
+        <Metric label="Принятые"  value={fmt(stats?.incoming??0)} pct={stats?.incoming_delta_pct??null} dir={stats?.incoming_delta_dir??null} light="text-blue-700"   dark="text-blue-300"/>
         <Metric label="Исходящие" value={fmt(stats?.outgoing??0)} pct={stats?.outgoing_delta_pct??null} dir={stats?.outgoing_delta_dir??null} light="text-violet-700" dark="text-violet-300"/>
-        <Metric label="Пропущенные" value={fmt(stats?.missed??0)} pct={stats?.missed_delta_pct??null}   dir={stats?.missed_delta_dir??null}   light="text-red-700"    dark="text-red-300"/>
+        <Metric label="Пропущенные" value={fmt(stats?.missed??0)} pct={stats?.missed_delta_pct??null}   dir={stats?.missed_delta_dir??null}   light="text-red-700"    dark="text-red-300" invert/>
         <Metric label="Ср. длительность" value={`${Math.floor(dur/60)}м ${dur%60}с`}
           pct={stats?.avg_duration_delta_pct??null} dir={stats?.avg_duration_delta_dir??null}
           light="text-amber-700" dark="text-amber-300"/>

@@ -54,7 +54,7 @@ export function ConversionBlock({ dateFrom, dateTo }: ConversionBlockProps) {
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium">{op.name.split(" ")[0]}</span>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>{op.incoming} вх.</span>
+                  <span>{op.incoming} прин.</span>
                   <span>→</span>
                   <span>{op.appointments} зап.</span>
                 </div>
@@ -77,7 +77,7 @@ export function ConversionBlock({ dateFrom, dateTo }: ConversionBlockProps) {
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold">Итого</span>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span>{data.total.incoming} вх.</span>
+                <span>{data.total.incoming} прин.</span>
                 <span>→</span>
                 <span>{data.total.appointments} зап.</span>
               </div>

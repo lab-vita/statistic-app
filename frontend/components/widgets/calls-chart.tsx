@@ -1,6 +1,7 @@
 "use client";
 import { Phone, TrendingUp, TrendingDown } from "lucide-react";
 import { OperatorStats, DailyItem } from "@/lib/api";
+import { formatPct } from "@/lib/call-metrics";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTheme } from "next-themes";
 
@@ -14,7 +15,7 @@ export function CallsChartWidget({ stats, daily, loading }: {
   const value     = stats?.incoming ?? 0;
   const delta     = stats?.incoming_delta_pct ?? null;
   const dir       = stats?.incoming_delta_dir ?? null;
-  const missedPct = value>0&&stats ? Math.round(stats.missed/value*100) : 0;
+  const missedPct = stats?.missed_pct ?? 0;   // пропущено ÷ поступило (считает сервер)
 
   const bg      = dark ? "#0f172a" : "#ffffff";
   const ttBg    = dark ? "#1e293b" : "#f8fafc";
@@ -31,7 +32,7 @@ export function CallsChartWidget({ stats, daily, loading }: {
             <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
               <Phone className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"/>
             </div>
-            <span className="text-xs font-medium text-muted-foreground">Входящие звонки</span>
+            <span className="text-xs font-medium text-muted-foreground">Принятые звонки</span>
           </div>
           <div className="text-4xl font-bold tracking-tight">{value.toLocaleString("ru-RU")}</div>
         </div>
@@ -47,7 +48,7 @@ export function CallsChartWidget({ stats, daily, loading }: {
             </span>
           )}
           <div className="text-right">
-            <div className="text-lg font-bold text-red-500">{missedPct}%</div>
+            <div className="text-lg font-bold text-red-500" title="Доля пропущенных среди поступивших звонков">{formatPct(missedPct)}</div>
             <div className="text-[10px] text-muted-foreground">пропущено</div>
           </div>
         </div>
@@ -68,7 +69,7 @@ export function CallsChartWidget({ stats, daily, loading }: {
               <Tooltip
                 contentStyle={{fontSize:11,borderRadius:8,border:`1px solid ${ttBord}`,background:ttBg,color:ttColor}}
                 labelFormatter={d=>new Date(String(d)).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}
-                formatter={(v)=>[Number(v).toLocaleString("ru-RU"),"Входящие"]}/>
+                formatter={(v)=>[Number(v).toLocaleString("ru-RU"),"Принятые"]}/>
               <Area type="monotone" dataKey="incoming" stroke="#3b82f6" strokeWidth={2} fill="url(#cg)" dot={false}/>
             </AreaChart>
           </ResponsiveContainer>

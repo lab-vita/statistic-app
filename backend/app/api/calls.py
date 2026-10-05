@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, and_
 from datetime import date, timedelta
 from typing import Optional
 
@@ -11,10 +11,13 @@ from app.services.collector import collect_calls
 from app.services.analytics.call_stats import (
     operator_stats_with_deltas,
     conversion_stats,
+    missed_share,
+    received_count,
     CONVERSION_OPERATOR_IDS,
+    MAX_CALLBACK_HOURS,
 )
 from app.core.config import settings
-from app.core.utils import prev_period, to_local, local_date
+from app.core.utils import prev_period, to_local, local_date, local_window_utc, today_local
 from app.core.constants import DAY_NAMES_RU
 from app.core.auth import require_any
 
@@ -23,17 +26,45 @@ router = APIRouter()
 ALLOWED_INTERVALS = {1, 5, 10, 15, 30, 60, 120}
 
 
-async def _load_calls(db: AsyncSession, date_from: date, date_to: date) -> list:
-    """Load calls for a date range (extends to +1 day to catch UTC boundary)."""
-    extended_to = date_to + timedelta(days=1)
+# Запас вперёд для поиска обратных звонков (пропущенный вечером мог быть перезвонен на следующий день)
+CALLBACK_LOOKAHEAD = timedelta(hours=MAX_CALLBACK_HOURS)
+
+
+async def _load_calls(
+    db: AsyncSession,
+    date_from: date,
+    date_to: date,
+    lookahead: timedelta = timedelta(0),
+) -> list:
+    """
+    Звонки за период date_from..date_to включительно — по границам СУТОК КЕМЕРОВО.
+
+    Сутки клиники (00:00–24:00 по Кемерово) не совпадают с датой в UTC, поэтому
+    фильтр идёт по точным моментам времени, а не по func.date(...). Все эндпоинты
+    обязаны брать звонки только через эту функцию, иначе цифры в разных местах
+    разойдутся (карточки, графики, тепловая карта).
+    """
+    start, end = local_window_utc(date_from, date_to)
     return list(await db.scalars(
         select(Call).where(
-            and_(
-                func.date(Call.call_start_date) >= date_from,
-                func.date(Call.call_start_date) <= extended_to,
-            )
+            and_(Call.call_start_date >= start, Call.call_start_date < end + lookahead)
         )
     ))
+
+
+async def _load_period(
+    db: AsyncSession, date_from: date, date_to: date, operator_id: Optional[str]
+) -> tuple[list, list]:
+    """
+    Возвращает (звонки периода, пул для поиска обратных звонков).
+    Считаются только звонки периода; пул — они же + ещё 24 часа вперёд.
+    """
+    start, end = local_window_utc(date_from, date_to)
+    pool = _filter_by_operator(
+        await _load_calls(db, date_from, date_to, CALLBACK_LOOKAHEAD), operator_id
+    )
+    calls = [c for c in pool if start <= c.call_start_date < end]
+    return calls, pool
 
 
 def _filter_by_operator(calls: list, operator_id: Optional[str]) -> list:
@@ -49,7 +80,7 @@ async def collect(
     db: AsyncSession = Depends(get_db),
 ):
     if not date_from:
-        date_from = date.today() - timedelta(days=1)
+        date_from = today_local() - timedelta(days=1)
     if not date_to:
         date_to = date_from
     count = await collect_calls(db, date_from, date_to)
@@ -64,16 +95,16 @@ async def get_stats(
     db: AsyncSession = Depends(get_db),
 ):
     if not date_from:
-        date_from = date.today() - timedelta(days=1)
+        date_from = today_local() - timedelta(days=1)
     if not date_to:
         date_to = date_from
 
     prev_from, prev_to = prev_period(date_from, date_to)
 
-    curr_calls = _filter_by_operator(await _load_calls(db, date_from, date_to), operator_id)
-    prev_calls = _filter_by_operator(await _load_calls(db, prev_from, prev_to), operator_id)
+    curr_calls, curr_pool = await _load_period(db, date_from, date_to, operator_id)
+    prev_calls, prev_pool = await _load_period(db, prev_from, prev_to, operator_id)
 
-    operators_with_delta = operator_stats_with_deltas(curr_calls, prev_calls)
+    operators_with_delta = operator_stats_with_deltas(curr_calls, prev_calls, curr_pool, prev_pool)
 
     if operator_id:
         return {
@@ -108,7 +139,7 @@ async def get_conversion(
     Только для Белобородовой, Пирожковой, Часовских.
     """
     if not date_from:
-        date_from = date.today() - timedelta(days=1)
+        date_from = today_local() - timedelta(days=1)
     if not date_to:
         date_to = date_from
 
@@ -152,18 +183,11 @@ async def get_daily(
     db: AsyncSession = Depends(get_db),
 ):
     if not date_from:
-        date_from = date.today() - timedelta(days=7)
+        date_from = today_local() - timedelta(days=7)
     if not date_to:
-        date_to = date.today() - timedelta(days=1)
+        date_to = today_local() - timedelta(days=1)
 
-    calls = list(await db.scalars(
-        select(Call).where(
-            and_(
-                func.date(Call.call_start_date) >= date_from,
-                func.date(Call.call_start_date) <= date_to,
-            )
-        )
-    ))
+    calls = await _load_calls(db, date_from, date_to)
     calls = _filter_by_operator(calls, operator_id)
 
     days: dict[str, dict] = {}
@@ -182,6 +206,10 @@ async def get_daily(
             if c.is_outgoing: days[d]["outgoing"] += 1
             if c.is_missed:   days[d]["missed"]   += 1
 
+    for day in days.values():
+        day["received"]   = received_count(day["incoming"], day["missed"])
+        day["missed_pct"] = missed_share(day["incoming"], day["missed"])
+
     return {"date_from": date_from, "date_to": date_to, "days": list(days.values())}
 
 
@@ -194,20 +222,13 @@ async def get_hourly(
     db: AsyncSession = Depends(get_db),
 ):
     if not date_from:
-        date_from = date.today() - timedelta(days=1)
+        date_from = today_local() - timedelta(days=1)
     if not date_to:
         date_to = date_from
     if interval not in ALLOWED_INTERVALS:
         interval = 60
 
-    calls = list(await db.scalars(
-        select(Call).where(
-            and_(
-                func.date(Call.call_start_date) >= date_from,
-                func.date(Call.call_start_date) <= date_to,
-            )
-        )
-    ))
+    calls = await _load_calls(db, date_from, date_to)
     calls = _filter_by_operator(calls, operator_id)
 
     minutes_in_day = 24 * 60
@@ -258,18 +279,11 @@ async def get_heatmap(
     db: AsyncSession = Depends(get_db),
 ):
     if not date_from:
-        date_from = date.today() - timedelta(days=30)
+        date_from = today_local() - timedelta(days=30)
     if not date_to:
-        date_to = date.today() - timedelta(days=1)
+        date_to = today_local() - timedelta(days=1)
 
-    calls = list(await db.scalars(
-        select(Call).where(
-            and_(
-                func.date(Call.call_start_date) >= date_from,
-                func.date(Call.call_start_date) <= date_to,
-            )
-        )
-    ))
+    calls = await _load_calls(db, date_from, date_to)
     calls = _filter_by_operator(calls, operator_id)
 
     matrix: dict[tuple, dict] = {}
@@ -307,20 +321,13 @@ async def get_comparison(
     db: AsyncSession = Depends(get_db),
 ):
     if not date_from:
-        date_from = date.today() - timedelta(days=7)
+        date_from = today_local() - timedelta(days=7)
     if not date_to:
-        date_to = date.today() - timedelta(days=1)
+        date_to = today_local() - timedelta(days=1)
     if metric not in {"total", "incoming", "outgoing", "missed"}:
         metric = "total"
 
-    calls = list(await db.scalars(
-        select(Call).where(
-            and_(
-                func.date(Call.call_start_date) >= date_from,
-                func.date(Call.call_start_date) <= date_to,
-            )
-        )
-    ))
+    calls = await _load_calls(db, date_from, date_to)
 
     dates = []
     current = date_from

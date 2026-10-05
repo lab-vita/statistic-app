@@ -4,7 +4,7 @@
 Используется во всех API-модулях, чтобы избежать дублирования логики.
 """
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 TZ_LOCAL = ZoneInfo("Asia/Krasnoyarsk")  # UTC+7, Кемерово
@@ -114,3 +114,24 @@ def to_local(dt: datetime) -> datetime:
 def local_date(dt: datetime) -> date:
     """Возвращает локальную дату для datetime (UTC -> UTC+7)."""
     return to_local(dt).date()
+
+
+def today_local() -> date:
+    """Сегодняшняя дата по Кемерово (а не по часовому поясу сервера)."""
+    return datetime.now(timezone.utc).astimezone(TZ_LOCAL).date()
+
+
+def local_day_start_utc(d: date) -> datetime:
+    """Начало суток d по Кемерово (00:00), выраженное в UTC."""
+    return datetime.combine(d, time.min, tzinfo=TZ_LOCAL).astimezone(timezone.utc)
+
+
+def local_window_utc(date_from: date, date_to: date) -> tuple[datetime, datetime]:
+    """
+    Период date_from..date_to ВКЛЮЧИТЕЛЬНО как полуинтервал [начало, конец) в UTC
+    по границам суток Кемерово.
+
+    Именно так нужно отбирать звонки из базы: сутки клиники — это не календарная
+    дата в UTC. Например, сутки 15.09 по Кемерово = 14.09 17:00 UTC … 15.09 17:00 UTC.
+    """
+    return local_day_start_utc(date_from), local_day_start_utc(date_to + timedelta(days=1))

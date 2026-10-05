@@ -1,4 +1,5 @@
 import { OperatorStats, formatDuration } from "@/lib/api";
+import { formatPct } from "@/lib/call-metrics";
 
 interface OperatorsTableProps {
   operators: Record<string, OperatorStats>;
@@ -9,7 +10,7 @@ const PROFOSMOTR_IDS = new Set(["544"]);
 
 const headers = [
   "Оператор",
-  "Входящие",
+  "Принятые",
   "Исходящие",
   "Пропущенные",
   "Всего",
@@ -42,8 +43,8 @@ export function OperatorsTable({ operators }: OperatorsTableProps) {
           <tbody className="divide-y divide-border">
             {rows.map(([id, op]) => {
               const isProfosmotr = PROFOSMOTR_IDS.has(id);
-              const missedPct = op.incoming > 0
-                ? Math.round((op.missed / op.incoming) * 100) : 0;
+              // пропущено ÷ поступило (принятые + пропущенные) — считает сервер
+              const missedPct = op.missed_pct;
 
               return (
                 <tr key={id} className="hover:bg-muted/40 transition-colors">
@@ -63,10 +64,12 @@ export function OperatorsTable({ operators }: OperatorsTableProps) {
                     {isProfosmotr ? (
                       <span className="text-muted-foreground">{op.missed}</span>
                     ) : (
-                      <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+                      <span
+                        title={`${op.missed} из ${op.received} поступивших звонков`}
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
                         missedPct > 10 ? "bg-red-500/10 text-red-500" : "bg-muted text-muted-foreground"
                       }`}>
-                        {op.missed} <span className="opacity-60">({missedPct}%)</span>
+                        {op.missed} <span className="opacity-60">({formatPct(missedPct)})</span>
                       </span>
                     )}
                   </td>

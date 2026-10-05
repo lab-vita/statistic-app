@@ -63,7 +63,7 @@ export function HourlyChart({ data, interval, onIntervalChange }: HourlyChartPro
           <h3 className="text-sm font-medium">Распределение по времени</h3>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-emerald-500" />Входящие
+              <span className="h-2 w-2 rounded-sm bg-emerald-500" />Принятые
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-sm bg-blue-500" />Исходящие
@@ -112,7 +112,7 @@ export function HourlyChart({ data, interval, onIntervalChange }: HourlyChartPro
               />
               <YAxis tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: isDark ? "#ffffff08" : "#00000008" }} />
-              <Bar dataKey="incoming" name="Входящие"    fill="#22c55e" radius={[3,3,0,0]} maxBarSize={18} />
+              <Bar dataKey="incoming" name="Принятые"    fill="#22c55e" radius={[3,3,0,0]} maxBarSize={18} />
               <Bar dataKey="outgoing" name="Исходящие"   fill="#3b82f6" radius={[3,3,0,0]} maxBarSize={18} />
               <Bar dataKey="missed"   name="Пропущенные" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={18} />
             </BarChart>

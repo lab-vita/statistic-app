@@ -38,7 +38,7 @@ export function CallsSinglePreview() {
         <div className="text-xs text-white/70">Выберите метрику</div>
       </div>
       <div className="flex flex-wrap gap-1">
-        {["Входящие","Пропущ.","Исход.","Конверсия"].map(l => (
+        {["Принятые","Пропущ.","Исход.","Конверсия"].map(l => (
           <span key={l} className="text-[9px] bg-white/15 text-white/80 px-1.5 py-0.5 rounded-md">{l}</span>
         ))}
       </div>
@@ -49,7 +49,7 @@ export function CallsSinglePreview() {
 // ─── 2. Три показателя ───────────────────────────────────────
 export function CallsTrioPreview() {
   const items = [
-    { label: "Входящие",    value: "2 239", from: "#2563eb", to: "#1d4ed8" },
+    { label: "Принятые",    value: "2 239", from: "#2563eb", to: "#1d4ed8" },
     { label: "Пропущенные", value: "268",   from: "#dc2626", to: "#b91c1c" },
     { label: "Исходящие",   value: "2 112", from: "#7c3aed", to: "#6d28d9" },
   ];
@@ -76,7 +76,7 @@ export function CallsChartPreview() {
     <div className="h-full flex flex-col p-3 rounded-xl bg-card border border-border">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <div className="text-[9px] text-muted-foreground">Входящие звонки</div>
+          <div className="text-[9px] text-muted-foreground">Принятые звонки</div>
           <div className="text-xl font-bold">2 239</div>
         </div>
         <span className="text-[9px] px-1.5 py-0.5 rounded-md font-semibold
