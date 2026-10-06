@@ -7,7 +7,7 @@ import { CALLS_SINGLE_METRICS, CallsSingleMetric } from "@/components/widgets/ca
 import { CallsSinglePreview    } from "@/components/widget-previews";
 import { CallsTrioPreview      } from "@/components/widget-previews";
 import { CallsChartPreview     } from "@/components/widget-previews";
-import { CallsFullPreview      } from "@/components/widget-previews";
+import { CallsFunnelPreview    } from "@/components/widget-previews";
 import { CallsOperatorsPreview } from "@/components/widget-previews";
 
 const GROUPS = ["Звонки"];
@@ -17,7 +17,7 @@ function Preview({ type }: { type: string }) {
     case "calls_single":    return <CallsSinglePreview />;
     case "calls_trio":      return <CallsTrioPreview />;
     case "calls_chart":     return <CallsChartPreview />;
-    case "calls_full":      return <CallsFullPreview />;
+    case "calls_funnel":    return <CallsFunnelPreview />;
     case "calls_operators": return <CallsOperatorsPreview />;
     default: return <div className="h-full bg-muted/20 rounded-xl" />;
   }
@@ -90,6 +90,9 @@ export function WidgetCatalog({ onAdd, onClose }: WidgetCatalogProps) {
         const COLORS: Record<string, { from: string; to: string }> = {
           incoming:       { from: "#2563eb", to: "#1d4ed8" },
           received:       { from: "#0891b2", to: "#0e7490" },
+          lost:           { from: "#e11d48", to: "#be123c" },
+          lost_pct:       { from: "#db2777", to: "#be185d" },
+          reaction:       { from: "#f97316", to: "#ea580c" },
           outgoing:       { from: "#7c3aed", to: "#6d28d9" },
           missed:         { from: "#dc2626", to: "#b91c1c" },
           missed_pct:     { from: "#e11d48", to: "#be123c" },
@@ -101,6 +104,9 @@ export function WidgetCatalog({ onAdd, onClose }: WidgetCatalogProps) {
         const EXAMPLE: Record<string, string> = {
           incoming:       "2 239",
           received:       "2 507",
+          lost:           "72",
+          lost_pct:       "3,4%",
+          reaction:       "39 мин",
           outgoing:       "3 099",
           missed:         "268",
           missed_pct:     "10,7%",

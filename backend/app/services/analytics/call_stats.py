@@ -18,6 +18,13 @@ def _operator_surname(uid: str) -> str | None:
     return full.split()[0] if full else None
 
 
+# Исходы пропущенного звонка (взаимоисключающие, в порядке приоритета)
+OUTCOME_REACHED = "reached"   # мы перезвонили и дозвонились                 → клиент обслужен
+OUTCOME_SELF    = "self"      # клиент дозвонился сам при повторном звонке   → клиент обслужен
+OUTCOME_FAILED  = "failed"    # перезванивали, но не дозвонились             → ПОТЕРЯН
+OUTCOME_NONE    = "none"      # не перезванивали вообще                      → ПОТЕРЯН
+
+
 def received_count(incoming: int, missed: int) -> int:
     """
     Сколько звонков ПОСТУПИЛО = принятые + пропущенные.
@@ -34,6 +41,11 @@ def missed_share(incoming: int, missed: int) -> float:
     return round(missed / received * 100, 1) if received else 0.0
 
 
+def lost_share(received: int, lost: int) -> float:
+    """Доля потерянных клиентов среди поступивших звонков, % (один знак после запятой)."""
+    return round(lost / received * 100, 1) if received else 0.0
+
+
 def calc_callbacks(calls: list, pool: list | None = None) -> list:
     """
     Для каждого пропущенного звонка из calls определяет, был ли сделан обратный звонок.
@@ -43,26 +55,43 @@ def calc_callbacks(calls: list, pool: list | None = None) -> list:
     следующий день, и это не должно считаться «не перезвонили».
     """
     missed = [c for c in calls if c.is_missed]
-    outgoing = [c for c in (pool if pool is not None else calls) if c.is_outgoing]
+    source = pool if pool is not None else calls
 
     out_by_phone: dict[str, list] = {}
-    for c in outgoing:
-        out_by_phone.setdefault(c.phone_number, []).append(c)
+    answered_by_phone: dict[str, list] = {}
+    for c in source:
+        if c.is_outgoing:
+            out_by_phone.setdefault(c.phone_number, []).append(c)
+        elif c.is_incoming:
+            answered_by_phone.setdefault(c.phone_number, []).append(c)
+
+    window = MAX_CALLBACK_HOURS * 3600
+
+    def after(c, m) -> bool:
+        """Звонок c был после пропущенного m и не позже чем через MAX_CALLBACK_HOURS часов."""
+        return 0 < (c.call_start_date - m.call_start_date).total_seconds() <= window
 
     results = []
     for m in missed:
         callback = None
-        candidates = [
-            c for c in out_by_phone.get(m.phone_number, [])
-            if c.call_start_date > m.call_start_date
-            and (c.call_start_date - m.call_start_date).total_seconds() <= MAX_CALLBACK_HOURS * 3600
-        ]
-        if candidates:
-            callback = min(candidates, key=lambda c: c.call_start_date)
+        attempts = [c for c in out_by_phone.get(m.phone_number, []) if after(c, m)]
+        if attempts:
+            callback = min(attempts, key=lambda c: c.call_start_date)
+
+        # Дозвонились ли мы: хотя бы одна попытка соединилась (код 200), а не «занято»/«недоступен»
+        reached = any(str(c.call_failed_code) == "200" for c in attempts)
+        # Клиент мог дозвониться сам: после пропущенного ему ответили при повторном звонке
+        recovered = any(after(c, m) for c in answered_by_phone.get(m.phone_number, []))
+
+        if reached:     outcome = OUTCOME_REACHED     # мы перезвонили и дозвонились
+        elif recovered: outcome = OUTCOME_SELF        # клиент дозвонился сам
+        elif attempts:  outcome = OUTCOME_FAILED      # пытались, но не дозвонились
+        else:           outcome = OUTCOME_NONE        # вообще не перезвонили
 
         results.append({
             "missed":           m,
             "called_back":      callback is not None,
+            "outcome":          outcome,
             "reaction_seconds": int((callback.call_start_date - m.call_start_date).total_seconds()) if callback else None,
         })
     return results
@@ -73,11 +102,23 @@ def callback_stats(callback_results: list) -> dict:
     total = len(callback_results)
     called = [r for r in callback_results if r["called_back"]]
     times = [r["reaction_seconds"] for r in called if r["reaction_seconds"] is not None]
+
+    def count(outcome: str) -> int:
+        return sum(1 for r in callback_results if r["outcome"] == outcome)
+
+    failed, none = count(OUTCOME_FAILED), count(OUTCOME_NONE)
     return {
         "missed_total":     total,
-        "callback_count":   len(called),
+        "callback_count":   len(called),          # были ЛИ попытки перезвонить (включая «занято»)
         "callback_pct":     round(len(called) / total * 100) if total else 0,
         "avg_reaction_sec": sum(times) // len(times) if times else 0,
+        # судьба пропущенных — четыре взаимоисключающих исхода
+        "outcome_reached":  count(OUTCOME_REACHED),
+        "outcome_self":     count(OUTCOME_SELF),
+        "outcome_failed":   failed,
+        "outcome_none":     none,
+        # потеряно = клиент так и не был обслужен
+        "lost":             failed + none,
     }
 
 
@@ -110,6 +151,7 @@ def operator_stats(calls: list, pool: list | None = None) -> dict:
             "avg_duration":  sum(durations)  // len(durations)  if durations  else 0,
             "avg_wait_time": sum(wait_times) // len(wait_times) if wait_times else 0,
             **cb,
+            "lost_pct":      lost_share(received_count(op_in, op_miss), cb["lost"]),
         }
 
     all_dur   = [c.call_duration for c in calls if c.call_duration > 0]
@@ -127,6 +169,7 @@ def operator_stats(calls: list, pool: list | None = None) -> dict:
         "avg_duration":  sum(all_dur)   // len(all_dur)   if all_dur   else 0,
         "avg_wait_time": sum(all_waits) // len(all_waits) if all_waits else 0,
         **cb_total,
+        "lost_pct":      lost_share(received_count(all_in, all_miss), cb_total["lost"]),
     }
     return result
 
@@ -134,6 +177,7 @@ def operator_stats(calls: list, pool: list | None = None) -> dict:
 STATS_DELTA_KEYS = (
     "incoming", "outgoing", "missed", "received", "missed_pct", "total",
     "avg_duration", "callback_count", "callback_pct",
+    "lost", "lost_pct", "avg_reaction_sec",
 )
 
 

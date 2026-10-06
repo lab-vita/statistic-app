@@ -14,7 +14,7 @@ import { WidgetCatalog } from "@/components/widget-catalog";
 import { CallsSingleWidget    } from "@/components/widgets/calls-single";
 import { CallsTrioWidget      } from "@/components/widgets/calls-trio";
 import { CallsChartWidget     } from "@/components/widgets/calls-chart";
-import { CallsFullWidget      } from "@/components/widgets/calls-full";
+import { CallsFunnelWidget    } from "@/components/widgets/calls-funnel";
 import { CallsOperatorsWidget } from "@/components/widgets/calls-operators";
 import {
   fetchStats, fetchDaily, fetchConversion, toDateStr, addDays,
@@ -68,8 +68,8 @@ function WidgetContent({ pw, statsData, dailyData, conversion, loading }: {
       return <CallsTrioWidget stats={total} loading={loading} />;
     case "calls_chart":
       return <CallsChartWidget stats={total} daily={dailyData?.days??[]} loading={loading} />;
-    case "calls_full":
-      return <CallsFullWidget stats={total} daily={dailyData?.days??[]} loading={loading} />;
+    case "calls_funnel":
+      return <CallsFunnelWidget stats={total} loading={loading} />;
     case "calls_operators":
       return <CallsOperatorsWidget operators={statsData?.operators??null} loading={loading} />;
     default:

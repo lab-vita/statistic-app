@@ -1,7 +1,7 @@
 "use client";
 import { Phone, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { OperatorStats } from "@/lib/api";
-import { deltaIsGood, formatPct, noDeltaLabel, type ConversionValue } from "@/lib/call-metrics";
+import { deltaIsGood, formatPct, formatReaction, noDeltaLabel, type ConversionValue } from "@/lib/call-metrics";
 
 export type { ConversionValue };
 
@@ -11,6 +11,9 @@ export type CallsSingleMetric =
   | "outgoing"
   | "missed"
   | "missed_pct"
+  | "lost"
+  | "lost_pct"
+  | "reaction"
   | "callback_count"
   | "callback_pct"
   | "avg_duration"
@@ -21,13 +24,16 @@ export const CALLS_SINGLE_METRICS: {
   label: string;
   /** Пояснение под названием: что именно считается. */
   hint?: string;
-  format: "number" | "percent" | "duration";
+  format: "number" | "percent" | "duration" | "minutes";
 }[] = [
   { key: "incoming",       label: "Принятые",          hint: "отвеченные входящие",           format: "number"  },
   { key: "received",       label: "Поступило",         hint: "принятые + пропущенные",        format: "number"  },
   { key: "outgoing",       label: "Исходящие",                                                format: "number"  },
   { key: "missed",         label: "Пропущенные",                                              format: "number"  },
   { key: "missed_pct",     label: "% пропущенных",     hint: "от поступивших звонков",        format: "percent" },
+  { key: "lost",           label: "Потеряно",          hint: "не перезвонили или не дозвонились", format: "number" },
+  { key: "lost_pct",       label: "% потерь",          hint: "потеряно от поступивших",       format: "percent" },
+  { key: "reaction",       label: "До перезвона",      hint: "среднее до первой попытки",     format: "minutes" },
   { key: "callback_count", label: "Перезвонили",       hint: "из пропущенных, за 24 часа",    format: "number"  },
   { key: "callback_pct",   label: "% перезвонили",     hint: "от пропущенных",                format: "percent" },
   { key: "avg_duration",   label: "Ср. длительность",                                         format: "duration"},
@@ -35,13 +41,16 @@ export const CALLS_SINGLE_METRICS: {
 ];
 
 /** Метрики, у которых рост — это плохо (цвет изменения переворачивается). */
-const BAD_WHEN_UP = new Set<CallsSingleMetric>(["missed", "missed_pct"]);
+const BAD_WHEN_UP = new Set<CallsSingleMetric>(["missed", "missed_pct", "lost", "lost_pct", "reaction"]);
 
 
 // Цвета градиента по метрике
 const GRADIENT: Record<CallsSingleMetric, string> = {
   incoming:       "from-blue-600 to-blue-700",
   received:       "from-cyan-600 to-cyan-700",
+  lost:           "from-rose-600 to-rose-700",
+  lost_pct:       "from-pink-600 to-pink-700",
+  reaction:       "from-orange-500 to-orange-600",
   outgoing:       "from-violet-600 to-violet-700",
   missed:         "from-rose-600 to-rose-700",
   missed_pct:     "from-rose-500 to-red-700",
@@ -69,6 +78,12 @@ function getValue(
     case "missed_pct":
       // доля считается на сервере: пропущено ÷ поступило
       return { value: stats.missed_pct, deltaPct: stats.missed_pct_delta_pct ?? null, deltaDir: stats.missed_pct_delta_dir ?? null };
+    case "lost":
+      return { value: stats.lost, deltaPct: stats.lost_delta_pct ?? null, deltaDir: stats.lost_delta_dir ?? null };
+    case "lost_pct":
+      return { value: stats.lost_pct, deltaPct: stats.lost_pct_delta_pct ?? null, deltaDir: stats.lost_pct_delta_dir ?? null };
+    case "reaction":
+      return { value: stats.avg_reaction_sec, deltaPct: stats.avg_reaction_sec_delta_pct ?? null, deltaDir: stats.avg_reaction_sec_delta_dir ?? null };
     case "callback_count":
       return { value: stats.callback_count, deltaPct: stats.callback_count_delta_pct ?? null, deltaDir: stats.callback_count_delta_dir ?? null };
     case "callback_pct":
@@ -82,8 +97,9 @@ function getValue(
   }
 }
 
-function formatValue(value: number, format: "number" | "percent" | "duration"): string {
+function formatValue(value: number, format: "number" | "percent" | "duration" | "minutes"): string {
   if (format === "percent")  return formatPct(value);
+  if (format === "minutes")  return formatReaction(value);
   if (format === "duration") {
     const m = Math.floor(value / 60);
     const s = Math.round(value % 60);

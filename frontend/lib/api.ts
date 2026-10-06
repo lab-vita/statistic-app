@@ -25,6 +25,15 @@ export interface OperatorStats {
   received: number;
   /** Доля пропущенных среди поступивших, % (пропущено ÷ поступило). */
   missed_pct: number;
+  /** Судьба пропущенных звонков — четыре взаимоисключающих исхода (сумма = missed). */
+  outcome_reached: number;   // мы перезвонили и дозвонились
+  outcome_self:    number;   // клиент дозвонился сам при повторном звонке
+  outcome_failed:  number;   // перезванивали, но не дозвонились (занято, недоступен)
+  outcome_none:    number;   // не перезванивали вообще
+  /** Потеряно = outcome_failed + outcome_none: клиент так и не был обслужен. */
+  lost: number;
+  /** Доля потерянных среди поступивших звонков, %. */
+  lost_pct: number;
   total: number;
   avg_duration: number;
   avg_wait_time: number;
@@ -45,6 +54,12 @@ export interface OperatorStats {
   missed_pct_delta_dir:   DeltaDir;
   callback_count_delta_pct: number | null;
   callback_count_delta_dir: DeltaDir;
+  lost_delta_pct:           number | null;
+  lost_delta_dir:           DeltaDir;
+  lost_pct_delta_pct:       number | null;
+  lost_pct_delta_dir:       DeltaDir;
+  avg_reaction_sec_delta_pct: number | null;
+  avg_reaction_sec_delta_dir: DeltaDir;
   total_delta_pct:        number | null;
   total_delta_dir:        DeltaDir;
   avg_duration_delta_pct: number | null;

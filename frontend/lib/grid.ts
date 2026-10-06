@@ -13,7 +13,7 @@ export type WidgetTypeId =
   | "calls_single"      // 1: одна цифра
   | "calls_trio"        // 2: три показателя
   | "calls_chart"       // 3: цифра + график
-  | "calls_full"        // 4: полная сводка
+  | "calls_funnel"      // 4: судьба звонков (раньше «полная сводка»)
   | "calls_operators";  // 5: операторы
 
 // ─── Определение типа (метаданные для каталога) ──────────────
@@ -36,14 +36,14 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     id:          "calls_single",
     group:       "Звонки",
     name:        "Одна метрика",
-    description: "Крупная цифра: входящие, пропущенные или конверсия. Минимум информации — максимум читаемости.",
+    description: "Крупная цифра на выбор: принятые, потеряно, время до перезвона, конверсия и другие. Минимум информации — максимум читаемости.",
     defaultW: 3, defaultH: 1, minW: 3, minH: 1, maxW: 6,  maxH: 2,
   },
   {
     id:          "calls_trio",
     group:       "Звонки",
     name:        "Три показателя",
-    description: "Принятые · Пропущенные · Исходящие в одной строке с изменением к предыдущему периоду.",
+    description: "Принято · Потеряно · До перезвона в одной строке с изменением к предыдущему периоду.",
     defaultW: 6, defaultH: 1, minW: 6, minH: 1, maxW: 12, maxH: 2,
   },
   {
@@ -54,11 +54,11 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     defaultW: 6, defaultH: 2, minW: 4, minH: 2, maxW: 12, maxH: 3,
   },
   {
-    id:          "calls_full",
+    id:          "calls_funnel",
     group:       "Звонки",
-    name:        "Полная сводка",
-    description: "Все 4 метрики + график динамики. Для тех кто работает со звонками каждый день.",
-    defaultW: 12, defaultH: 2, minW: 8, minH: 2, maxW: 12, maxH: 3,
+    name:        "Судьба звонков",
+    description: "Сколько поступило и пропущено и что стало с пропущенными. Главная цифра — сколько клиентов потеряно.",
+    defaultW: 6, defaultH: 3, minW: 5, minH: 3, maxW: 12, maxH: 4,
   },
   {
     id:          "calls_operators",
@@ -85,11 +85,35 @@ export interface PlacedWidget {
 
 const LS_KEY = "grid_layout_v1";
 
+/**
+ * Приводит сохранённую раскладку к актуальным типам виджетов:
+ *  • «Полная сводка» (calls_full) заменена на «Судьба звонков» (calls_funnel) — виджет переезжает
+ *    на свободное место с размером по умолчанию;
+ *  • неизвестные типы отбрасываются, чтобы на главной не оставалось пустых карточек.
+ */
+export function migrateGrid(saved: unknown): { widgets: PlacedWidget[]; changed: boolean } {
+  const list = Array.isArray(saved) ? (saved as PlacedWidget[]) : [];
+  const known = new Set<string>(WIDGET_TYPES.map(d => d.id));
+  const kept   = list.filter(w => known.has(w.type));
+  const legacy = list.filter(w => (w.type as string) === "calls_full");
+
+  let widgets = kept;
+  const funnel = WIDGET_TYPES.find(d => d.id === "calls_funnel")!;
+  for (const old of legacy) {
+    const slot = findFreeSlot(widgets, funnel.defaultW, funnel.defaultH);
+    widgets = [...widgets, { id: old.id, type: "calls_funnel", ...slot, w: funnel.defaultW, h: funnel.defaultH }];
+  }
+  return { widgets, changed: widgets.length !== list.length || legacy.length > 0 };
+}
+
 export function loadGrid(): PlacedWidget[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(LS_KEY);
-    return raw ? (JSON.parse(raw) as PlacedWidget[]) : [];
+    if (!raw) return [];
+    const { widgets, changed } = migrateGrid(JSON.parse(raw));
+    if (changed) localStorage.setItem(LS_KEY, JSON.stringify(widgets));
+    return widgets;
   } catch { return []; }
 }
 

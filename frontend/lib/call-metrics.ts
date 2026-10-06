@@ -14,6 +14,17 @@ export function formatPct(value: number): string {
   return `${value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%`;
 }
 
+/** Время до перезвона: «< 1 мин», «39 мин», «1 ч 12 мин»; нет данных → «—». */
+export function formatReaction(seconds: number | null | undefined): string {
+  if (!seconds || seconds <= 0) return "—";
+  if (seconds < 60) return "< 1 мин";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} мин`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} ч ${m} мин` : `${h} ч`;
+}
+
 /** Относительное изменение, как на сервере (calc_delta): нет базы → null. */
 export function relativeDelta(current: number, previous: number): { pct: number | null; dir: DeltaDir } {
   if (!previous) return { pct: null, dir: null };

@@ -49,9 +49,9 @@ export function CallsSinglePreview() {
 // ─── 2. Три показателя ───────────────────────────────────────
 export function CallsTrioPreview() {
   const items = [
-    { label: "Принятые",    value: "2 239", from: "#2563eb", to: "#1d4ed8" },
-    { label: "Пропущенные", value: "268",   from: "#dc2626", to: "#b91c1c" },
-    { label: "Исходящие",   value: "2 112", from: "#7c3aed", to: "#6d28d9" },
+    { label: "Принято",      value: "2 239",  from: "#2563eb", to: "#1d4ed8" },
+    { label: "Потеряно",     value: "72",     from: "#e11d48", to: "#be123c" },
+    { label: "До перезвона", value: "39 мин", from: "#f97316", to: "#ea580c" },
   ];
   return (
     <div className="h-full grid grid-cols-3 gap-1.5">
@@ -102,35 +102,28 @@ export function CallsChartPreview() {
   );
 }
 
-// ─── 4. Полная сводка ────────────────────────────────────────
-export function CallsFullPreview() {
-  const metrics = [
-    { label: "Вход.",   value: "2 239", cls: "text-blue-700   dark:text-blue-300"   },
-    { label: "Исход.",  value: "2 112", cls: "text-violet-700 dark:text-violet-300" },
-    { label: "Проп.",   value: "268",   cls: "text-red-700    dark:text-red-300"    },
-    { label: "Ср. дл.", value: "3м 12с",cls: "text-amber-700  dark:text-amber-300"  },
-  ];
+// ─── 4. Судьба звонков ───────────────────────────────────────
+export function CallsFunnelPreview() {
   return (
-    <div className="h-full flex flex-col p-3 rounded-xl bg-card border border-border">
-      <div className="text-[9px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-        Звонки · сводка
+    <div className="relative h-full flex flex-col justify-between p-3 rounded-xl overflow-hidden text-white
+      bg-gradient-to-br from-indigo-700 to-slate-900">
+      <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-white/10 pointer-events-none" />
+      <div className="text-[9px] text-white/70 z-10">Судьба звонков</div>
+      <div className="z-10 space-y-1.5">
+        <div className="flex h-1.5 gap-0.5 rounded-full overflow-hidden">
+          <div className="bg-sky-300" style={{ flexGrow: 91 }} />
+          <div className="bg-orange-300" style={{ flexGrow: 9 }} />
+        </div>
+        <div className="flex h-1.5 gap-0.5 rounded-full overflow-hidden">
+          <div className="bg-emerald-300" style={{ flexGrow: 50 }} />
+          <div className="bg-teal-200" style={{ flexGrow: 12 }} />
+          <div className="bg-amber-300" style={{ flexGrow: 12 }} />
+          <div className="bg-rose-400" style={{ flexGrow: 26 }} />
+        </div>
       </div>
-      <div className="grid grid-cols-4 gap-2 mb-2">
-        {metrics.map(m => (
-          <div key={m.label}>
-            <div className="text-[8px] text-muted-foreground">{m.label}</div>
-            <div className={`text-xs font-bold ${m.cls}`}>{m.value}</div>
-          </div>
-        ))}
-      </div>
-      <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={DEMO_DAILY.slice(0,7)}
-            margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barCategoryGap="35%">
-            <Bar dataKey="incoming" fill="#3b82f6" opacity={0.8} radius={[1,1,0,0]} />
-            <Bar dataKey="missed"   fill="#f43f5e" opacity={0.8} radius={[1,1,0,0]} />
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="z-10 flex items-end justify-between">
+        <div className="text-[9px] text-white/60">Потеряно</div>
+        <div className="text-lg font-bold leading-none">72</div>
       </div>
     </div>
   );
