@@ -416,21 +416,21 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
   return (
     <div className="min-h-full">
-      <div className="max-w-screen-2xl mx-auto px-6 py-6 space-y-5">
+      <div className="space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-base font-semibold">Сводка</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+            <h1 className="text-xl font-semibold tracking-tight">Сводка</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{label}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1 rounded-xl border border-border bg-muted/30 p-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex gap-0.5 rounded-xl border border-border bg-muted/30 p-1">
               {(["day","week","month"] as PeriodType[]).map(t=>(
                 <button key={t} onClick={()=>{setPeriodType(t);setOffset(0);}}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                     periodType===t
-                      ?"bg-background border border-border shadow-sm"
+                      ?"bg-card text-foreground shadow-sm ring-1 ring-border"
                       :"text-muted-foreground hover:text-foreground"
                   }`}>
                   {t==="day"?"День":t==="week"?"Неделя":"Месяц"}
@@ -439,23 +439,23 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
             </div>
             <div className="flex gap-1">
               <button onClick={()=>setOffset(o=>o-1)}
-                className="h-8 w-8 rounded-xl border border-border hover:bg-muted/40 flex items-center justify-center">
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card transition-colors hover:bg-accent">
                 <ChevronLeft className="h-4 w-4 text-muted-foreground"/>
               </button>
               <button onClick={()=>setOffset(o=>o+1)} disabled={offset>=0}
-                className="h-8 w-8 rounded-xl border border-border hover:bg-muted/40 flex items-center justify-center disabled:opacity-30">
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card transition-colors hover:bg-accent disabled:opacity-30">
                 <ChevronRight className="h-4 w-4 text-muted-foreground"/>
               </button>
             </div>
             <button onClick={()=>setShowCatalog(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold">
+              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background transition-colors hover:bg-foreground/90">
               <Plus className="h-3.5 w-3.5"/> Добавить
             </button>
             <button onClick={()=>setEditMode(e=>!e)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-semibold transition-all ${
                 editMode
-                  ?"bg-muted border-border"
-                  :"border-border text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                  ?"bg-accent border-border text-foreground"
+                  :"border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}>
               <Settings2 className="h-3.5 w-3.5"/> {editMode?"Готово":"Настроить"}
             </button>
@@ -464,13 +464,13 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
         {/* Edit hint */}
         {editMode && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-2">
-            <GripVertical className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0"/>
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+            <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground"/>
             <p className="text-xs text-muted-foreground">
               Тяните виджет для перемещения
-              <span className="text-foreground/30 mx-1.5">·</span>
+              <span className="mx-1.5 text-border">·</span>
               Зелёная зона — свободно, красная — занято
-              <span className="text-foreground/30 mx-1.5">·</span>
+              <span className="mx-1.5 text-border">·</span>
               Угол справа внизу — изменить размер
             </p>
           </div>
@@ -509,14 +509,18 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
             )}
 
             {widgets.length===0 ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 min-h-[320px]">
-                <div className="h-14 w-14 rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
-                  <Plus className="h-6 w-6 text-muted-foreground/40"/>
+              <div className="flex min-h-[340px] flex-col items-center justify-center gap-5">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/30">
+                  <Plus className="h-7 w-7 text-muted-foreground/40"/>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-foreground/50">Нет виджетов</p>
-                  <p className="text-xs text-muted-foreground mt-1">Нажмите «Добавить» чтобы начать</p>
+                  <p className="text-sm font-semibold text-foreground/60">Виджеты не добавлены</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Нажмите «Добавить» чтобы настроить дашборд</p>
                 </div>
+                <button onClick={()=>setShowCatalog(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                  <Plus className="h-3.5 w-3.5"/> Добавить виджет
+                </button>
               </div>
             ) : widgets.map(pw=>(
               <DraggableWidget
@@ -535,9 +539,9 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
                 <div style={{
                   width:   pxW(colPx,activeWidget.w),
                   height:  pxH(rowH,activeWidget.h),
-                  borderRadius: 16,
+                  borderRadius: 12,
                   overflow: "hidden",
-                  boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
+                  boxShadow: "0 24px 48px rgba(0,0,0,0.18)",
                 }}>
                   <WidgetContent
                     pw={activeWidget}

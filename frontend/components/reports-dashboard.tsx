@@ -14,6 +14,8 @@ import {
   Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 // ─── Типы ────────────────────────────────────────────────────
 
@@ -318,170 +320,174 @@ export function ReportsDashboard() {
   const tickInterval = chartData.length > 60 ? 6 : chartData.length > 30 ? 2 : 0;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
 
       {/* Пресеты */}
       <div>
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Быстрые отчёты</div>
+        <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Быстрые отчёты</div>
         <div className="flex flex-wrap gap-2">
           {PRESETS.map(p => (
-            <button
+            <Button
               key={p.id}
+              variant="outline"
+              size="sm"
               onClick={() => applyPreset(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              className={`text-xs ${
                 activePreset === p.id
-                  ? "bg-foreground text-background border-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                  ? "bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background"
+                  : ""
               }`}
             >
               {p.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       {/* Настройки */}
-      <div className="rounded-xl border border-border bg-card p-4 flex flex-wrap gap-4 items-end">
+      <Card className="p-5">
+        <div className="flex flex-wrap gap-5 items-end">
 
-        {/* Источник */}
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Источник</div>
-          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
-            {(["calls","appointments"] as Source[]).map(s => (
-              <button key={s} onClick={() => updateConfig({ source: s })}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  config.source === s
-                    ? "bg-background border border-border text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}>
-                {s === "calls" ? "Звонки" : "Записи"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Период */}
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Период</div>
-          <div className="flex items-center gap-1.5">
-            <input type="date" value={config.dateFrom}
-              onChange={e => updateConfig({ dateFrom: e.target.value })}
-              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40" />
-            <span className="text-muted-foreground text-xs">—</span>
-            <input type="date" value={config.dateTo}
-              onChange={e => updateConfig({ dateTo: e.target.value })}
-              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40" />
-          </div>
-        </div>
-
-        {/* Разбивка */}
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Разбивка</div>
-          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
-            {(["day","week","month"] as Breakdown[]).map(b => (
-              <button key={b} onClick={() => updateConfig({ breakdown: b })}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  config.breakdown === b
-                    ? "bg-background border border-border text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}>
-                {BREAKDOWN_LABELS[b]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Тип графика */}
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">График</div>
-          <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
-            {(["bar","line"] as ChartType[]).map(t => (
-              <button key={t} onClick={() => updateConfig({ chartType: t })}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  config.chartType === t
-                    ? "bg-background border border-border text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}>
-                {t === "bar" ? "Столбцы" : "Линии"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Метрики — Звонки */}
-        {config.source === "calls" && (
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Метрики</div>
-            <div className="flex gap-1 flex-wrap">
-              {(Object.keys(CALL_METRIC_LABELS) as CallMetric[]).map(m => (
-                <button key={m} onClick={() => toggleCallMetric(m)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    config.callMetrics.includes(m)
-                      ? "border-transparent text-white"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                  style={config.callMetrics.includes(m) ? { background: METRIC_COLORS[m] } : {}}>
-                  {CALL_METRIC_LABELS[m]}
-                </button>
-              ))}
+            {/* Источник */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Источник</div>
+              <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+                {(["calls","appointments"] as Source[]).map(s => (
+                  <button key={s} onClick={() => updateConfig({ source: s })}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      config.source === s
+                        ? "bg-card ring-1 ring-border text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}>
+                    {s === "calls" ? "Звонки" : "Записи"}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Метрики — Записи */}
-        {config.source === "appointments" && (
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Метрики</div>
-            <div className="flex gap-1 flex-wrap">
-              {(Object.keys(APPT_METRIC_LABELS) as ApptMetric[]).map(m => (
-                <button key={m} onClick={() => toggleApptMetric(m)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    config.apptMetrics.includes(m)
-                      ? "border-transparent text-white"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                  style={config.apptMetrics.includes(m) ? { background: METRIC_COLORS[m] } : {}}>
-                  {APPT_METRIC_LABELS[m]}
-                </button>
-              ))}
+            {/* Период */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Период</div>
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={config.dateFrom}
+                  onChange={e => updateConfig({ dateFrom: e.target.value })}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors" />
+                <span className="text-muted-foreground text-xs">—</span>
+                <input type="date" value={config.dateTo}
+                  onChange={e => updateConfig({ dateTo: e.target.value })}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors" />
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Фильтр по оператору */}
-        {config.source === "calls" && (
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Оператор</div>
-            <select value={config.operatorId ?? ""}
-              onChange={e => updateConfig({ operatorId: e.target.value || null })}
-              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40 min-w-32">
-              <option value="">Все</option>
-              {operators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}
-            </select>
-          </div>
-        )}
+            {/* Разбивка */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Разбивка</div>
+              <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+                {(["day","week","month"] as Breakdown[]).map(b => (
+                  <button key={b} onClick={() => updateConfig({ breakdown: b })}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      config.breakdown === b
+                        ? "bg-card ring-1 ring-border text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}>
+                    {BREAKDOWN_LABELS[b]}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Фильтр по администратору */}
-        {config.source === "appointments" && (
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Сотрудник</div>
-            <select value={config.adminSurname ?? ""}
-              onChange={e => updateConfig({ adminSurname: e.target.value || null })}
-              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground/40 min-w-32">
-              <option value="">Все</option>
-              {admins.map(a => <option key={a.surname} value={a.surname}>{a.surname} — {a.label}</option>)}
-            </select>
+            {/* Тип графика */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">График</div>
+              <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+                {(["bar","line"] as ChartType[]).map(t => (
+                  <button key={t} onClick={() => updateConfig({ chartType: t })}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      config.chartType === t
+                        ? "bg-card ring-1 ring-border text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}>
+                    {t === "bar" ? "Столбцы" : "Линии"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Метрики — Звонки */}
+            {config.source === "calls" && (
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Метрики</div>
+                <div className="flex gap-1 flex-wrap">
+                  {(Object.keys(CALL_METRIC_LABELS) as CallMetric[]).map(m => (
+                    <button key={m} onClick={() => toggleCallMetric(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        config.callMetrics.includes(m)
+                          ? "border-transparent text-white"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                      style={config.callMetrics.includes(m) ? { background: METRIC_COLORS[m] } : {}}>
+                      {CALL_METRIC_LABELS[m]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Метрики — Записи */}
+            {config.source === "appointments" && (
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Метрики</div>
+                <div className="flex gap-1 flex-wrap">
+                  {(Object.keys(APPT_METRIC_LABELS) as ApptMetric[]).map(m => (
+                    <button key={m} onClick={() => toggleApptMetric(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        config.apptMetrics.includes(m)
+                          ? "border-transparent text-white"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                      style={config.apptMetrics.includes(m) ? { background: METRIC_COLORS[m] } : {}}>
+                      {APPT_METRIC_LABELS[m]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Фильтр по оператору */}
+            {config.source === "calls" && (
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Оператор</div>
+                <select value={config.operatorId ?? ""}
+                  onChange={e => updateConfig({ operatorId: e.target.value || null })}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors min-w-32">
+                  <option value="">Все</option>
+                  {operators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Фильтр по администратору */}
+            {config.source === "appointments" && (
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Сотрудник</div>
+                <select value={config.adminSurname ?? ""}
+                  onChange={e => updateConfig({ adminSurname: e.target.value || null })}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors min-w-32">
+                  <option value="">Все</option>
+                  {admins.map(a => <option key={a.surname} value={a.surname}>{a.surname} — {a.label}</option>)}
+                </select>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+      </Card>
 
       {/* График */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center justify-between mb-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div>
-            <h3 className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium">
               {config.source === "calls" ? "Звонки" : "Записи"} · {BREAKDOWN_LABELS[config.breakdown].toLowerCase()}
-            </h3>
+            </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               {new Date(config.dateFrom).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} —{" "}
               {new Date(config.dateTo).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
@@ -495,14 +501,14 @@ export function ReportsDashboard() {
               </span>
             ))}
           </div>
-        </div>
-
-        {loading ? (
-          <div className="h-64 rounded-lg bg-muted/40 animate-pulse" />
-        ) : chartData.length === 0 ? (
-          <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
-            Нет данных за выбранный период
-          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />
+          ) : chartData.length === 0 ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-2">
+              <p className="text-sm text-muted-foreground">Нет данных за выбранный период</p>
+            </div>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             {config.chartType === "bar" ? (
@@ -546,14 +552,15 @@ export function ReportsDashboard() {
             )}
           </ResponsiveContainer>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Сводная таблица с дельтами */}
       {summaryStats && !loading && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium">Сводка · сравнение с {prevLabel}</h3>
-          </div>
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border">
+            <CardTitle className="text-sm font-medium">Сводка · сравнение с {prevLabel}</CardTitle>
+          </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -574,7 +581,7 @@ export function ReportsDashboard() {
                     { label: "Ср. разговор",    val: formatDuration(s.avg_duration), pct: s.avg_duration_delta_pct, dir: s.avg_duration_delta_dir },
                     { label: "% перезвонов",    val: `${s.callback_pct}%`, pct: s.callback_pct_delta_pct, dir: s.callback_pct_delta_dir },
                   ].map(row => (
-                    <tr key={row.label} className="hover:bg-muted/40 transition-colors">
+                    <tr key={row.label} className="hover:bg-muted/30 transition-colors">
                       <td className="px-5 py-3 font-medium">{row.label}</td>
                       <td className="px-5 py-3 text-right font-mono">{row.val}</td>
                       <td className="px-5 py-3 text-right">
@@ -593,7 +600,7 @@ export function ReportsDashboard() {
                     { label: "Отмены",          val: s.cancels,       pct: s.cancel_pct_delta_pct,   dir: s.cancel_pct_delta_dir, inv: true },
                     { label: "Новые пациенты",  val: s.new_patients,  pct: s.new_patients_delta_pct, dir: s.new_patients_delta_dir },
                   ].map(row => (
-                    <tr key={row.label} className="hover:bg-muted/40 transition-colors">
+                    <tr key={row.label} className="hover:bg-muted/30 transition-colors">
                       <td className="px-5 py-3 font-medium">{row.label}</td>
                       <td className="px-5 py-3 text-right font-mono">{row.val}</td>
                       <td className="px-5 py-3 text-right">
@@ -605,15 +612,15 @@ export function ReportsDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Детализация по администраторам (только записи, без фильтра) */}
       {config.source === "appointments" && !config.adminSurname && apptData && !loading && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium">По сотрудникам · сравнение с {prevLabel}</h3>
-          </div>
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border">
+            <CardTitle className="text-sm font-medium">По сотрудникам · сравнение с {prevLabel}</CardTitle>
+          </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -625,7 +632,7 @@ export function ReportsDashboard() {
               </thead>
               <tbody className="divide-y divide-border">
                 {Object.values(apptData.by_admin).sort((a: any, b: any) => b.total - a.total).map((a: any) => (
-                  <tr key={a.name} className="hover:bg-muted/40 transition-colors">
+                  <tr key={a.name} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium whitespace-nowrap">
                       {a.name}
                       {a.group_label && a.group !== "callcenter" && a.group !== "admin" && (
@@ -652,7 +659,7 @@ export function ReportsDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

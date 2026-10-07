@@ -40,9 +40,9 @@ export function PeriodSelector({
           <button
             key={type}
             onClick={() => onTypeChange(type)}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
               period.type === type
-                ? "bg-background text-foreground shadow-sm border border-border"
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -58,14 +58,14 @@ export function PeriodSelector({
             type="date"
             value={customFrom}
             onChange={e => onCustomFromChange?.(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium outline-none focus:border-foreground/40 transition-colors"
+            className="rounded-lg border border-input bg-background px-3 py-1.5 text-xs font-medium outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
           <span className="text-muted-foreground">—</span>
           <input
             type="date"
             value={customTo}
             onChange={e => onCustomToChange?.(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium outline-none focus:border-foreground/40 transition-colors"
+            className="rounded-lg border border-input bg-background px-3 py-1.5 text-xs font-medium outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
         </div>
       ) : (

@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import { DailyItem } from "@/lib/api";
 import { useTheme } from "next-themes";
+import { Card } from "@/components/ui/card";
 
 interface DailyChartProps {
   data: DailyItem[];
@@ -45,9 +46,9 @@ export function DailyChart({ data }: DailyChartProps) {
   }));
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Динамика по дням</h3>
+        <h3 className="text-sm font-semibold tracking-tight">Динамика по дням</h3>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-sm bg-emerald-500" />Принятые
@@ -71,6 +72,6 @@ export function DailyChart({ data }: DailyChartProps) {
           <Bar dataKey="missed"   name="Пропущенные" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={20} />
         </ComposedChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

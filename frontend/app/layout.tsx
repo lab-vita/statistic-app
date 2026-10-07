@@ -9,8 +9,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Лабвита — Статистика",
-  description: "Дашборд колл-центра",
+  title: "Пульс — Аналитика",
+  description: "Аналитика звонков и записей — Пульс",
 };
 
 export default function RootLayout({

@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import { ComparisonSeries, ComparisonMetric, OPERATOR_COLORS } from "@/lib/api";
 import { useTheme } from "next-themes";
+import { Card } from "@/components/ui/card";
 
 interface ComparisonChartProps {
   series: ComparisonSeries[];
@@ -69,9 +70,9 @@ export function ComparisonChart({ series, dates, metric, onMetricChange }: Compa
   const tickInterval = dates.length > 30 ? 6 : dates.length > 14 ? 2 : 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Сравнение операторов</h3>
+        <h3 className="text-sm font-semibold tracking-tight">Сравнение операторов</h3>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
           {METRICS.map(({ value, label }) => (
             <button
@@ -79,7 +80,7 @@ export function ComparisonChart({ series, dates, metric, onMetricChange }: Compa
               onClick={() => onMetricChange(value)}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 metric === value
-                  ? "bg-background text-foreground shadow-sm border border-border"
+                  ? "bg-card ring-1 ring-border text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -125,6 +126,6 @@ export function ComparisonChart({ series, dates, metric, onMetricChange }: Compa
           })}
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

@@ -36,8 +36,8 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
     : 0;
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Принятые" value={s.incoming} sub={`из ${s.received.toLocaleString("ru-RU")} поступивших`}
           accent="green" icon={<PhoneIncoming className="h-4 w-4 text-emerald-500" />}
@@ -70,7 +70,7 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
           deltaPct={s.avg_duration_delta_pct} deltaDir={s.avg_duration_delta_dir}
         />
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Ср. ожидание" value={formatDuration(s.avg_wait_time)} sub="клиент ждал до сброса"
           accent="yellow" icon={<Timer className="h-4 w-4 text-yellow-500" />}

@@ -4,6 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from "recharts";
+import { Card } from "@/components/ui/card";
 import { SlotItem } from "@/lib/api";
 import { useTheme } from "next-themes";
 
@@ -56,11 +57,11 @@ export function HourlyChart({ data, interval, onIntervalChange }: HourlyChartPro
   const tickInterval = interval <= 5 ? 11 : interval <= 15 ? 3 : interval <= 30 ? 1 : 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <Card className="p-5">
       {/* Шапка */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-medium">Распределение по времени</h3>
+          <h3 className="text-sm font-semibold tracking-tight">Распределение по времени</h3>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-sm bg-emerald-500" />Принятые
@@ -82,7 +83,7 @@ export function HourlyChart({ data, interval, onIntervalChange }: HourlyChartPro
               onClick={() => onIntervalChange(value)}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 interval === value
-                  ? "bg-background text-foreground shadow-sm border border-border"
+                  ? "bg-card ring-1 ring-border text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -119,6 +120,6 @@ export function HourlyChart({ data, interval, onIntervalChange }: HourlyChartPro
           </ResponsiveContainer>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

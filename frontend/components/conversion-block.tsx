@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchConversion, ConversionResponse } from "@/lib/api";
+import { Card, CardHeader, CardTitle, CardAction, CardContent, CardFooter } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
 
 interface ConversionBlockProps {
@@ -20,7 +21,7 @@ function ConversionBar({ pct }: { pct: number }) {
 }
 
 export function ConversionBlock({ dateFrom, dateTo }: ConversionBlockProps) {
-  const [data, setData]     = useState<ConversionResponse | null>(null);
+  const [data, setData]       = useState<ConversionResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,28 +39,30 @@ export function ConversionBlock({ dateFrom, dateTo }: ConversionBlockProps) {
   if (!data || data.operators.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2 mb-5">
-        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Конверсия звонок → запись</span>
-        <span className="text-xs text-muted-foreground ml-auto">
-          только колл-центр
-        </span>
-      </div>
+    <Card>
+      <CardHeader className="border-b">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardTitle>Конверсия звонок → запись</CardTitle>
+        </div>
+        <CardAction>
+          <span className="text-xs text-muted-foreground">только колл-центр</span>
+        </CardAction>
+      </CardHeader>
 
-      <div className="space-y-4">
+      <CardContent className="pt-4 space-y-4">
         {data.operators.map(op => (
           <div key={op.operator_id}>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium">{op.name.split(" ")[0]}</span>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>{op.incoming} прин.</span>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="tabular-nums">{op.incoming} прин.</span>
                   <span>→</span>
-                  <span>{op.appointments} зап.</span>
+                  <span className="tabular-nums">{op.appointments} зап.</span>
                 </div>
               </div>
-              <span className={`text-sm font-semibold font-mono ${
+              <span className={`text-sm font-semibold font-mono tabular-nums ${
                 op.conversion_pct >= 70 ? "text-emerald-500"
                 : op.conversion_pct >= 40 ? "text-yellow-500"
                 : "text-red-500"
@@ -76,13 +79,13 @@ export function ConversionBlock({ dateFrom, dateTo }: ConversionBlockProps) {
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold">Итого</span>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span>{data.total.incoming} прин.</span>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="tabular-nums">{data.total.incoming} прин.</span>
                 <span>→</span>
-                <span>{data.total.appointments} зап.</span>
+                <span className="tabular-nums">{data.total.appointments} зап.</span>
               </div>
             </div>
-            <span className={`text-sm font-semibold font-mono ${
+            <span className={`text-sm font-semibold font-mono tabular-nums ${
               data.total.conversion_pct >= 70 ? "text-emerald-500"
               : data.total.conversion_pct >= 40 ? "text-yellow-500"
               : "text-red-500"
@@ -92,12 +95,13 @@ export function ConversionBlock({ dateFrom, dateTo }: ConversionBlockProps) {
           </div>
           <ConversionBar pct={data.total.conversion_pct} />
         </div>
-      </div>
+      </CardContent>
 
-      {/* Подсказка */}
-      <p className="text-[11px] text-muted-foreground mt-4">
-        Конверсия = записи сделанные оператором / входящие звонки × 100%
-      </p>
-    </div>
+      <CardFooter>
+        <p className="text-[11px] text-muted-foreground">
+          Конверсия = записи сделанные оператором / входящие звонки × 100%
+        </p>
+      </CardFooter>
+    </Card>
   );
 }

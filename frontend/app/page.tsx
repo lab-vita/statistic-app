@@ -145,17 +145,26 @@ function DashboardPage() {
   const displayCalls = selectedOp ? callsOpData : callsTotal;
 
   const Skeleton = () => (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-24 rounded-xl border border-border bg-card animate-pulse" />
+          <div key={i} className="h-32 rounded-xl border border-border bg-card animate-pulse" />
         ))}
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-24 rounded-xl border border-border bg-card animate-pulse" />
+          <div key={i} className="h-32 rounded-xl border border-border bg-card animate-pulse" />
         ))}
       </div>
+    </div>
+  );
+
+  const EmptyState = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+        <span className="text-lg">—</span>
+      </div>
+      <p className="max-w-sm text-sm text-muted-foreground">{children}</p>
     </div>
   );
 
@@ -164,10 +173,10 @@ function DashboardPage() {
   const revTo   = toDateStr(addDays(new Date(), -1));
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar section={section} onSelectSection={handleSelectSection} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
         {!noTopbar.includes(section) && (
           <Topbar
             section={section}
@@ -189,9 +198,10 @@ function DashboardPage() {
           />
         )}
 
-        <main className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1280px] space-y-6 px-4 py-6 lg:px-6">
           {error && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-500">
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
               {error}
             </div>
           )}
@@ -200,10 +210,7 @@ function DashboardPage() {
             can("view:calls")
               ? <HomeDashboard onNavigate={handleSelectSection} />
               : (
-                <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                  Виджеты главной строятся на данных по звонкам, а доступа к ним у вас нет.
-                  Выберите раздел в меню слева.
-                </div>
+                <EmptyState>Виджеты главной строятся на данных по звонкам, а доступа к ним у вас нет. Выберите раздел в меню слева.</EmptyState>
               )
           )}
           {section === "reports" && canSee("reports") && <ReportsDashboard />}
@@ -212,8 +219,8 @@ function DashboardPage() {
           {section === "revenue" && canSee("revenue") && (
             <>
               <div>
-                <h1 className="text-base font-semibold">Выручка</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <h1 className="text-xl font-semibold tracking-tight">Выручка</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Последние 30 дней · только обычные платежи (исключены возвраты и страховые)
                 </p>
               </div>
@@ -226,9 +233,7 @@ function DashboardPage() {
               {loading ? <Skeleton /> : displayCalls ? (
                 <CardsOverview stats={displayCalls} dateFrom={dateFrom} dateTo={dateTo} />
               ) : (
-                <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                  Нет данных за выбранный период
-                </div>
+                <EmptyState>Нет данных за выбранный период</EmptyState>
               )}
               {!loading && hourly && (
                 <HourlyChart data={hourly.slots} interval={interval} onIntervalChange={setIntervalVal} />
@@ -264,9 +269,7 @@ function DashboardPage() {
                   dateTo={dateTo}
                 />
               ) : (
-                <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                  Нет данных за выбранный период
-                </div>
+                <EmptyState>Нет данных за выбранный период</EmptyState>
               )}
               {!loading && apptDaily && apptDaily.days.length > 0 && (
                 <AppointmentsDailyChart data={apptDaily.days} />
@@ -276,6 +279,7 @@ function DashboardPage() {
               )}
             </>
           )}
+          </div>
         </main>
       </div>
     </div>

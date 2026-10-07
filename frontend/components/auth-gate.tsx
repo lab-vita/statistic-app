@@ -9,6 +9,8 @@ import {
   getToken,
 } from "@/lib/auth";
 import { canWith, sectionAllowed, type Section } from "@/lib/permissions";
+import { Button } from "@/components/ui/button";
+import { Activity, ShieldAlert, WifiOff } from "lucide-react";
 
 interface AuthValue {
   user: Me;
@@ -31,12 +33,39 @@ type State =
   | { kind: "error" }
   | { kind: "ok"; me: Me };
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function AuthCard({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  children?: React.ReactNode;
+}) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="max-w-md rounded-xl border bg-card p-8 text-center shadow-sm">
-        <h2 className="mb-2 text-lg font-semibold">{title}</h2>
-        <div className="text-sm text-muted-foreground">{children}</div>
+      <div className="flex w-full max-w-sm flex-col items-center rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+        {/* Brand */}
+        <div className="mb-6 flex items-center gap-2.5">
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-background">
+            <Activity className="h-4.5 w-4.5" strokeWidth={2.5} />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+          </div>
+          <span className="text-[15px] font-semibold tracking-tight">Пульс</span>
+        </div>
+
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          {icon}
+        </div>
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        {description && (
+          <p className="mt-1.5 max-w-[280px] text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        )}
+        {children && <div className="mt-5 w-full">{children}</div>}
       </div>
     </div>
   );
@@ -49,7 +78,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<State>({ kind: "checking" });
-  const [attempt, setAttempt] = useState(0);   // «Повторить» увеличивает счётчик и запускает проверку заново
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +94,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         const me = await fetchMe();
         if (!cancelled) setState({ kind: "ok", me });
       } catch {
-        // 401 → authFetch уже стёр токен и сообщил интерфейсу; иначе — сбой сети/сервера
         if (!cancelled) setState(getToken() || AUTH_DISABLED ? { kind: "error" } : { kind: "denied" });
       }
     })();
@@ -79,7 +107,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   const retry = () => {
     setState({ kind: "checking" });
-    setAttempt(a => a + 1);
+    setAttempt((a) => a + 1);
   };
 
   const value = useMemo<AuthValue | null>(() => {
@@ -92,28 +120,40 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [state]);
 
-  if (state.kind === "checking") return null;
+  if (state.kind === "checking") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
+          <span className="text-xs text-muted-foreground">Загрузка…</span>
+        </div>
+      </div>
+    );
+  }
+
   if (state.kind === "denied") {
     return (
-      <Card title="Доступ ограничен">
-        Это приложение доступно только внутри портала Битрикс24.
-        <br />
-        Откройте его через левое меню.
-      </Card>
+      <AuthCard
+        icon={<ShieldAlert className="h-6 w-6" />}
+        title="Доступ ограничен"
+        description="«Пульс» доступен только внутри портала Битрикс24. Откройте его через левое меню."
+      />
     );
   }
+
   if (state.kind === "error") {
     return (
-      <Card title="Не удалось проверить доступ">
-        <p className="mb-4">Проверьте соединение и попробуйте ещё раз.</p>
-        <button
-          onClick={retry}
-          className="rounded-lg bg-foreground px-4 py-2 text-xs font-medium text-background"
-        >
+      <AuthCard
+        icon={<WifiOff className="h-6 w-6" />}
+        title="Не удалось проверить доступ"
+        description="Проверьте соединение и попробуйте ещё раз."
+      >
+        <Button onClick={retry} className="w-full">
           Повторить
-        </button>
-      </Card>
+        </Button>
+      </AuthCard>
     );
   }
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

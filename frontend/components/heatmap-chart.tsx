@@ -2,6 +2,7 @@
 
 import { HeatmapCell } from "@/lib/api";
 import { useTheme } from "next-themes";
+import { Card } from "@/components/ui/card";
 
 interface HeatmapChartProps {
   cells: HeatmapCell[];
@@ -53,9 +54,9 @@ export function HeatmapChart({ cells }: HeatmapChartProps) {
   const CELL_H = 26;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Тепловая карта нагрузки</h3>
+        <h3 className="text-sm font-semibold tracking-tight">Тепловая карта нагрузки</h3>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Меньше</span>
           <div className="flex gap-0.5">
@@ -131,6 +132,6 @@ export function HeatmapChart({ cells }: HeatmapChartProps) {
           ))}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

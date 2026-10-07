@@ -6,7 +6,9 @@ import {
   AdminAppointmentStats, GroupBreakdownItem,
   fetchPlanRange, PlanRangeResponse,
 } from "@/lib/api";
-import { CalendarCheck, CalendarX, UserPlus, Phone, Users } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { CalendarCheck, CalendarX, UserPlus, Users } from "lucide-react";
 
 interface AppointmentCardsProps {
   stats:    AdminAppointmentStats;
@@ -36,9 +38,9 @@ export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: Appoin
   const hasGroups = Object.keys(byGroup).length > 0;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Основные карточки */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Всего записей" value={s.total} sub="за период"
           icon={<CalendarCheck className="h-4 w-4 text-blue-500" />}
@@ -62,7 +64,7 @@ export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: Appoin
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Отмены" value={s.cancels} sub="отменено пациентами"
           icon={<CalendarX className="h-4 w-4 text-muted-foreground" />}
@@ -75,14 +77,15 @@ export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: Appoin
 
       {/* Разбивка по источникам записей */}
       {hasGroups && (
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Источники записей</span>
-            <span className="text-xs text-muted-foreground ml-auto">всего {s.total}</span>
-          </div>
-
-          <div className="space-y-3">
+        <Card>
+          <CardHeader className="border-b">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle>Источники записей</CardTitle>
+              <span className="text-xs text-muted-foreground ml-auto">всего {s.total}</span>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-3">
             {GROUP_ORDER.map(group => {
               const item = byGroup[group];
               if (!item) return null;
@@ -90,16 +93,17 @@ export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: Appoin
               return (
                 <div key={group}>
                   <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${colors.bg} ${colors.text}`}>
-                        {item.label}
-                      </span>
-                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`border-transparent ${colors.bg} ${colors.text}`}
+                    >
+                      {item.label}
+                    </Badge>
                     <div className="flex items-center gap-3">
                       <span className={`text-sm font-semibold font-mono ${colors.text}`}>
                         {item.count}
                       </span>
-                      <span className="text-xs text-muted-foreground w-10 text-right">
+                      <span className="text-xs text-muted-foreground w-10 text-right tabular-nums">
                         {item.pct}%
                       </span>
                     </div>
@@ -113,8 +117,8 @@ export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: Appoin
                 </div>
               );
             })}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

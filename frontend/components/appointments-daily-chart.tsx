@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import { AppointmentDailyItem } from "@/lib/api";
 import { useTheme } from "next-themes";
+import { Card } from "@/components/ui/card";
 
 interface AppointmentsDailyChartProps {
   data: AppointmentDailyItem[];
@@ -44,9 +45,9 @@ export function AppointmentsDailyChart({ data }: AppointmentsDailyChartProps) {
   const tickInterval = data.length > 30 ? 6 : data.length > 14 ? 2 : 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Динамика записей по дням</h3>
+        <h3 className="text-sm font-semibold tracking-tight">Динамика записей по дням</h3>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-sm bg-blue-500" />Записей
@@ -77,6 +78,6 @@ export function AppointmentsDailyChart({ data }: AppointmentsDailyChartProps) {
             stroke="#a855f7" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
         </ComposedChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

@@ -57,27 +57,29 @@ export function WidgetCatalog({ onAdd, onClose }: WidgetCatalogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-background border border-border rounded-3xl w-full max-w-4xl max-h-[85vh]
-        flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
 
         {/* Шапка */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-5">
           <div>
             {configuring ? (
               <>
-                <h2 className="text-base font-semibold">Настройка виджета</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Выберите метрику для отображения</p>
+                <h2 className="text-base font-semibold tracking-tight">Настройка виджета</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Выберите метрику для отображения</p>
               </>
             ) : (
               <>
-                <h2 className="text-base font-semibold">Добавить виджет</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Выберите виджет и добавьте его на главный экран</p>
+                <h2 className="text-base font-semibold tracking-tight">Добавить виджет</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Выберите виджет и добавьте его на главный экран</p>
               </>
             )}
           </div>
-          <button onClick={onClose}
-            className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center hover:bg-muted/70 transition-colors">
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted transition-colors hover:bg-accent"
+            aria-label="Закрыть"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
