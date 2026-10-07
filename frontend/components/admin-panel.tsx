@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-gate";
 import {
   adminApi,
@@ -222,16 +222,22 @@ export function AdminPanel() {
   const [newRole, setNewRole] = useState("viewer");
   const [adding, setAdding] = useState(false);
 
-  const reload = useCallback(async () => {
-    try {
-      const [m, u, r] = await Promise.all([adminApi.meta(), adminApi.users(), adminApi.requests()]);
-      setMeta(m); setUsers(u.users); setRequests(r.requests); setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось загрузить данные");
-    }
-  }, []);
+  const [reloadKey, setReloadKey] = useState(0);   // любое действие увеличивает счётчик и перечитывает данные
+  const reload = () => setReloadKey(k => k + 1);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [m, u, r] = await Promise.all([adminApi.meta(), adminApi.users(), adminApi.requests()]);
+        if (cancelled) return;
+        setMeta(m); setUsers(u.users); setRequests(r.requests); setError(null);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Не удалось загрузить данные");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [reloadKey]);
 
   if (!meta) {
     return error

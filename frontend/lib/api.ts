@@ -100,6 +100,8 @@ export interface DailyItem {
   received: number;
   /** Доля пропущенных среди поступивших, %. */
   missed_pct: number;
+  /** Потеряно за день: пропущенные, по которым клиент так и не был обслужен. */
+  lost:     number;
   total:    number;
 }
 

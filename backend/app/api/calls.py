@@ -11,6 +11,9 @@ from app.services.collector import collect_calls
 from app.services.analytics.call_stats import (
     operator_stats_with_deltas,
     conversion_stats,
+    OUTCOME_FAILED,
+    OUTCOME_NONE,
+    calc_callbacks,
     missed_share,
     received_count,
     CONVERSION_OPERATOR_IDS,
@@ -187,14 +190,14 @@ async def get_daily(
     if not date_to:
         date_to = today_local() - timedelta(days=1)
 
-    calls = await _load_calls(db, date_from, date_to)
-    calls = _filter_by_operator(calls, operator_id)
+    # calls — звонки периода, pool — они же + запас вперёд для поиска обратных звонков (как в /stats)
+    calls, pool = await _load_period(db, date_from, date_to, operator_id)
 
     days: dict[str, dict] = {}
     current = date_from
     while current <= date_to:
         days[current.isoformat()] = {
-            "date": current.isoformat(), "incoming": 0, "outgoing": 0, "missed": 0, "total": 0,
+            "date": current.isoformat(), "incoming": 0, "outgoing": 0, "missed": 0, "lost": 0, "total": 0,
         }
         current += timedelta(days=1)
 
@@ -205,6 +208,13 @@ async def get_daily(
             if c.is_incoming: days[d]["incoming"] += 1
             if c.is_outgoing: days[d]["outgoing"] += 1
             if c.is_missed:   days[d]["missed"]   += 1
+
+    # «Потеряно» по дням — тем же расчётом, что и в /stats; день — это день пропущенного звонка
+    for r in calc_callbacks(calls, pool):
+        if r["outcome"] in (OUTCOME_FAILED, OUTCOME_NONE):
+            d = local_date(r["missed"].call_start_date).isoformat()
+            if d in days:
+                days[d]["lost"] += 1
 
     for day in days.values():
         day["received"]   = received_count(day["incoming"], day["missed"])

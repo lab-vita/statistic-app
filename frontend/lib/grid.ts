@@ -14,7 +14,8 @@ export type WidgetTypeId =
   | "calls_trio"        // 2: три показателя
   | "calls_chart"       // 3: цифра + график
   | "calls_funnel"      // 4: судьба звонков (раньше «полная сводка»)
-  | "calls_operators";  // 5: операторы
+  | "calls_plan"        // 5: план и прогноз
+  | "calls_operators";  // 6: операторы: качество
 
 // ─── Определение типа (метаданные для каталога) ──────────────
 
@@ -50,7 +51,7 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     id:          "calls_chart",
     group:       "Звонки",
     name:        "Динамика",
-    description: "Принятые звонки за период с мини-графиком по дням и долей пропущенных. Сразу виден тренд.",
+    description: "Принято, поступило или потеряно по дням: линия этого периода и пунктир прошлого. Сразу виден тренд.",
     defaultW: 6, defaultH: 2, minW: 4, minH: 2, maxW: 12, maxH: 3,
   },
   {
@@ -61,11 +62,18 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     defaultW: 6, defaultH: 3, minW: 5, minH: 3, maxW: 12, maxH: 4,
   },
   {
+    id:          "calls_plan",
+    group:       "Звонки",
+    name:        "План и прогноз",
+    description: "Сколько плана по звонкам выполнено и чем закончится период при текущем темпе. План задаётся в разделе «Планы».",
+    defaultW: 6, defaultH: 2, minW: 4, minH: 2, maxW: 12, maxH: 3,
+  },
+  {
     id:          "calls_operators",
     group:       "Звонки",
-    name:        "Операторы",
-    description: "Рейтинг операторов по количеству звонков с долей и баром.",
-    defaultW: 6, defaultH: 3, minW: 4, minH: 2, maxW: 12, maxH: 4,
+    name:        "Операторы: качество",
+    description: "Принято, пропущено, потеряно, время до перезвона и конверсия по каждому оператору, с цветной оценкой.",
+    defaultW: 8, defaultH: 3, minW: 6, minH: 2, maxW: 12, maxH: 4,
   },
 ];
 

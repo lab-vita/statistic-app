@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { X, Plus, Phone, Check } from "lucide-react";
-import { WIDGET_TYPES, WidgetTypeDef } from "@/lib/grid";
+import { WIDGET_TYPES } from "@/lib/grid";
 import { CALLS_SINGLE_METRICS, CallsSingleMetric } from "@/components/widgets/calls-single";
 import { CallsSinglePreview    } from "@/components/widget-previews";
 import { CallsTrioPreview      } from "@/components/widget-previews";
 import { CallsChartPreview     } from "@/components/widget-previews";
 import { CallsFunnelPreview    } from "@/components/widget-previews";
 import { CallsOperatorsPreview } from "@/components/widget-previews";
+import { CallsPlanPreview      } from "@/components/widget-previews";
 
 const GROUPS = ["Звонки"];
 
@@ -18,6 +19,7 @@ function Preview({ type }: { type: string }) {
     case "calls_trio":      return <CallsTrioPreview />;
     case "calls_chart":     return <CallsChartPreview />;
     case "calls_funnel":    return <CallsFunnelPreview />;
+    case "calls_plan":      return <CallsPlanPreview />;
     case "calls_operators": return <CallsOperatorsPreview />;
     default: return <div className="h-full bg-muted/20 rounded-xl" />;
   }

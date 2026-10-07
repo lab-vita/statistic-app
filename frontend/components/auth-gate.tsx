@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { fetchMe, type Me } from "@/lib/api";
 import {
   AUTH_DISABLED,
@@ -49,31 +49,38 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<State>({ kind: "checking" });
-
-  const load = useCallback(async () => {
-    setState({ kind: "checking" });
-    try {
-      const me = await fetchMe();
-      setState({ kind: "ok", me });
-    } catch {
-      // 401 → authFetch уже стёр токен и сообщил интерфейсу; иначе — сбой сети/сервера
-      setState(getToken() || AUTH_DISABLED ? { kind: "error" } : { kind: "denied" });
-    }
-  }, []);
+  const [attempt, setAttempt] = useState(0);   // «Повторить» увеличивает счётчик и запускает проверку заново
 
   useEffect(() => {
-    if (!AUTH_DISABLED) {
-      captureTokenFromHash();
-      if (!getToken()) {
-        setState({ kind: "denied" });
-        return;
+    let cancelled = false;
+    (async () => {
+      if (!AUTH_DISABLED) {
+        captureTokenFromHash();
+        if (!getToken()) {
+          if (!cancelled) setState({ kind: "denied" });
+          return;
+        }
       }
-    }
-    load();
+      try {
+        const me = await fetchMe();
+        if (!cancelled) setState({ kind: "ok", me });
+      } catch {
+        // 401 → authFetch уже стёр токен и сообщил интерфейсу; иначе — сбой сети/сервера
+        if (!cancelled) setState(getToken() || AUTH_DISABLED ? { kind: "error" } : { kind: "denied" });
+      }
+    })();
     const onLost = () => setState({ kind: "denied" });
     window.addEventListener(AUTH_LOST_EVENT, onLost);
-    return () => window.removeEventListener(AUTH_LOST_EVENT, onLost);
-  }, [load]);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AUTH_LOST_EVENT, onLost);
+    };
+  }, [attempt]);
+
+  const retry = () => {
+    setState({ kind: "checking" });
+    setAttempt(a => a + 1);
+  };
 
   const value = useMemo<AuthValue | null>(() => {
     if (state.kind !== "ok") return null;
@@ -100,7 +107,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       <Card title="Не удалось проверить доступ">
         <p className="mb-4">Проверьте соединение и попробуйте ещё раз.</p>
         <button
-          onClick={load}
+          onClick={retry}
           className="rounded-lg bg-foreground px-4 py-2 text-xs font-medium text-background"
         >
           Повторить

@@ -16,15 +16,16 @@ import { CallsTrioWidget      } from "@/components/widgets/calls-trio";
 import { CallsChartWidget     } from "@/components/widgets/calls-chart";
 import { CallsFunnelWidget    } from "@/components/widgets/calls-funnel";
 import { CallsOperatorsWidget } from "@/components/widgets/calls-operators";
+import { CallsPlanWidget      } from "@/components/widgets/calls-plan";
 import {
-  fetchStats, fetchDaily, fetchConversion, toDateStr, addDays,
-  StatsResponse, DailyResponse,
+  fetchStats, fetchDaily, fetchConversion, fetchPlanRange, toDateStr, addDays,
 } from "@/lib/api";
-import { conversionValue } from "@/lib/call-metrics";
+import { loadHomeData, emptyHomeData, type HomeData } from "@/lib/home-data";
+import type { ChartMetric } from "@/components/widgets/calls-chart";
+import type { PlanMetric } from "@/lib/plan-forecast";
 import { Plus, Settings2, ChevronLeft, ChevronRight, GripVertical, X } from "lucide-react";
 import { Section } from "@/components/sidebar";
 import { CallsSingleMetric } from "@/components/widgets/calls-single";
-import type { ConversionValue } from "@/lib/call-metrics";
 
 // ─ Period ───────────────────────────────────────────────────────
 type PeriodType = "day" | "week" | "month";
@@ -51,33 +52,35 @@ function getPeriod(type: PeriodType, offset: number) {
 }
 
 // ─ Widget content ────────────────────────────────────────────────
-function WidgetContent({ pw, statsData, dailyData, conversion, loading }: {
-  pw: PlacedWidget; statsData: StatsResponse|null;
-  dailyData: DailyResponse|null; conversion: ConversionValue|null; loading: boolean;
+function WidgetContent({ pw, data, loading }: {
+  pw: PlacedWidget; data: HomeData; loading: boolean;
 }) {
-  const total = statsData?.operators["total"] ?? null;
+  const total = data.stats?.operators["total"] ?? null;
   switch (pw.type) {
     case "calls_single":
       return <CallsSingleWidget
-        stats={total}
-        loading={loading}
+        stats={total} loading={loading}
         metric={(pw.config?.metric as CallsSingleMetric) ?? "incoming"}
-        conversion={conversion}
+        conversion={data.conversion}
       />;
     case "calls_trio":
       return <CallsTrioWidget stats={total} loading={loading} />;
     case "calls_chart":
-      return <CallsChartWidget stats={total} daily={dailyData?.days??[]} loading={loading} />;
+      return <CallsChartWidget
+        daily={data.daily?.days ?? []} prevDaily={data.prevDaily?.days ?? null} loading={loading}
+        metric={(pw.config?.metric as ChartMetric) ?? "incoming"}
+      />;
     case "calls_funnel":
       return <CallsFunnelWidget stats={total} loading={loading} />;
+    case "calls_plan":
+      return <CallsPlanWidget
+        days={data.daily?.days ?? []} plan={data.plan} dateFrom={data.dateFrom} dateTo={data.dateTo} loading={loading}
+        metric={(pw.config?.metric as PlanMetric) ?? "calls_incoming"}
+      />;
     case "calls_operators":
-      return <CallsOperatorsWidget operators={statsData?.operators??null} loading={loading} />;
+      return <CallsOperatorsWidget operators={data.stats?.operators ?? null} conversion={data.conversionData} loading={loading} />;
     default:
-      return (
-        <div className="h-full rounded-2xl bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">
-          неизвестный
-        </div>
-      );
+      return null;
   }
 }
 
@@ -168,12 +171,12 @@ function ResizeGhost({ colPx, rowH, x, y, w, h }: {
 
 // ─ Draggable widget ──────────────────────────────────────────────
 function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
-  isDragging, statsData, dailyData, conversion, loading, colPx, rowH }: {
+  isDragging, data, loading, colPx, rowH }: {
   pw: PlacedWidget; editMode: boolean;
   onDelete: (id:string)=>void;
   onResizeStart: (e:React.MouseEvent, pw:PlacedWidget)=>void;
   isDragging: boolean;
-  statsData: StatsResponse|null; dailyData: DailyResponse|null; conversion: ConversionValue|null;
+  data: HomeData;
   loading: boolean; colPx: number; rowH: number;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({
@@ -194,7 +197,7 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
         willChange: "transform",
       }}
     >
-      <WidgetContent pw={pw} statsData={statsData} dailyData={dailyData} conversion={conversion} loading={loading} />
+      <WidgetContent pw={pw} data={data} loading={loading} />
 
       {editMode && (
         <div className="
@@ -268,9 +271,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
   const [offset,     setOffset]     = useState(0);
   const { from:df, to:dt, label }   = getPeriod(periodType, offset);
 
-  const [statsData, setStatsData] = useState<StatsResponse|null>(null);
-  const [dailyData, setDailyData] = useState<DailyResponse|null>(null);
-  const [conversion, setConversion] = useState<ConversionValue|null>(null);
+  const [data, setData] = useState<HomeData>(() => emptyHomeData());
   const [loading,   setLoading]   = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -293,22 +294,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s,d,cv] = await Promise.allSettled([fetchStats(df,dt), fetchDaily(df,dt), fetchConversion(df,dt)]);
-    setStatsData(s.status==="fulfilled" ? s.value : null);
-    setDailyData(d.status==="fulfilled" ? d.value : null);
-
-    // Конверсия: то же число, что на странице «Звонки»; для дельты берём прошлый период из ответа /stats
-    let conv: ConversionValue|null = null;
-    if (cv.status==="fulfilled") {
-      let prevPct: number|null = null;
-      if (s.status==="fulfilled") {
-        try {
-          prevPct = (await fetchConversion(s.value.prev_from, s.value.prev_to)).total.conversion_pct;
-        } catch { /* без дельты */ }
-      }
-      conv = conversionValue(cv.value.total.conversion_pct, prevPct);
-    }
-    setConversion(conv);
+    setData(await loadHomeData(df, dt, { fetchStats, fetchDaily, fetchConversion, fetchPlanRange }));
     setLoading(false);
   }, [df,dt]);
 
@@ -539,7 +525,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
                 onDelete={id=>save(widgets.filter(w=>w.id!==id))}
                 onResizeStart={startResize}
                 isDragging={pw.id===activeId}
-                statsData={statsData} dailyData={dailyData} conversion={conversion} loading={loading}
+                data={data} loading={loading}
                 colPx={colPx} rowH={rowH}
               />
             ))}
@@ -555,7 +541,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
                 }}>
                   <WidgetContent
                     pw={activeWidget}
-                    statsData={statsData} dailyData={dailyData} conversion={conversion} loading={loading}
+                    data={data} loading={loading}
                   />
                 </div>
               )}
