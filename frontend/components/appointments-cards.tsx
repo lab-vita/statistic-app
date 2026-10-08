@@ -7,8 +7,8 @@ import {
   fetchPlanRange, PlanRangeResponse,
 } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { CalendarCheck, CalendarX, UserPlus, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AppointmentCardsProps {
   stats:    AdminAppointmentStats;
@@ -18,11 +18,11 @@ interface AppointmentCardsProps {
 }
 
 const GROUP_ORDER  = ["callcenter", "admin", "other", "unknown"] as const;
-const GROUP_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
-  callcenter: { bar: "bg-blue-500",    text: "text-blue-500",    bg: "bg-blue-500/10"    },
-  admin:      { bar: "bg-emerald-500", text: "text-emerald-500", bg: "bg-emerald-500/10" },
-  other:      { bar: "bg-purple-500",  text: "text-purple-500",  bg: "bg-purple-500/10"  },
-  unknown:    { bar: "bg-muted",       text: "text-muted-foreground", bg: "bg-muted/30"  },
+const GROUP_COLORS: Record<string, { bar: string; text: string; pill: string }> = {
+  callcenter: { bar: "bg-blue-500",    text: "text-blue-600 dark:text-blue-400",    pill: "bg-blue-500/10 text-blue-600 dark:text-blue-400"    },
+  admin:      { bar: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", pill: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  other:      { bar: "bg-violet-500",  text: "text-violet-600 dark:text-violet-400", pill: "bg-violet-500/10 text-violet-600 dark:text-violet-400"  },
+  unknown:    { bar: "bg-border",      text: "text-muted-foreground",               pill: "bg-muted text-muted-foreground"                        },
 };
 
 export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: AppointmentCardsProps) {
@@ -34,85 +34,72 @@ export function AppointmentCards({ stats: s, byGroup, dateFrom, dateTo }: Appoin
 
   const apptPlanTotal = plan?.totals.appt_count ?? 0;
   const apptPlanPct   = apptPlanTotal > 0 ? Math.round(s.total / apptPlanTotal * 100) : null;
-
-  const hasGroups = Object.keys(byGroup).length > 0;
+  const hasGroups     = Object.keys(byGroup).length > 0;
 
   return (
     <div className="space-y-4">
-      {/* Основные карточки */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Всего записей" value={s.total} sub="за период"
-          icon={<CalendarCheck className="h-4 w-4 text-blue-500" />}
+          icon={<CalendarCheck className="h-4 w-4" />}
           planValue={apptPlanTotal}
           planLabel={apptPlanTotal > 0 ? `план ${apptPlanTotal}` : undefined}
           planPct={apptPlanPct}
         />
         <StatCard
           title="Явки" value={s.visits} sub={`${s.visit_pct}% от записей`}
-          accent="green" icon={<CalendarCheck className="h-4 w-4 text-emerald-500" />}
+          accent="green" icon={<CalendarCheck className="h-4 w-4" />}
         />
         <StatCard
           title="Неявки" value={s.noshow} sub={`${s.noshow_pct}% от записей`}
           accent={s.noshow_pct > 10 ? "red" : "yellow"}
-          icon={<CalendarX className="h-4 w-4 text-red-500" />}
+          icon={<CalendarX className="h-4 w-4" />}
         />
         <StatCard
           title="Новые пациенты" value={s.new_patients}
           sub={`${s.total > 0 ? Math.round(s.new_patients / s.total * 100) : 0}% от записей`}
-          accent="purple" icon={<UserPlus className="h-4 w-4 text-purple-500" />}
+          accent="purple" icon={<UserPlus className="h-4 w-4" />}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Отмены" value={s.cancels} sub="отменено пациентами"
-          icon={<CalendarX className="h-4 w-4 text-muted-foreground" />}
+          icon={<CalendarX className="h-4 w-4" />}
         />
         <StatCard
           title="Ожидают" value={s.pending} sub="не подтверждены / одобрены"
-          icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
+          icon={<CalendarCheck className="h-4 w-4" />}
         />
       </div>
 
-      {/* Разбивка по источникам записей */}
       {hasGroups && (
         <Card>
-          <CardHeader className="border-b">
+          <CardHeader className="border-b px-5 py-3.5">
             <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <CardTitle>Источники записей</CardTitle>
-              <span className="text-xs text-muted-foreground ml-auto">всего {s.total}</span>
+              <Users className="h-4 w-4 text-muted-foreground/60" />
+              <CardTitle className="text-sm font-semibold">Источники записей</CardTitle>
+              <span className="ml-auto text-[11px] text-muted-foreground/60">всего {s.total}</span>
             </div>
           </CardHeader>
-          <CardContent className="pt-4 space-y-3">
+          <CardContent className="p-5 space-y-4">
             {GROUP_ORDER.map(group => {
               const item = byGroup[group];
               if (!item) return null;
-              const colors = GROUP_COLORS[group];
+              const c = GROUP_COLORS[group];
               return (
                 <div key={group}>
-                  <div className="flex items-center justify-between mb-1">
-                    <Badge
-                      variant="outline"
-                      className={`border-transparent ${colors.bg} ${colors.text}`}
-                    >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={cn("text-[11px] font-semibold uppercase tracking-widest", c.text)}>
                       {item.label}
-                    </Badge>
+                    </span>
                     <div className="flex items-center gap-3">
-                      <span className={`text-sm font-semibold font-mono ${colors.text}`}>
-                        {item.count}
-                      </span>
-                      <span className="text-xs text-muted-foreground w-10 text-right tabular-nums">
-                        {item.pct}%
-                      </span>
+                      <span className={cn("text-[13px] font-semibold tabular-nums", c.text)}>{item.count}</span>
+                      <span className="text-[11px] text-muted-foreground/60 tabular-nums w-8 text-right">{item.pct}%</span>
                     </div>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${colors.bar}`}
-                      style={{ width: `${item.pct}%` }}
-                    />
+                  <div className="h-1 w-full rounded-full bg-border overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all duration-500", c.bar)} style={{ width: `${item.pct}%` }} />
                   </div>
                 </div>
               );

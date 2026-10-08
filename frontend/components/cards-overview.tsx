@@ -19,28 +19,20 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
     fetchPlanRange(dateFrom, dateTo).then(setPlan).catch(() => {});
   }, [dateFrom, dateTo]);
 
-  // Доля пропущенных = пропущено ÷ поступило (принятые + пропущенные). Считает сервер.
-  const missedPct = s.missed_pct;
-
-  // % выполнения плана
   const incomingPlanTotal = plan?.totals.calls_incoming ?? 0;
   const outgoingPlanTotal = plan?.totals.calls_outgoing ?? 0;
   const missedPlanPct     = plan?.fixed.calls_missed_pct ?? 6;
 
-  const incomingPlanPct = incomingPlanTotal > 0 ? Math.round(s.incoming / incomingPlanTotal * 100) : null;
-  const outgoingPlanPct = outgoingPlanTotal > 0 ? Math.round(s.outgoing / outgoingPlanTotal * 100) : null;
-  // Для пропущенных: факт% <= план% — хорошо
-  const missedFactPct   = s.missed_pct;
-  const missedPlanPctVal = missedFactPct > 0
-    ? Math.round(missedFactPct / missedPlanPct * 100)
-    : 0;
+  const incomingPlanPct  = incomingPlanTotal > 0 ? Math.round(s.incoming / incomingPlanTotal * 100) : null;
+  const outgoingPlanPct  = outgoingPlanTotal > 0 ? Math.round(s.outgoing / outgoingPlanTotal * 100) : null;
+  const missedPlanPctVal = s.missed_pct > 0 ? Math.round(s.missed_pct / missedPlanPct * 100) : 0;
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Принятые" value={s.incoming} sub={`из ${s.received.toLocaleString("ru-RU")} поступивших`}
-          accent="green" icon={<PhoneIncoming className="h-4 w-4 text-emerald-500" />}
+          accent="green" icon={<PhoneIncoming className="h-4 w-4" />}
           deltaPct={s.incoming_delta_pct} deltaDir={s.incoming_delta_dir}
           planValue={incomingPlanTotal}
           planLabel={incomingPlanTotal > 0 ? `план ${incomingPlanTotal}` : undefined}
@@ -48,15 +40,15 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
         />
         <StatCard
           title="Исходящие" value={s.outgoing} sub="совершённые звонки"
-          accent="blue" icon={<PhoneOutgoing className="h-4 w-4 text-blue-500" />}
+          accent="blue" icon={<PhoneOutgoing className="h-4 w-4" />}
           deltaPct={s.outgoing_delta_pct} deltaDir={s.outgoing_delta_dir}
           planValue={outgoingPlanTotal}
           planLabel={outgoingPlanTotal > 0 ? `план ${outgoingPlanTotal}` : undefined}
           planPct={outgoingPlanPct}
         />
         <StatCard
-          title="Пропущенные" value={s.missed} sub={`${formatPct(missedPct)} от поступивших`}
-          accent="red" icon={<PhoneMissed className="h-4 w-4 text-red-500" />}
+          title="Пропущенные" value={s.missed} sub={`${formatPct(s.missed_pct)} от поступивших`}
+          accent="red" icon={<PhoneMissed className="h-4 w-4" />}
           deltaPct={s.missed_delta_pct} deltaDir={s.missed_delta_dir}
           deltaInvert
           planValue={missedPlanPct}
@@ -66,24 +58,24 @@ export function CardsOverview({ stats: s, dateFrom, dateTo }: CardsOverviewProps
         />
         <StatCard
           title="Ср. разговор" value={formatDuration(s.avg_duration)} sub="успешные звонки"
-          icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+          icon={<Clock className="h-4 w-4" />}
           deltaPct={s.avg_duration_delta_pct} deltaDir={s.avg_duration_delta_dir}
         />
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Ср. ожидание" value={formatDuration(s.avg_wait_time)} sub="клиент ждал до сброса"
-          accent="yellow" icon={<Timer className="h-4 w-4 text-yellow-500" />}
+          accent="yellow" icon={<Timer className="h-4 w-4" />}
         />
         <StatCard
           title="Перезвонили" value={`${s.callback_count} / ${s.missed_total}`}
           sub={`${s.callback_pct}% пропущенных`}
-          accent="green" icon={<PhoneCall className="h-4 w-4 text-emerald-500" />}
+          accent="green" icon={<PhoneCall className="h-4 w-4" />}
           deltaPct={s.callback_pct_delta_pct} deltaDir={s.callback_pct_delta_dir}
         />
         <StatCard
           title="Ср. реакция" value={formatDuration(s.avg_reaction_sec)} sub="до перезвона"
-          accent="blue" icon={<Zap className="h-4 w-4 text-blue-500" />}
+          accent="blue" icon={<Zap className="h-4 w-4" />}
         />
       </div>
     </div>

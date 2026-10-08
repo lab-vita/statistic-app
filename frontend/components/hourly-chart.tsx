@@ -1,91 +1,87 @@
 "use client";
 
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card } from "@/components/ui/card";
 import { SlotItem } from "@/lib/api";
 import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 
 export const INTERVALS = [
-  { value: 1,   label: "1 мин"  },
-  { value: 5,   label: "5 мин"  },
-  { value: 10,  label: "10 мин" },
-  { value: 15,  label: "15 мин" },
-  { value: 30,  label: "30 мин" },
-  { value: 60,  label: "1 час"  },
-  { value: 120, label: "2 часа" },
+  { value: 1,   label: "1м"   },
+  { value: 5,   label: "5м"   },
+  { value: 10,  label: "10м"  },
+  { value: 15,  label: "15м"  },
+  { value: 30,  label: "30м"  },
+  { value: 60,  label: "1ч"   },
+  { value: 120, label: "2ч"   },
 ];
 
-// Минимальная ширина одного столбца (группы баров) в пикселях
 const BAR_GROUP_MIN_WIDTH = 36;
 
 interface HourlyChartProps {
-  data: SlotItem[];
-  interval: number;
+  data:             SlotItem[];
+  interval:         number;
   onIntervalChange: (v: number) => void;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs shadow-md">
-        <p className="font-mono font-medium mb-1.5">{label}</p>
-        {payload.map((p: any) => (
-          <p key={p.name} className="flex items-center justify-between gap-4">
-            <span style={{ color: p.fill }}>{p.name}</span>
-            <span className="font-mono font-medium">{p.value}</span>
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
+const ChartTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-[12px] shadow-md space-y-1">
+      <p className="font-medium tabular-nums mb-1.5">{label}</p>
+      {payload.map((p: any) => (
+        <div key={p.name} className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="h-2 w-2 rounded-sm shrink-0" style={{ background: p.fill }} />
+            {p.name}
+          </span>
+          <span className="font-medium tabular-nums">{p.value}</span>
+        </div>
+      ))}
+    </div>
+  );
 };
 
+const LEGEND = [
+  { label: "Принятые",    color: "bg-emerald-500" },
+  { label: "Исходящие",   color: "bg-blue-500"    },
+  { label: "Пропущенные", color: "bg-red-500"     },
+];
+
 export function HourlyChart({ data, interval, onIntervalChange }: HourlyChartProps) {
-  const { theme } = useTheme();
-  const isDark    = theme === "dark";
-  const gridColor = isDark ? "#ffffff10" : "#00000010";
-  const axisColor = isDark ? "#666" : "#999";
+  const { resolvedTheme } = useTheme();
+  const isDark    = resolvedTheme === "dark";
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+  const axisColor = isDark ? "#555" : "#aaa";
 
-  // Вычисляем нужную ширину графика
-  const minChartWidth = Math.max(data.length * BAR_GROUP_MIN_WIDTH, 500);
-
-  // Прореживаем подписи по оси X чтобы не перекрывались
-  const tickInterval = interval <= 5 ? 11 : interval <= 15 ? 3 : interval <= 30 ? 1 : 0;
+  const minChartWidth  = Math.max(data.length * BAR_GROUP_MIN_WIDTH, 500);
+  const tickInterval   = interval <= 5 ? 11 : interval <= 15 ? 3 : interval <= 30 ? 1 : 0;
 
   return (
     <Card className="p-5">
-      {/* Шапка */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-semibold tracking-tight">Распределение по времени</h3>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-emerald-500" />Принятые
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-blue-500" />Исходящие
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-red-500" />Пропущенные
-            </span>
+          <h3 className="text-[13px] font-semibold tracking-tight">Распределение по времени</h3>
+          <div className="hidden items-center gap-3 sm:flex">
+            {LEGEND.map(({ label, color }) => (
+              <span key={label} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className={`h-2 w-2 rounded-sm ${color}`} />{label}
+              </span>
+            ))}
           </div>
         </div>
 
-        {/* Селектор интервала */}
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
+        <div className="inline-flex items-center rounded-lg border border-border bg-background p-0.5">
           {INTERVALS.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => onIntervalChange(value)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={cn(
+                "rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-150",
                 interval === value
-                  ? "bg-card ring-1 ring-border text-foreground shadow-sm"
+                  ? "bg-foreground text-background"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+              )}
             >
               {label}
             </button>
@@ -93,26 +89,14 @@ export function HourlyChart({ data, interval, onIntervalChange }: HourlyChartPro
         </div>
       </div>
 
-      {/* Скроллируемый контейнер */}
       <div className="overflow-x-auto">
         <div style={{ minWidth: `${minChartWidth}px`, height: "240px" }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 0, right: 8, left: -20, bottom: 0 }}
-              barGap={2}
-              barCategoryGap="30%"
-            >
+            <BarChart data={data} margin={{ top: 0, right: 8, left: -20, bottom: 0 }} barGap={2} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-              <XAxis
-                dataKey="time"
-                tick={{ fontSize: 10, fill: axisColor }}
-                axisLine={false}
-                tickLine={false}
-                interval={tickInterval}
-              />
+              <XAxis dataKey="time" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} interval={tickInterval} />
               <YAxis tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: isDark ? "#ffffff08" : "#00000008" }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" }} />
               <Bar dataKey="incoming" name="Принятые"    fill="#22c55e" radius={[3,3,0,0]} maxBarSize={18} />
               <Bar dataKey="outgoing" name="Исходящие"   fill="#3b82f6" radius={[3,3,0,0]} maxBarSize={18} />
               <Bar dataKey="missed"   name="Пропущенные" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={18} />

@@ -7,11 +7,12 @@ import {
 import { ComparisonSeries, ComparisonMetric, OPERATOR_COLORS } from "@/lib/api";
 import { useTheme } from "next-themes";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ComparisonChartProps {
-  series: ComparisonSeries[];
-  dates: string[];
-  metric: ComparisonMetric;
+  series:         ComparisonSeries[];
+  dates:          string[];
+  metric:         ComparisonMetric;
   onMetricChange: (m: ComparisonMetric) => void;
 }
 
@@ -22,38 +23,36 @@ const METRICS: { value: ComparisonMetric; label: string }[] = [
   { value: "missed",   label: "Пропущенные" },
 ];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const date = new Date(label).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
   return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs shadow-md space-y-1">
-      <p className="font-medium text-foreground mb-1">{date}</p>
+    <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-[12px] shadow-md space-y-1">
+      <p className="font-medium mb-1.5">{date}</p>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.color }} />
             {p.name}
           </span>
-          <span className="font-mono font-medium">{p.value}</span>
+          <span className="font-medium tabular-nums">{p.value}</span>
         </div>
       ))}
     </div>
   );
 };
 
-// Сокращаем имя оператора для легенды
 function shortName(name: string): string {
   const parts = name.split(" ");
   return parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
 }
 
 export function ComparisonChart({ series, dates, metric, onMetricChange }: ComparisonChartProps) {
-  const { theme } = useTheme();
-  const isDark    = theme === "dark";
-  const gridColor = isDark ? "#ffffff10" : "#00000010";
-  const axisColor = isDark ? "#666" : "#999";
+  const { resolvedTheme } = useTheme();
+  const isDark    = resolvedTheme === "dark";
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+  const axisColor = isDark ? "#555" : "#aaa";
 
-  // Готовим данные для recharts: [{date, name1: val, name2: val, ...}]
   const data = dates.map(d => {
     const row: Record<string, any> = { date: d };
     for (const s of series) {
@@ -63,26 +62,24 @@ export function ComparisonChart({ series, dates, metric, onMetricChange }: Compa
     return row;
   });
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-
-  // Прореживаем подписи если дат много
-  const tickInterval = dates.length > 30 ? 6 : dates.length > 14 ? 2 : 0;
+  const formatDate    = (d: string) => new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  const tickInterval  = dates.length > 30 ? 6 : dates.length > 14 ? 2 : 0;
 
   return (
     <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold tracking-tight">Сравнение операторов</h3>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
+        <h3 className="text-[13px] font-semibold tracking-tight">Сравнение операторов</h3>
+        <div className="inline-flex items-center rounded-lg border border-border bg-background p-0.5">
           {METRICS.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => onMetricChange(value)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={cn(
+                "rounded-md px-3 py-1 text-[12px] font-medium transition-all duration-150",
                 metric === value
-                  ? "bg-card ring-1 ring-border text-foreground shadow-sm"
+                  ? "bg-foreground text-background"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+              )}
             >
               {label}
             </button>
@@ -97,12 +94,11 @@ export function ComparisonChart({ series, dates, metric, onMetricChange }: Compa
             dataKey="date"
             tickFormatter={formatDate}
             tick={{ fontSize: 11, fill: axisColor }}
-            axisLine={false}
-            tickLine={false}
+            axisLine={false} tickLine={false}
             interval={tickInterval}
           />
           <YAxis tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<ChartTooltip />} />
           <Legend
             formatter={(value) => {
               const s = series.find(s => s.operator_id === value);

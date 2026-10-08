@@ -1,92 +1,98 @@
 import { AdminAppointmentStats } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableFooter,
-  TableHead,
-  TableRow,
-  TableCell,
+  Table, TableHeader, TableBody, TableFooter,
+  TableHead, TableRow, TableCell,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface AppointmentsTableProps {
   byAdmin: Record<string, AdminAppointmentStats>;
-  total: AdminAppointmentStats;
+  total:   AdminAppointmentStats;
 }
 
-const GROUP_ORDER = ["callcenter", "admin", "other"] as const;
+const GROUP_ORDER  = ["callcenter", "admin", "other"] as const;
 const GROUP_LABELS: Record<string, string> = {
   callcenter: "Колл-центр",
   admin:      "Администраторы",
   other:      "Прочие",
 };
 
-const headers = [
-  "Сотрудник", "Записей", "Явки", "% явки",
-  "Неявки", "Отмены", "Новые пациенты",
+const HEADERS = [
+  { label: "Сотрудник",       align: "left"  },
+  { label: "Записей",         align: "right" },
+  { label: "Явки",            align: "right" },
+  { label: "% явки",          align: "right" },
+  { label: "Неявки",          align: "right" },
+  { label: "Отмены",          align: "right" },
+  { label: "Новые пациенты",  align: "right" },
 ];
 
-export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
-  const rows = Object.values(byAdmin);
+function VisitPill({ pct }: { pct: number }) {
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
+      pct >= 90 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+      : pct >= 75 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+      : "bg-red-500/10 text-red-600 dark:text-red-400"
+    )}>
+      {pct}%
+    </span>
+  );
+}
 
-  const grouped = GROUP_ORDER.reduce((acc, g) => {
-    acc[g] = rows.filter(r => r.group === g).sort((a, b) => b.total - a.total);
-    return acc;
-  }, {} as Record<string, AdminAppointmentStats[]>);
-
-  const visitBadgeClass = (pct: number) =>
-    pct >= 90
-      ? "border-transparent bg-emerald-500/10 text-emerald-500"
-      : pct >= 75
-        ? "border-transparent bg-yellow-500/10 text-yellow-500"
-        : "border-transparent bg-red-500/10 text-red-500";
-
-  const renderRow = (op: AdminAppointmentStats) => (
-    <TableRow key={op.name}>
-      <TableCell className="px-5 py-3 font-medium whitespace-nowrap">
+function renderRow(op: AdminAppointmentStats) {
+  return (
+    <TableRow key={op.name} className="border-b border-border hover:bg-muted/40 transition-colors">
+      <TableCell className="px-4 py-3 whitespace-nowrap">
         <div className="flex items-center gap-2">
-          {op.name}
+          <span className="text-[13px] font-medium">{op.name}</span>
           {op.group === "other" && op.group_label !== "Прочие" && (
-            <span className="text-[10px] text-muted-foreground font-normal">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
               {op.group_label}
             </span>
           )}
         </div>
       </TableCell>
-      <TableCell className="px-5 py-3 text-right font-mono font-medium">{op.total}</TableCell>
-      <TableCell className="px-5 py-3 text-right font-mono text-emerald-500 font-medium">{op.visits}</TableCell>
-      <TableCell className="px-5 py-3 text-right font-mono">
-        <Badge variant="outline" className={`font-mono font-medium ${visitBadgeClass(op.visit_pct)}`}>
-          {op.visit_pct}%
-        </Badge>
-      </TableCell>
-      <TableCell className="px-5 py-3 text-right font-mono">
+      <TableCell className="px-4 py-3 text-right text-[13px] font-medium tabular-nums">{op.total}</TableCell>
+      <TableCell className="px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{op.visits}</TableCell>
+      <TableCell className="px-4 py-3 text-right"><VisitPill pct={op.visit_pct} /></TableCell>
+      <TableCell className="px-4 py-3 text-right text-[13px] tabular-nums">
         {op.noshow > 0
-          ? <span className="text-red-500">{op.noshow}</span>
-          : <span className="text-muted-foreground">0</span>}
+          ? <span className="text-red-600 dark:text-red-400 font-medium">{op.noshow}</span>
+          : <span className="text-muted-foreground/40">0</span>}
       </TableCell>
-      <TableCell className="px-5 py-3 text-right font-mono text-muted-foreground">{op.cancels}</TableCell>
-      <TableCell className="px-5 py-3 text-right font-mono text-purple-500">{op.new_patients}</TableCell>
+      <TableCell className="px-4 py-3 text-right text-[12px] tabular-nums text-muted-foreground">{op.cancels}</TableCell>
+      <TableCell className="px-4 py-3 text-right text-[12px] tabular-nums text-violet-600 dark:text-violet-400">{op.new_patients}</TableCell>
     </TableRow>
   );
+}
+
+export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
+  const rows = Object.values(byAdmin);
+  const grouped = GROUP_ORDER.reduce((acc, g) => {
+    acc[g] = rows.filter(r => r.group === g).sort((a, b) => b.total - a.total);
+    return acc;
+  }, {} as Record<string, AdminAppointmentStats[]>);
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="border-b">
-        <CardTitle>По сотрудникам</CardTitle>
+      <CardHeader className="border-b px-5 py-3.5">
+        <CardTitle className="text-sm font-semibold">По сотрудникам</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow>
-              {headers.map((h, i) => (
+            <TableRow className="hover:bg-transparent border-b border-border">
+              {HEADERS.map(({ label, align }) => (
                 <TableHead
-                  key={h}
-                  className={`px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap ${i === 0 ? "text-left" : "text-right"}`}
+                  key={label}
+                  className={cn(
+                    "px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap",
+                    align === "right" ? "text-right" : "text-left"
+                  )}
                 >
-                  {h}
+                  {label}
                 </TableHead>
               ))}
             </TableRow>
@@ -97,8 +103,8 @@ export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
               if (!items?.length) return null;
               return (
                 <>
-                  <TableRow key={`group-${group}`} className="bg-muted/20 hover:bg-muted/20">
-                    <TableCell colSpan={7} className="px-5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <TableRow key={`group-${group}`} className="bg-muted/30 hover:bg-muted/30 border-b border-border">
+                    <TableCell colSpan={7} className="px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
                       {GROUP_LABELS[group]}
                     </TableCell>
                   </TableRow>
@@ -107,19 +113,15 @@ export function AppointmentsTable({ byAdmin, total }: AppointmentsTableProps) {
               );
             })}
           </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell className="px-5 py-3.5 font-semibold">Итого</TableCell>
-              <TableCell className="px-5 py-3.5 text-right font-mono font-semibold">{total.total}</TableCell>
-              <TableCell className="px-5 py-3.5 text-right font-mono font-semibold text-emerald-500">{total.visits}</TableCell>
-              <TableCell className="px-5 py-3.5 text-right font-mono">
-                <Badge variant="outline" className={`font-mono font-medium ${visitBadgeClass(total.visit_pct)}`}>
-                  {total.visit_pct}%
-                </Badge>
-              </TableCell>
-              <TableCell className="px-5 py-3.5 text-right font-mono font-semibold text-red-500">{total.noshow}</TableCell>
-              <TableCell className="px-5 py-3.5 text-right font-mono font-semibold text-muted-foreground">{total.cancels}</TableCell>
-              <TableCell className="px-5 py-3.5 text-right font-mono font-semibold text-purple-500">{total.new_patients}</TableCell>
+          <TableFooter className="bg-muted/30">
+            <TableRow className="border-t border-border hover:bg-transparent">
+              <TableCell className="px-4 py-3 text-[12px] font-semibold">Итого</TableCell>
+              <TableCell className="px-4 py-3 text-right text-[13px] font-bold tabular-nums">{total.total}</TableCell>
+              <TableCell className="px-4 py-3 text-right text-[13px] font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{total.visits}</TableCell>
+              <TableCell className="px-4 py-3 text-right"><VisitPill pct={total.visit_pct} /></TableCell>
+              <TableCell className="px-4 py-3 text-right text-[13px] font-semibold tabular-nums text-red-600 dark:text-red-400">{total.noshow}</TableCell>
+              <TableCell className="px-4 py-3 text-right text-[12px] tabular-nums text-muted-foreground">{total.cancels}</TableCell>
+              <TableCell className="px-4 py-3 text-right text-[12px] tabular-nums text-violet-600 dark:text-violet-400">{total.new_patients}</TableCell>
             </TableRow>
           </TableFooter>
         </Table>

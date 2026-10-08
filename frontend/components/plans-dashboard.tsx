@@ -85,7 +85,7 @@ function EditModal({ metric, label, accent, year, month: initMonth, onClose, onS
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-md flex-col rounded-xl border border-border bg-card shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col rounded-lg border border-border bg-card shadow-xl">
 
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h3 className="text-sm font-semibold">{label}</h3>
@@ -217,7 +217,7 @@ function MissedPctModal({ value, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="w-80 space-y-4 rounded-xl border border-border bg-card p-6 shadow-xl">
+      <div className="w-80 space-y-4 rounded-lg border border-border bg-card p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Порог пропущенных</h3>
           <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={onClose} aria-label="Закрыть">
@@ -259,11 +259,11 @@ interface PlanCardProps {
 function PlanCard({ title, icon, accent, value, sub, clickable, onClick }: PlanCardProps) {
   return (
     <div onClick={clickable ? onClick : undefined}
-      className={`flex flex-col gap-1.5 rounded-xl border border-border bg-card p-5 transition-all ${
+      className={`flex flex-col gap-1.5 rounded-lg border border-border bg-card p-5 transition-all ${
         clickable ? "cursor-pointer hover:border-foreground/15 hover:shadow-sm" : ""
       }`}>
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">{title}</span>
         <div className="flex items-center gap-1.5">
           {icon}
           {clickable && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground"><Pencil className="h-3 w-3" /> изменить</span>}
@@ -358,7 +358,7 @@ export function PlansDashboard() {
 
       {/* Звонки */}
       <div className="space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Звонки</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Звонки</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <PlanCard
             title="Входящие" icon={<PhoneIncoming className="h-4 w-4 text-emerald-500" />}
@@ -385,7 +385,7 @@ export function PlansDashboard() {
 
       {/* Записи */}
       <div className="space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Записи</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Записи</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <PlanCard
             title="Записей в день" icon={<CalendarCheck className="h-4 w-4 text-violet-500" />}

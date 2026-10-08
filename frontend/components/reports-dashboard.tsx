@@ -504,7 +504,7 @@ export function ReportsDashboard() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />
+            <div className="h-64 rounded-lg bg-muted/40 animate-pulse" />
           ) : chartData.length === 0 ? (
             <div className="flex h-64 flex-col items-center justify-center gap-2">
               <p className="text-sm text-muted-foreground">Нет данных за выбранный период</p>
