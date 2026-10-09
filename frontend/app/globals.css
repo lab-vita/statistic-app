@@ -5,7 +5,6 @@
 @theme inline {
   --font-sans: var(--font-montserrat);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
 
   --color-background:           var(--background);
   --color-foreground:           var(--foreground);
@@ -25,15 +24,11 @@
   --color-border:               var(--border);
   --color-input:                var(--input);
   --color-ring:                 var(--ring);
-
-  --color-sidebar:                    var(--sidebar);
-  --color-sidebar-foreground:         var(--sidebar-foreground);
-  --color-sidebar-primary:            var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent:             var(--sidebar-accent);
-  --color-sidebar-accent-foreground:  var(--sidebar-accent-foreground);
-  --color-sidebar-border:             var(--sidebar-border);
-  --color-sidebar-ring:               var(--sidebar-ring);
+  --color-sidebar:              var(--sidebar);
+  --color-sidebar-foreground:   var(--sidebar-foreground);
+  --color-sidebar-border:       var(--sidebar-border);
+  --color-sidebar-accent:       var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -41,145 +36,103 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  /* Radius scale */
-  --radius-sm:  calc(var(--radius) * 0.5);
-  --radius-md:  calc(var(--radius) * 0.75);
-  --radius-lg:  var(--radius);
-  --radius-xl:  calc(var(--radius) * 1.5);
-  --radius-2xl: calc(var(--radius) * 2);
-  --radius-3xl: calc(var(--radius) * 2.5);
-  --radius-4xl: calc(var(--radius) * 3);
+  --radius-sm:  calc(var(--radius) - 2px);
+  --radius-md:  var(--radius);
+  --radius-lg:  calc(var(--radius) + 2px);
+  --radius-xl:  calc(var(--radius) + 6px);
 }
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── LIGHT THEME ────────────────────────────────────────────── */
-/* Ориентир: Linear / Vercel / Spark Pixel — нейтральный серый фон,
-   белые карточки, очень тонкие границы, акцент — чёрный + синий  */
+/* ── LIGHT ── */
 :root {
-  /* Страница — тёплый нейтральный серый (не белый) */
-  --background:         oklch(0.965 0.002 240);
-  --foreground:         oklch(0.11 0.010 255);
+  --background:          oklch(0.962 0.002 247);
+  --foreground:          oklch(0.12 0.010 255);
 
-  /* Карточки — чистый белый, контрастируют с фоном */
-  --card:               oklch(1 0 0);
-  --card-foreground:    oklch(0.11 0.010 255);
+  --card:                oklch(1 0 0);
+  --card-foreground:     oklch(0.12 0.010 255);
 
-  /* Поповеры и дропдауны */
-  --popover:            oklch(1 0 0);
-  --popover-foreground: oklch(0.11 0.010 255);
+  --popover:             oklch(1 0 0);
+  --popover-foreground:  oklch(0.12 0.010 255);
 
-  /* Primary — почти чёрный (как в Spark Pixel, Linear) */
-  --primary:            oklch(0.14 0.012 255);
-  --primary-foreground: oklch(0.98 0 0);
+  --primary:             oklch(0.13 0.012 255);
+  --primary-foreground:  oklch(0.98 0 0);
 
-  /* Secondary — очень светлый серый */
-  --secondary:          oklch(0.95 0.003 240);
-  --secondary-foreground: oklch(0.14 0.012 255);
+  --secondary:           oklch(0.95 0.003 247);
+  --secondary-foreground:oklch(0.13 0.012 255);
 
-  /* Muted — для неактивных фонов */
-  --muted:              oklch(0.95 0.003 240);
-  --muted-foreground:   oklch(0.50 0.010 255);
+  --muted:               oklch(0.94 0.003 247);
+  --muted-foreground:    oklch(0.50 0.008 255);
 
-  /* Accent — чуть темнее muted, для hover */
-  --accent:             oklch(0.92 0.004 240);
-  --accent-foreground:  oklch(0.14 0.012 255);
+  --accent:              oklch(0.92 0.004 247);
+  --accent-foreground:   oklch(0.13 0.012 255);
 
-  /* Destructive */
-  --destructive:        oklch(0.577 0.245 27.325);
+  --destructive:         oklch(0.577 0.245 27.325);
 
-  /* Границы — очень тонкие, почти невидимые */
-  --border:             oklch(0.88 0.004 240);
-  --input:              oklch(0.88 0.004 240);
-  --ring:               oklch(0.50 0.010 255);
+  --border:              oklch(0.885 0.004 247);
+  --input:               oklch(0.885 0.004 247);
+  --ring:                oklch(0.50 0.010 255);
 
-  /* Графики */
-  --chart-1:            oklch(0.62 0.17 145);   /* emerald — принятые, визиты */
-  --chart-2:            oklch(0.55 0.20 255);   /* blue — исходящие, нейтраль */
-  --chart-3:            oklch(0.56 0.24 27);    /* red — пропущенные, неявки */
-  --chart-4:            oklch(0.72 0.16 84);    /* amber — предыдущий период */
-  --chart-5:            oklch(0.60 0.19 302);   /* purple — резерв */
+  --chart-1:             oklch(0.62 0.17 145);
+  --chart-2:             oklch(0.55 0.20 255);
+  --chart-3:             oklch(0.56 0.24 27);
+  --chart-4:             oklch(0.72 0.16 84);
+  --chart-5:             oklch(0.60 0.19 302);
 
-  /* Сайдбар — чуть светлее карточки, но темнее background */
-  --sidebar:                    oklch(0.98 0.001 240);
-  --sidebar-foreground:         oklch(0.11 0.010 255);
-  --sidebar-primary:            oklch(0.14 0.012 255);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent:             oklch(0.92 0.004 240);
-  --sidebar-accent-foreground:  oklch(0.14 0.012 255);
-  --sidebar-border:             oklch(0.88 0.004 240);
-  --sidebar-ring:               oklch(0.50 0.010 255);
+  --sidebar:             oklch(0.980 0.001 247);
+  --sidebar-foreground:  oklch(0.12 0.010 255);
+  --sidebar-border:      oklch(0.885 0.004 247);
+  --sidebar-accent:      oklch(0.92 0.004 247);
+  --sidebar-accent-foreground: oklch(0.12 0.010 255);
 
-  /* Базовый радиус — умеренный, не слишком круглый */
   --radius: 0.5rem;
 }
 
-/* ── DARK THEME ─────────────────────────────────────────────── */
+/* ── DARK ── */
 .dark {
-  /* Фон — глубокий нейтральный, не синеватый */
-  --background:         oklch(0.12 0.005 255);
-  --foreground:         oklch(0.94 0.004 255);
+  --background:          oklch(0.115 0.006 255);
+  --foreground:          oklch(0.94 0.004 255);
 
-  /* Карточки — чуть светлее фона */
-  --card:               oklch(0.16 0.006 255);
-  --card-foreground:    oklch(0.94 0.004 255);
+  --card:                oklch(0.155 0.006 255);
+  --card-foreground:     oklch(0.94 0.004 255);
 
-  /* Поповеры */
-  --popover:            oklch(0.18 0.006 255);
-  --popover-foreground: oklch(0.94 0.004 255);
+  --popover:             oklch(0.175 0.007 255);
+  --popover-foreground:  oklch(0.94 0.004 255);
 
-  /* Primary в тёмной — светлый */
-  --primary:            oklch(0.92 0.004 255);
-  --primary-foreground: oklch(0.16 0.006 255);
+  --primary:             oklch(0.93 0.003 255);
+  --primary-foreground:  oklch(0.155 0.006 255);
 
-  /* Secondary */
-  --secondary:          oklch(0.21 0.007 255);
-  --secondary-foreground: oklch(0.94 0.004 255);
+  --secondary:           oklch(0.21 0.007 255);
+  --secondary-foreground:oklch(0.94 0.004 255);
 
-  /* Muted */
-  --muted:              oklch(0.21 0.007 255);
-  --muted-foreground:   oklch(0.55 0.008 255);
+  --muted:               oklch(0.21 0.007 255);
+  --muted-foreground:    oklch(0.54 0.008 255);
 
-  /* Accent */
-  --accent:             oklch(0.24 0.008 255);
-  --accent-foreground:  oklch(0.94 0.004 255);
+  --accent:              oklch(0.24 0.008 255);
+  --accent-foreground:   oklch(0.94 0.004 255);
 
-  /* Destructive */
-  --destructive:        oklch(0.65 0.20 22.216);
+  --destructive:         oklch(0.65 0.20 22);
 
-  /* Границы */
-  --border:             oklch(1 0 0 / 8%);
-  --input:              oklch(1 0 0 / 10%);
-  --ring:               oklch(0.55 0.008 255);
+  --border:              oklch(1 0 0 / 9%);
+  --input:               oklch(1 0 0 / 11%);
+  --ring:                oklch(0.55 0.008 255);
 
-  /* Графики — чуть ярче для тёмного */
-  --chart-1:            oklch(0.68 0.16 145);
-  --chart-2:            oklch(0.62 0.19 255);
-  --chart-3:            oklch(0.63 0.22 27);
-  --chart-4:            oklch(0.76 0.15 84);
-  --chart-5:            oklch(0.66 0.17 302);
+  --chart-1:             oklch(0.68 0.16 145);
+  --chart-2:             oklch(0.62 0.19 255);
+  --chart-3:             oklch(0.63 0.22 27);
+  --chart-4:             oklch(0.76 0.15 84);
+  --chart-5:             oklch(0.66 0.17 302);
 
-  /* Сайдбар */
-  --sidebar:                    oklch(0.145 0.006 255);
-  --sidebar-foreground:         oklch(0.94 0.004 255);
-  --sidebar-primary:            oklch(0.92 0.004 255);
-  --sidebar-primary-foreground: oklch(0.16 0.006 255);
-  --sidebar-accent:             oklch(0.22 0.008 255);
-  --sidebar-accent-foreground:  oklch(0.94 0.004 255);
-  --sidebar-border:             oklch(1 0 0 / 7%);
-  --sidebar-ring:               oklch(0.55 0.008 255);
+  --sidebar:             oklch(0.138 0.006 255);
+  --sidebar-foreground:  oklch(0.94 0.004 255);
+  --sidebar-border:      oklch(1 0 0 / 8%);
+  --sidebar-accent:      oklch(0.22 0.008 255);
+  --sidebar-accent-foreground: oklch(0.94 0.004 255);
 }
 
-/* ── BASE LAYER ─────────────────────────────────────────────── */
+/* ── BASE ── */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  }
+  * { @apply border-border outline-ring/50; }
 
   html {
     @apply font-sans;
@@ -187,48 +140,32 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-sans tracking-tight;
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
   }
 
-  /* Тонкий скроллбар */
-  ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/25;
-  }
-
-  :focus-visible {
-    outline-offset: 2px;
-  }
+  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/30; }
 }
 
-/* ── UTILITIES ───────────────────────────────────────────────── */
+/* ── UTILITIES ── */
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Лёгкий hover на карточках — без тени, только граница */
-  .card-hover {
-    @apply transition-all duration-150 hover:border-foreground/20;
-  }
-
-  /* Числа в метриках */
   .metric-value {
-    @apply text-[28px] font-semibold leading-none tracking-tight tabular-nums;
+    @apply text-[26px] font-semibold leading-none tracking-tight tabular-nums;
   }
-
-  /* Метка карточки (ПРИНЯТЫЕ, ПРОПУЩЕННЫЕ) */
   .metric-label {
-    @apply text-[11px] font-semibold uppercase tracking-widest text-muted-foreground;
+    @apply text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60;
   }
+  .pill-green  { @apply inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400; }
+  .pill-red    { @apply inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400; }
+  .pill-amber  { @apply inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400; }
+  .pill-blue   { @apply inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400; }
+  .pill-muted  { @apply inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground; }
+  .tab-btn     { @apply rounded-md px-3 py-1 text-[12px] font-medium transition-all duration-150; }
+  .tab-btn-active  { @apply bg-foreground text-background; }
+  .tab-btn-idle    { @apply text-muted-foreground hover:text-foreground; }
+  .tab-group   { @apply inline-flex items-center rounded-lg border border-border bg-background p-0.5; }
 }

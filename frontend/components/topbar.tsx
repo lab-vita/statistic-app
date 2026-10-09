@@ -1,237 +1,176 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
+import { ChevronLeft, ChevronRight, RefreshCw, ChevronDown, CalendarDays } from "lucide-react";
 import { Period, PeriodType, shiftPeriod, formatPeriodLabel } from "@/lib/periods";
 import { toDateStr, Operator, Admin } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, RefreshCw, ChevronDown, CalendarDays } from "lucide-react";
-import { Section } from "@/components/sidebar";
-import { useState, useRef, useEffect } from "react";
+import { type Section } from "@/components/sidebar";
+import { cn } from "@/lib/utils";
 
 const PERIODS: { type: PeriodType; label: string }[] = [
-  { type: "day", label: "День" },
-  { type: "week", label: "Неделя" },
-  { type: "month", label: "Месяц" },
+  { type: "day",     label: "День"    },
+  { type: "week",    label: "Неделя"  },
+  { type: "month",   label: "Месяц"   },
   { type: "quarter", label: "Квартал" },
-  { type: "year", label: "Год" },
-  { type: "custom", label: "Период" },
+  { type: "year",    label: "Год"     },
+  { type: "custom",  label: "Период"  },
 ];
 
 const SECTION_LABELS: Record<Section, string> = {
-  home: "Главная",
-  calls: "Звонки",
-  appointments: "Записи",
-  revenue: "Выручка",
-  reports: "Отчёты",
-  plans: "Планы",
-  admin: "Доступ",
+  home: "Главная", calls: "Звонки", appointments: "Записи",
+  revenue: "Выручка", reports: "Отчёты", plans: "Планы", admin: "Доступ",
+};
+
+const GROUP_ORDER  = ["callcenter", "admin", "other"] as const;
+const GROUP_LABELS: Record<string, string> = {
+  callcenter: "Колл-центр", admin: "Администраторы", other: "Прочие",
 };
 
 interface TopbarProps {
-  section: Section;
-  period: Period;
-  onChange: (p: Period) => void;
-  onTypeChange: (t: PeriodType) => void;
-  customFrom?: string;
-  customTo?: string;
-  onCustomFromChange?: (v: string) => void;
-  onCustomToChange?: (v: string) => void;
-  onRefresh: () => void;
-  refreshing: boolean;
-  operators?: Operator[];
-  selectedOperator?: string | null;
-  onSelectOperator?: (id: string | null) => void;
-  admins?: Admin[];
-  selectedAdmin?: string | null;
-  onSelectAdmin?: (surname: string | null) => void;
+  section:              Section;
+  period:               Period;
+  onChange:             (p: Period) => void;
+  onTypeChange:         (t: PeriodType) => void;
+  customFrom?:          string;
+  customTo?:            string;
+  onCustomFromChange?:  (v: string) => void;
+  onCustomToChange?:    (v: string) => void;
+  onRefresh:            () => void;
+  refreshing:           boolean;
+  operators?:           Operator[];
+  selectedOperator?:    string | null;
+  onSelectOperator?:    (id: string | null) => void;
+  admins?:              Admin[];
+  selectedAdmin?:       string | null;
+  onSelectAdmin?:       (s: string | null) => void;
 }
 
-const GROUP_ORDER = ["callcenter", "admin", "other"] as const;
-const GROUP_LABELS: Record<string, string> = {
-  callcenter: "Колл-центр",
-  admin: "Администраторы",
-  other: "Прочие",
-};
+function Dropdown({ trigger, children }: { trigger: React.ReactNode; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  return (
+    <div className="relative" ref={ref}>
+      <div onClick={() => setOpen(v => !v)}>{trigger}</div>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[180px] max-h-64 overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-lg">
+          <div onClick={() => setOpen(false)}>{children}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropItem({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full px-3 py-1.5 text-left text-[12px] transition-colors",
+        active ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DropLabel({ children }: { children: React.ReactNode }) {
+  return <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">{children}</div>;
+}
+
+function DropDivider() {
+  return <div className="mx-2 my-1 h-px bg-border" />;
+}
 
 export function Topbar({
-  section,
-  period,
-  onChange,
-  onTypeChange,
-  customFrom,
-  customTo,
-  onCustomFromChange,
-  onCustomToChange,
-  onRefresh,
-  refreshing,
-  operators = [],
-  selectedOperator,
-  onSelectOperator,
-  admins = [],
-  selectedAdmin,
-  onSelectAdmin,
+  section, period, onChange, onTypeChange,
+  customFrom, customTo, onCustomFromChange, onCustomToChange,
+  onRefresh, refreshing,
+  operators = [], selectedOperator, onSelectOperator,
+  admins = [], selectedAdmin, onSelectAdmin,
 }: TopbarProps) {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const isMaxDate = toDateStr(period.dateTo) >= toDateStr(yesterday);
+  const isMax = toDateStr(period.dateTo) >= toDateStr(yesterday);
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+  const showOpFilter   = section === "calls"        && !!onSelectOperator && operators.length > 0;
+  const showAdmFilter  = section === "appointments" && !!onSelectAdmin    && admins.length > 0;
 
-  const filterLabel = (() => {
-    if (section === "calls") {
-      if (!selectedOperator) return "Все операторы";
-      return operators.find((o) => o.id === selectedOperator)?.name.split(" ")[0] ?? "Все";
-    }
-    if (section === "appointments") {
-      if (!selectedAdmin) return "Все";
-      return selectedAdmin;
-    }
-    return null;
-  })();
-
-  const showFilter =
-    (section === "calls" && onSelectOperator && operators.length > 0) ||
-    (section === "appointments" && onSelectAdmin && admins.length > 0);
+  const filterLabel = showOpFilter
+    ? (selectedOperator ? operators.find(o => o.id === selectedOperator)?.name ?? "Все" : "Все операторы")
+    : showAdmFilter
+    ? (selectedAdmin ?? "Все сотрудники")
+    : null;
 
   const adminsByGroup = GROUP_ORDER.reduce(
-    (acc, g) => {
-      acc[g] = admins.filter((a) => a.group === g);
-      return acc;
-    },
+    (acc, g) => { acc[g] = admins.filter(a => a.group === g); return acc; },
     {} as Record<string, Admin[]>,
   );
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4 lg:px-5">
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 lg:px-5">
+
       {/* Title + filter */}
-      <div className="flex items-center gap-2.5 min-w-0 shrink-0">
-        <h2 className="text-sm font-semibold tracking-tight whitespace-nowrap">
-          {SECTION_LABELS[section]}
-        </h2>
+      <div className="flex items-center gap-2 shrink-0">
+        <h2 className="text-[13px] font-semibold whitespace-nowrap">{SECTION_LABELS[section]}</h2>
 
-        {showFilter && (
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
-            >
-              <span>{filterLabel}</span>
-              <ChevronDown
-                className={`h-3 w-3 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1.5 max-h-80 min-w-[200px] overflow-y-auto rounded-xl border border-border bg-popover py-1.5 shadow-lg">
-                {section === "calls" && onSelectOperator && (
-                  <>
-                    <button
-                      onClick={() => {
-                        onSelectOperator(null);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full px-3.5 py-2 text-left text-xs transition-colors ${
-                        !selectedOperator
-                          ? "bg-accent font-medium text-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                      }`}
-                    >
-                      Все операторы
-                    </button>
-                    <div className="mx-2 my-1 h-px bg-border" />
-                    {operators.map((op) => (
-                      <button
-                        key={op.id}
-                        onClick={() => {
-                          onSelectOperator(op.id);
-                          setDropdownOpen(false);
-                        }}
-                        className={`w-full px-3.5 py-2 text-left text-xs transition-colors ${
-                          selectedOperator === op.id
-                            ? "bg-accent font-medium text-foreground"
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                        }`}
-                      >
-                        {op.name}
-                      </button>
-                    ))}
-                  </>
-                )}
-
-                {section === "appointments" && onSelectAdmin && (
-                  <>
-                    <button
-                      onClick={() => {
-                        onSelectAdmin(null);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full px-3.5 py-2 text-left text-xs transition-colors ${
-                        !selectedAdmin
-                          ? "bg-accent font-medium text-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                      }`}
-                    >
-                      Все сотрудники
-                    </button>
-                    <div className="mx-2 my-1 h-px bg-border" />
-                    {GROUP_ORDER.map((group) => {
-                      const items = adminsByGroup[group];
-                      if (!items?.length) return null;
-                      return (
-                        <div key={group}>
-                          <div className="px-3.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                            {GROUP_LABELS[group]}
-                          </div>
-                          {items.map((admin) => (
-                            <button
-                              key={admin.surname}
-                              onClick={() => {
-                                onSelectAdmin(admin.surname);
-                                setDropdownOpen(false);
-                              }}
-                              className={`w-full px-3.5 py-2 text-left text-xs transition-colors ${
-                                selectedAdmin === admin.surname
-                                  ? "bg-accent font-medium text-foreground"
-                                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                              }`}
-                            >
-                              {admin.surname}
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
-              </div>
+        {(showOpFilter || showAdmFilter) && filterLabel && (
+          <Dropdown
+            trigger={
+              <button className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:border-foreground/20 hover:text-foreground transition-colors">
+                {filterLabel}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            }
+          >
+            {showOpFilter && onSelectOperator && (
+              <>
+                <DropItem active={!selectedOperator} onClick={() => onSelectOperator(null)}>Все операторы</DropItem>
+                <DropDivider />
+                {operators.map(op => (
+                  <DropItem key={op.id} active={selectedOperator === op.id} onClick={() => onSelectOperator(op.id)}>
+                    {op.name}
+                  </DropItem>
+                ))}
+              </>
             )}
-          </div>
+            {showAdmFilter && onSelectAdmin && (
+              <>
+                <DropItem active={!selectedAdmin} onClick={() => onSelectAdmin(null)}>Все сотрудники</DropItem>
+                <DropDivider />
+                {GROUP_ORDER.map(g => {
+                  const items = adminsByGroup[g];
+                  if (!items?.length) return null;
+                  return (
+                    <div key={g}>
+                      <DropLabel>{GROUP_LABELS[g]}</DropLabel>
+                      {items.map(a => (
+                        <DropItem key={a.surname} active={selectedAdmin === a.surname} onClick={() => onSelectAdmin(a.surname)}>
+                          {a.surname}
+                        </DropItem>
+                      ))}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </Dropdown>
         )}
       </div>
 
-      {/* Period selector — centered on desktop, hidden on mobile (shown below) */}
-      <div className="hidden flex-1 justify-center lg:flex">
-        <div className="inline-flex items-center gap-0.5 rounded-xl border border-border bg-muted/30 p-1">
+      {/* Period tabs */}
+      <div className="flex flex-1 justify-center">
+        <div className="tab-group">
           {PERIODS.map(({ type, label }) => (
             <button
               key={type}
               onClick={() => onTypeChange(type)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                period.type === type
-                  ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={cn("tab-btn", period.type === type ? "tab-btn-active" : "tab-btn-idle")}
             >
               {label}
             </button>
@@ -239,91 +178,54 @@ export function Topbar({
         </div>
       </div>
 
-      {/* Mobile period selector */}
-      <div className="flex flex-1 justify-center lg:hidden">
-        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 p-0.5">
-          {PERIODS.slice(0, 4).map(({ type, label }) => (
-            <button
-              key={type}
-              onClick={() => onTypeChange(type)}
-              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
-                period.type === type
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Right — date navigation + refresh */}
-      <div className="flex shrink-0 items-center gap-1.5">
+      {/* Right controls */}
+      <div className="flex shrink-0 items-center gap-1">
         {period.type === "custom" ? (
-          <div className="hidden items-center gap-1.5 sm:flex">
-            <div className="relative">
-              <CalendarDays className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => onCustomFromChange?.(e.target.value)}
-                className="rounded-lg border border-border bg-background py-1.5 pl-7 pr-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
-              />
-            </div>
-            <span className="text-xs text-muted-foreground">—</span>
-            <div className="relative">
-              <CalendarDays className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => onCustomToChange?.(e.target.value)}
-                className="rounded-lg border border-border bg-background py-1.5 pl-7 pr-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
-              />
-            </div>
+          <div className="hidden sm:flex items-center gap-1.5">
+            {[
+              { val: customFrom, onChange: onCustomFromChange },
+              { val: customTo,   onChange: onCustomToChange   },
+            ].map((inp, i) => (
+              <div key={i} className="relative">
+                <CalendarDays className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/50" />
+                <input
+                  type="date" value={inp.val}
+                  onChange={e => inp.onChange?.(e.target.value)}
+                  className="rounded-md border border-border bg-background py-1 pl-7 pr-2 text-[12px] outline-none focus:border-foreground/30 transition-colors"
+                />
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7 shrink-0 rounded-lg"
+          <div className="flex items-center gap-0.5">
+            <button
               onClick={() => onChange(shiftPeriod(period, -1))}
-              aria-label="Предыдущий период"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            <span className="hidden min-w-[110px] text-center text-xs font-medium tabular-nums sm:inline">
+            </button>
+            <span className="hidden sm:inline min-w-[110px] text-center text-[12px] font-medium tabular-nums">
               {formatPeriodLabel(period)}
             </span>
-            <span className="min-w-0 truncate text-center text-[11px] font-medium sm:hidden">
-              {formatPeriodLabel(period)}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7 shrink-0 rounded-lg"
+            <button
               onClick={() => onChange(shiftPeriod(period, 1))}
-              disabled={isMaxDate}
-              aria-label="Следующий период"
+              disabled={isMax}
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40 disabled:pointer-events-none"
             >
               <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
         )}
 
-        <div className="ml-1 h-5 w-px bg-border hidden sm:block" />
+        <div className="hidden sm:block mx-1 h-4 w-px bg-border" />
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 rounded-lg"
+        <button
           onClick={onRefresh}
           disabled={refreshing}
-          aria-label="Обновить данные"
+          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-        </Button>
+          <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+        </button>
       </div>
     </header>
   );
