@@ -34,7 +34,6 @@ import {
 } from "@/lib/api";
 import { Period, PeriodType, getDefaultPeriod } from "@/lib/periods";
 
-/* ── helpers ── */
 const Skeleton = () => (
   <div className="space-y-4">
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -65,13 +64,12 @@ const Empty = ({ text }: { text: string }) => (
   </div>
 );
 
-/* ── main ── */
 function DashboardPage() {
   const { can, canSee } = useAuth();
 
   const [section,       setSection]       = useState<Section>("home");
   const [period,        setPeriod]        = useState<Period>(getDefaultPeriod("day"));
-  const [interval,      setInterval]      = useState(60);
+  const [intervalVal,   setIntervalVal]   = useState(60);
   const [customFrom,    setCustomFrom]    = useState(toDateStr(addDays(new Date(), -7)));
   const [customTo,      setCustomTo]      = useState(toDateStr(addDays(new Date(), -1)));
   const [selectedOp,    setSelectedOp]    = useState<string | null>(null);
@@ -95,10 +93,8 @@ function DashboardPage() {
 
   const dateFrom = period.type === "custom" ? customFrom : toDateStr(period.dateFrom);
   const dateTo   = period.type === "custom" ? customTo   : toDateStr(period.dateTo);
-
   const noTopbar = ["home", "reports", "plans", "revenue", "admin"];
 
-  /* load operators/admins once */
   useEffect(() => {
     if (can("view:calls") || can("view:reports"))
       fetchOperators().then(r => setOperators(r.operators)).catch(() => {});
@@ -112,35 +108,47 @@ function DashboardPage() {
     try {
       if (section === "calls") {
         const isDay = period.type === "day";
-        const base  = [
+
+        const [s, hm] = await Promise.all([
           fetchStats(dateFrom, dateTo, selectedOp ?? undefined),
           fetchHeatmap(dateFrom, dateTo, selectedOp ?? undefined),
-        ];
-        const chart = isDay
-          ? fetchHourly(dateFrom, dateTo, interval, selectedOp ?? undefined)
-          : fetchDaily(dateFrom, dateTo, selectedOp ?? undefined);
-        const comp  = (!isDay && !selectedOp)
-          ? fetchComparison(dateFrom, dateTo, compMetric)
-          : Promise.resolve(null);
+        ]);
+        setStats(s);
+        setHeatmap(hm);
 
-        const [s, hm, ch, cp] = await Promise.all([...base, chart, comp]);
-        setStats(s); setHeatmap(hm);
-        if (isDay)  { setHourly(ch as HourlyResponse); setDaily(null); setComparison(null); }
-        else        { setDaily(ch as DailyResponse); setHourly(null); setComparison(cp); }
+        if (isDay) {
+          const h = await fetchHourly(dateFrom, dateTo, intervalVal, selectedOp ?? undefined);
+          setHourly(h);
+          setDaily(null);
+          setComparison(null);
+        } else {
+          const d = await fetchDaily(dateFrom, dateTo, selectedOp ?? undefined);
+          setDaily(d);
+          setHourly(null);
+
+          if (!selectedOp) {
+            const c = await fetchComparison(dateFrom, dateTo, compMetric);
+            setComparison(c);
+          } else {
+            setComparison(null);
+          }
+        }
       }
+
       if (section === "appointments") {
         const [as_, ad] = await Promise.all([
           fetchAppointmentStats(dateFrom, dateTo, selectedAdmin ?? undefined),
           fetchAppointmentDaily(dateFrom, dateTo, selectedAdmin ?? undefined),
         ]);
-        setApptStats(as_); setApptDaily(ad);
+        setApptStats(as_);
+        setApptDaily(ad);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally {
       setLoading(false);
     }
-  }, [section, dateFrom, dateTo, period.type, interval, selectedOp, selectedAdmin, compMetric]);
+  }, [section, dateFrom, dateTo, period.type, intervalVal, selectedOp, selectedAdmin, compMetric]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -160,24 +168,24 @@ function DashboardPage() {
     setSection(s); setSelectedOp(null); setSelectedAdmin(null); setError(null);
   }
 
-  const callsStats  = selectedOp ? stats?.operators[selectedOp] : stats?.operators["total"];
-  const revFrom     = toDateStr(addDays(new Date(), -30));
-  const revTo       = toDateStr(addDays(new Date(), -1));
+  const callsStats = selectedOp
+    ? stats?.operators[selectedOp] ?? null
+    : stats?.operators["total"] ?? null;
+
+  const revFrom = toDateStr(addDays(new Date(), -30));
+  const revTo   = toDateStr(addDays(new Date(), -1));
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar — desktop left, mobile top */}
       <div className="hidden lg:flex lg:flex-col lg:w-[210px] lg:shrink-0 lg:border-r lg:border-border">
         <Sidebar section={section} onSelectSection={handleSelectSection} />
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {/* Mobile sidebar header */}
         <div className="lg:hidden">
           <Sidebar section={section} onSelectSection={handleSelectSection} />
         </div>
 
-        {/* Topbar for data sections */}
         {!noTopbar.includes(section) && (
           <Topbar
             section={section} period={period}
@@ -190,20 +198,17 @@ function DashboardPage() {
           />
         )}
 
-        {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1400px] px-4 py-6 lg:px-6 space-y-5">
 
             {error && <ErrorBanner msg={error} />}
 
-            {/* ── Главная ── */}
             {section === "home" && (
               can("view:calls")
                 ? <HomeDashboard onNavigate={handleSelectSection} />
                 : <Empty text="Нет доступа к данным. Выберите раздел в меню." />
             )}
 
-            {/* ── Звонки ── */}
             {section === "calls" && canSee("calls") && (
               <>
                 {loading ? <Skeleton /> : callsStats
@@ -211,7 +216,7 @@ function DashboardPage() {
                   : <Empty text="Нет данных за выбранный период" />
                 }
                 {!loading && hourly && (
-                  <HourlyChart data={hourly.slots} interval={interval} onIntervalChange={setInterval} />
+                  <HourlyChart data={hourly.slots} interval={intervalVal} onIntervalChange={setIntervalVal} />
                 )}
                 {!loading && daily && daily.days.length > 0 && (
                   <DailyChart data={daily.days} />
@@ -234,7 +239,6 @@ function DashboardPage() {
               </>
             )}
 
-            {/* ── Записи ── */}
             {section === "appointments" && canSee("appointments") && (
               <>
                 {loading ? <Skeleton /> : apptStats
@@ -250,7 +254,6 @@ function DashboardPage() {
               </>
             )}
 
-            {/* ── Выручка ── */}
             {section === "revenue" && canSee("revenue") && (
               <>
                 <PageHeader
@@ -261,7 +264,6 @@ function DashboardPage() {
               </>
             )}
 
-            {/* ── Отчёты / Планы / Доступ ── */}
             {section === "reports" && canSee("reports") && <ReportsDashboard />}
             {section === "plans"   && canSee("plans")   && <PlansDashboard />}
             {section === "admin"   && canSee("admin")   && <AdminPanel />}
