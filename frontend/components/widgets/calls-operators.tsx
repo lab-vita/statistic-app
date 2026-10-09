@@ -1,60 +1,40 @@
 "use client";
+
 import { Users } from "lucide-react";
 import type { ConversionResponse, OperatorStats } from "@/lib/api";
 import { formatPct, formatReaction } from "@/lib/call-metrics";
-import {
-  STATUS_DOT, STATUS_LABEL, lostStatus, missedStatus, reactionStatus, type Status,
-} from "@/lib/thresholds";
+import { lostStatus, missedStatus, reactionStatus, type Status } from "@/lib/thresholds";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-/** Оператор линии профосмотров: пропущенные для него не оценка качества, светофор не показываем. */
 const PROFOSMOTR_IDS = new Set(["544"]);
-
 const n = (v: number) => v.toLocaleString("ru-RU");
 
-function Dot({ status }: { status: Status | null }) {
-  if (!status) return null;
+const STATUS_PILL: Record<Status, string> = {
+  good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  warn: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  bad:  "bg-red-500/10 text-red-600 dark:text-red-400",
+};
+
+function StatusVal({ value, status, sub }: { value: string; status: Status | null; sub?: string }) {
+  if (!status) return (
+    <span className="text-[12px] tabular-nums text-muted-foreground">{value}{sub && <span className="ml-1 text-muted-foreground/50">{sub}</span>}</span>
+  );
   return (
-    <span
-      role="img" aria-label={STATUS_LABEL[status]} title={STATUS_LABEL[status]}
-      className={`mr-1.5 inline-block h-2 w-2 rounded-full ${STATUS_DOT[status]}`}
-    />
+    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums", STATUS_PILL[status])}>
+      {value}{sub && <span className="ml-1 opacity-60">{sub}</span>}
+    </span>
   );
 }
 
 interface Row { id: string; op: OperatorStats; conversion: number | null; plain: boolean; isTotal: boolean }
 
-function Cells({ row }: { row: Row }) {
-  const { op, conversion, plain } = row;
-  const hasCalls = op.received > 0;
-  const st = (s: Status | null) => (plain || !hasCalls ? null : s);
-  const muted = plain ? "text-white/50" : "";
-  return (
-    <>
-      <td className="px-2 py-2 text-right tabular-nums">{n(op.incoming)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${muted}`}>
-        <Dot status={st(missedStatus(op.missed_pct))} />{n(op.missed)}
-        <span className="ml-1 text-white/50">{formatPct(op.missed_pct)}</span>
-      </td>
-      <td className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${muted}`}>
-        <Dot status={st(lostStatus(op.lost_pct))} />{n(op.lost)}
-        <span className="ml-1 text-white/50">{formatPct(op.lost_pct)}</span>
-      </td>
-      <td className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${muted}`}>
-        <Dot status={plain ? null : reactionStatus(op.avg_reaction_sec)} />{formatReaction(op.avg_reaction_sec)}
-      </td>
-      <td className="px-2 py-2 text-right tabular-nums">{conversion === null ? "—" : formatPct(conversion)}</td>
-    </>
-  );
-}
-
-/**
- * «Операторы: качество работы»: что принято, сколько пропущено и потеряно, как быстро перезванивают,
- * сколько звонков заканчивается записью. Цветная точка — оценка по порогам (см. lib/thresholds.ts).
- */
 export function CallsOperatorsWidget({ operators, conversion, loading }: {
-  operators: Record<string, OperatorStats> | null; conversion: ConversionResponse | null; loading: boolean;
+  operators: Record<string, OperatorStats> | null;
+  conversion: ConversionResponse | null;
+  loading: boolean;
 }) {
-  if (loading) return <div className="h-full rounded-2xl bg-muted/40 animate-pulse" />;
+  if (loading) return <div className="h-full rounded-lg bg-muted/60 animate-pulse" />;
 
   const convOf = (id: string) => {
     const c = conversion?.operators.find(o => o.operator_id === id);
@@ -72,56 +52,121 @@ export function CallsOperatorsWidget({ operators, conversion, loading }: {
     ? { id: "total", op: total, conversion: conversion ? conversion.total.conversion_pct : null, plain: false, isTotal: true }
     : null;
 
+  const HEADERS = ["Оператор", "Принято", "Пропущено", "Потеряно", "До перезвона", "Конверсия"];
+
   return (
-    <div className="relative h-full rounded-2xl overflow-hidden p-4 flex flex-col gap-3 text-white
-      bg-gradient-to-br from-slate-700 to-slate-900">
-      <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10 pointer-events-none" />
-
-      <div className="z-10 flex items-center gap-2">
-        <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center">
-          <Users className="h-3.5 w-3.5 text-white" />
+    <Card className="h-full overflow-hidden flex flex-col">
+      <CardHeader className="border-b px-5 py-3.5 shrink-0">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground/60" />
+          <CardTitle className="text-sm font-semibold">Качество работы операторов</CardTitle>
+          <span className="ml-auto text-[11px] text-muted-foreground/50">точка = показатель в норме</span>
         </div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold">Операторы: качество работы</div>
-          <div className="text-[11px] text-white/55">точка показывает, в норме ли показатель</div>
-        </div>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="z-10 flex-1 flex items-center justify-center text-xs text-white/60">нет данных</div>
-      ) : (
-        <div className="z-10 flex-1 min-h-0 overflow-auto">
-          <table className="w-full text-xs">
+      </CardHeader>
+      <CardContent className="p-0 flex-1 overflow-auto">
+        {rows.length === 0 ? (
+          <div className="flex items-center justify-center py-10 text-[12px] text-muted-foreground/50">
+            Нет данных
+          </div>
+        ) : (
+          <table className="w-full">
             <thead>
-              <tr className="text-[11px] text-white/55">
-                <th scope="col" className="px-2 py-1 text-left font-normal">Оператор</th>
-                <th scope="col" className="px-2 py-1 text-right font-normal">Принято</th>
-                <th scope="col" className="px-2 py-1 text-right font-normal">Пропущено</th>
-                <th scope="col" className="px-2 py-1 text-right font-normal">Потеряно</th>
-                <th scope="col" className="px-2 py-1 text-right font-normal">До перезвона</th>
-                <th scope="col" className="px-2 py-1 text-right font-normal">Конверсия</th>
+              <tr className="border-b border-border">
+                {HEADERS.map((h, i) => (
+                  <th key={h} className={cn(
+                    "px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap",
+                    i === 0 ? "text-left" : "text-right"
+                  )}>
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
-              {rows.map(r => (
-                <tr key={r.id}>
-                  <td className="px-2 py-2 font-medium whitespace-nowrap">
-                    {r.op.name}
-                    {r.plain && <span className="ml-1.5 text-[10px] font-normal text-white/50">профосмотры</span>}
-                  </td>
-                  <Cells row={r} />
-                </tr>
-              ))}
+            <tbody>
+              {rows.map(r => {
+                const { op, plain, isTotal } = r;
+                const hasCalls = op.received > 0;
+                const st = (s: Status | null) => plain || !hasCalls ? null : s;
+                return (
+                  <tr key={r.id} className="border-b border-border hover:bg-muted/40 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-medium">{op.name}</span>
+                        {plain && (
+                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                            профосмотры
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-[13px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {n(op.incoming)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <StatusVal
+                        value={n(op.missed)}
+                        sub={`(${formatPct(op.missed_pct)})`}
+                        status={st(missedStatus(op.missed_pct))}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <StatusVal
+                        value={n(op.lost)}
+                        sub={`(${formatPct(op.lost_pct)})`}
+                        status={st(lostStatus(op.lost_pct))}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <StatusVal
+                        value={formatReaction(op.avg_reaction_sec)}
+                        status={plain ? null : reactionStatus(op.avg_reaction_sec)}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-[12px] tabular-nums text-muted-foreground">
+                        {r.conversion === null ? "—" : formatPct(r.conversion)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
               {totalRow && (
-                <tr className="border-t border-white/25 font-semibold">
-                  <td className="px-2 py-2">Итого</td>
-                  <Cells row={totalRow} />
+                <tr className="bg-muted/30 border-t border-border font-semibold">
+                  <td className="px-4 py-3 text-[12px]">Итого</td>
+                  <td className="px-4 py-3 text-right text-[13px] font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {n(totalRow.op.incoming)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <StatusVal
+                      value={n(totalRow.op.missed)}
+                      sub={`(${formatPct(totalRow.op.missed_pct)})`}
+                      status={missedStatus(totalRow.op.missed_pct)}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <StatusVal
+                      value={n(totalRow.op.lost)}
+                      sub={`(${formatPct(totalRow.op.lost_pct)})`}
+                      status={lostStatus(totalRow.op.lost_pct)}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <StatusVal
+                      value={formatReaction(totalRow.op.avg_reaction_sec)}
+                      status={reactionStatus(totalRow.op.avg_reaction_sec)}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-right text-[12px] tabular-nums text-muted-foreground">
+                    {totalRow.conversion === null ? "—" : formatPct(totalRow.conversion)}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -148,19 +148,19 @@ function DashboardPage() {
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-32 rounded-xl border border-border bg-card animate-pulse" />
+          <div key={i} className="h-32 rounded-lg border border-border bg-muted/50 animate-pulse" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-32 rounded-xl border border-border bg-card animate-pulse" />
+          <div key={i} className="h-32 rounded-lg border border-border bg-muted/50 animate-pulse" />
         ))}
       </div>
     </div>
   );
 
   const EmptyState = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-6 py-12 text-center">
       <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <span className="text-lg">—</span>
       </div>
@@ -201,7 +201,7 @@ function DashboardPage() {
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1280px] space-y-6 px-4 py-6 lg:px-6">
           {error && (
-            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
               {error}
             </div>
           )}

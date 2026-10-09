@@ -1,99 +1,71 @@
 "use client";
-import { Phone, TrendingUp, TrendingDown, Minus } from "lucide-react";
+
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { OperatorStats } from "@/lib/api";
 import { deltaIsGood, formatPct, formatReaction, noDeltaLabel, type ConversionValue } from "@/lib/call-metrics";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export type { ConversionValue };
 
 export type CallsSingleMetric =
-  | "incoming"
-  | "received"
-  | "outgoing"
-  | "missed"
-  | "missed_pct"
-  | "lost"
-  | "lost_pct"
-  | "reaction"
-  | "callback_count"
-  | "callback_pct"
-  | "avg_duration"
-  | "conversion";
+  | "incoming" | "received" | "outgoing" | "missed" | "missed_pct"
+  | "lost" | "lost_pct" | "reaction" | "callback_count" | "callback_pct"
+  | "avg_duration" | "conversion";
 
 export const CALLS_SINGLE_METRICS: {
-  key: CallsSingleMetric;
-  label: string;
-  /** Пояснение под названием: что именно считается. */
-  hint?: string;
+  key:    CallsSingleMetric;
+  label:  string;
+  hint?:  string;
   format: "number" | "percent" | "duration" | "minutes";
 }[] = [
-  { key: "incoming",       label: "Принятые",          hint: "отвеченные входящие",           format: "number"  },
-  { key: "received",       label: "Поступило",         hint: "принятые + пропущенные",        format: "number"  },
-  { key: "outgoing",       label: "Исходящие",                                                format: "number"  },
-  { key: "missed",         label: "Пропущенные",                                              format: "number"  },
-  { key: "missed_pct",     label: "% пропущенных",     hint: "от поступивших звонков",        format: "percent" },
-  { key: "lost",           label: "Потеряно",          hint: "не перезвонили или не дозвонились", format: "number" },
-  { key: "lost_pct",       label: "% потерь",          hint: "потеряно от поступивших",       format: "percent" },
-  { key: "reaction",       label: "До перезвона",      hint: "среднее до первой попытки",     format: "minutes" },
-  { key: "callback_count", label: "Перезвонили",       hint: "из пропущенных, за 24 часа",    format: "number"  },
-  { key: "callback_pct",   label: "% перезвонили",     hint: "от пропущенных",                format: "percent" },
-  { key: "avg_duration",   label: "Ср. длительность",                                         format: "duration"},
-  { key: "conversion",     label: "Конверсия → запись",hint: "записи ÷ принятые, колл-центр", format: "percent" },
+  { key: "incoming",       label: "Принятые",           hint: "отвеченные входящие",            format: "number"   },
+  { key: "received",       label: "Поступило",          hint: "принятые + пропущенные",         format: "number"   },
+  { key: "outgoing",       label: "Исходящие",                                                   format: "number"   },
+  { key: "missed",         label: "Пропущенные",                                                 format: "number"   },
+  { key: "missed_pct",     label: "% пропущенных",      hint: "от поступивших звонков",         format: "percent"  },
+  { key: "lost",           label: "Потеряно",           hint: "не перезвонили или не дозвонились", format: "number" },
+  { key: "lost_pct",       label: "% потерь",           hint: "потеряно от поступивших",        format: "percent"  },
+  { key: "reaction",       label: "До перезвона",       hint: "среднее до первой попытки",      format: "minutes"  },
+  { key: "callback_count", label: "Перезвонили",        hint: "из пропущенных, за 24 часа",     format: "number"   },
+  { key: "callback_pct",   label: "% перезвонили",      hint: "от пропущенных",                 format: "percent"  },
+  { key: "avg_duration",   label: "Ср. длительность",                                            format: "duration" },
+  { key: "conversion",     label: "Конверсия → запись", hint: "записи ÷ принятые, колл-центр",  format: "percent"  },
 ];
 
-/** Метрики, у которых рост — это плохо (цвет изменения переворачивается). */
-const BAD_WHEN_UP = new Set<CallsSingleMetric>(["missed", "missed_pct", "lost", "lost_pct", "reaction"]);
+const BAD_WHEN_UP = new Set<CallsSingleMetric>(["missed","missed_pct","lost","lost_pct","reaction"]);
 
-
-// Цвета градиента по метрике
-const GRADIENT: Record<CallsSingleMetric, string> = {
-  incoming:       "from-blue-600 to-blue-700",
-  received:       "from-cyan-600 to-cyan-700",
-  lost:           "from-rose-600 to-rose-700",
-  lost_pct:       "from-pink-600 to-pink-700",
-  reaction:       "from-orange-500 to-orange-600",
-  outgoing:       "from-violet-600 to-violet-700",
-  missed:         "from-rose-600 to-rose-700",
-  missed_pct:     "from-rose-500 to-red-700",
-  callback_count: "from-teal-600 to-teal-700",
-  callback_pct:   "from-teal-500 to-emerald-700",
-  avg_duration:   "from-amber-500 to-amber-700",
-  conversion:     "from-emerald-600 to-emerald-700",
+const ACCENT: Record<CallsSingleMetric, string> = {
+  incoming:       "text-emerald-600 dark:text-emerald-400",
+  received:       "text-foreground",
+  outgoing:       "text-blue-600 dark:text-blue-400",
+  missed:         "text-red-600 dark:text-red-400",
+  missed_pct:     "text-red-600 dark:text-red-400",
+  lost:           "text-red-600 dark:text-red-400",
+  lost_pct:       "text-red-600 dark:text-red-400",
+  reaction:       "text-amber-600 dark:text-amber-400",
+  callback_count: "text-emerald-600 dark:text-emerald-400",
+  callback_pct:   "text-emerald-600 dark:text-emerald-400",
+  avg_duration:   "text-foreground",
+  conversion:     "text-emerald-600 dark:text-emerald-400",
 };
 
-function getValue(
-  stats: OperatorStats | null,
-  metric: CallsSingleMetric,
-  conversion?: ConversionValue | null,
-): { value: number | null; deltaPct: number | null; deltaDir: string | null } {
+function getValue(stats: OperatorStats | null, metric: CallsSingleMetric, conversion?: ConversionValue | null) {
   if (!stats) return { value: null, deltaPct: null, deltaDir: null };
   switch (metric) {
-    case "incoming":
-      return { value: stats.incoming, deltaPct: stats.incoming_delta_pct, deltaDir: stats.incoming_delta_dir };
-    case "received":
-      return { value: stats.received, deltaPct: stats.received_delta_pct, deltaDir: stats.received_delta_dir };
-    case "outgoing":
-      return { value: stats.outgoing, deltaPct: stats.outgoing_delta_pct, deltaDir: stats.outgoing_delta_dir };
-    case "missed":
-      return { value: stats.missed, deltaPct: stats.missed_delta_pct, deltaDir: stats.missed_delta_dir };
-    case "missed_pct":
-      // доля считается на сервере: пропущено ÷ поступило
-      return { value: stats.missed_pct, deltaPct: stats.missed_pct_delta_pct ?? null, deltaDir: stats.missed_pct_delta_dir ?? null };
-    case "lost":
-      return { value: stats.lost, deltaPct: stats.lost_delta_pct ?? null, deltaDir: stats.lost_delta_dir ?? null };
-    case "lost_pct":
-      return { value: stats.lost_pct, deltaPct: stats.lost_pct_delta_pct ?? null, deltaDir: stats.lost_pct_delta_dir ?? null };
-    case "reaction":
-      return { value: stats.avg_reaction_sec, deltaPct: stats.avg_reaction_sec_delta_pct ?? null, deltaDir: stats.avg_reaction_sec_delta_dir ?? null };
-    case "callback_count":
-      return { value: stats.callback_count, deltaPct: stats.callback_count_delta_pct ?? null, deltaDir: stats.callback_count_delta_dir ?? null };
-    case "callback_pct":
-      return { value: stats.callback_pct, deltaPct: stats.callback_pct_delta_pct ?? null, deltaDir: stats.callback_pct_delta_dir ?? null };
-    case "avg_duration":
-      return { value: stats.avg_duration, deltaPct: stats.avg_duration_delta_pct, deltaDir: stats.avg_duration_delta_dir };
-    case "conversion":
-      return conversion ?? { value: null, deltaPct: null, deltaDir: null };
-    default:
-      return { value: null, deltaPct: null, deltaDir: null };
+    case "incoming":       return { value: stats.incoming,        deltaPct: stats.incoming_delta_pct,        deltaDir: stats.incoming_delta_dir };
+    case "received":       return { value: stats.received,        deltaPct: stats.received_delta_pct,        deltaDir: stats.received_delta_dir };
+    case "outgoing":       return { value: stats.outgoing,        deltaPct: stats.outgoing_delta_pct,        deltaDir: stats.outgoing_delta_dir };
+    case "missed":         return { value: stats.missed,          deltaPct: stats.missed_delta_pct,          deltaDir: stats.missed_delta_dir };
+    case "missed_pct":     return { value: stats.missed_pct,      deltaPct: stats.missed_pct_delta_pct ?? null, deltaDir: stats.missed_pct_delta_dir ?? null };
+    case "lost":           return { value: stats.lost,            deltaPct: stats.lost_delta_pct ?? null,    deltaDir: stats.lost_delta_dir ?? null };
+    case "lost_pct":       return { value: stats.lost_pct,        deltaPct: stats.lost_pct_delta_pct ?? null, deltaDir: stats.lost_pct_delta_dir ?? null };
+    case "reaction":       return { value: stats.avg_reaction_sec,deltaPct: stats.avg_reaction_sec_delta_pct ?? null, deltaDir: stats.avg_reaction_sec_delta_dir ?? null };
+    case "callback_count": return { value: stats.callback_count,  deltaPct: stats.callback_count_delta_pct ?? null, deltaDir: stats.callback_count_delta_dir ?? null };
+    case "callback_pct":   return { value: stats.callback_pct,    deltaPct: stats.callback_pct_delta_pct ?? null, deltaDir: stats.callback_pct_delta_dir ?? null };
+    case "avg_duration":   return { value: stats.avg_duration,    deltaPct: stats.avg_duration_delta_pct,   deltaDir: stats.avg_duration_delta_dir };
+    case "conversion":     return conversion ?? { value: null, deltaPct: null, deltaDir: null };
+    default:               return { value: null, deltaPct: null, deltaDir: null };
   }
 }
 
@@ -101,65 +73,60 @@ function formatValue(value: number, format: "number" | "percent" | "duration" | 
   if (format === "percent")  return formatPct(value);
   if (format === "minutes")  return formatReaction(value);
   if (format === "duration") {
-    const m = Math.floor(value / 60);
-    const s = Math.round(value % 60);
+    const m = Math.floor(value / 60), s = Math.round(value % 60);
     return m > 0 ? `${m}м ${s}с` : `${s}с`;
   }
   return value.toLocaleString("ru-RU");
 }
 
 interface Props {
-  stats:    OperatorStats | null;
-  loading:  boolean;
-  metric?:  CallsSingleMetric;
+  stats:      OperatorStats | null;
+  loading:    boolean;
+  metric?:    CallsSingleMetric;
   conversion?: ConversionValue | null;
 }
 
 export function CallsSingleWidget({ stats, loading, metric = "incoming", conversion }: Props) {
-  if (loading) return <div className="h-full rounded-2xl bg-blue-500/10 animate-pulse" />;
+  if (loading) return <div className="h-full rounded-lg bg-muted/60 animate-pulse" />;
 
-  const def = CALLS_SINGLE_METRICS.find(m => m.key === metric)!;
+  const def   = CALLS_SINGLE_METRICS.find(m => m.key === metric)!;
   const { value, deltaPct, deltaDir } = getValue(stats, metric, conversion);
-  const good = deltaIsGood(deltaDir, BAD_WHEN_UP.has(metric));
-  const gradient = GRADIENT[metric];
-
-  const displayValue = value !== null ? formatValue(value, def.format) : "—";
+  const good  = deltaIsGood(deltaDir, BAD_WHEN_UP.has(metric));
+  const display = value !== null ? formatValue(value, def.format) : "—";
 
   return (
-    <div className={`relative h-full flex flex-col justify-between p-5 rounded-2xl overflow-hidden select-none
-      bg-gradient-to-br ${gradient}`}>
-
-      {/* Декоративные круги */}
-      <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10 pointer-events-none" />
-      <div className="absolute -right-2 -bottom-8 h-36 w-36 rounded-full bg-white/5  pointer-events-none" />
-
-      {/* Иконка */}
-      <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center z-10">
-        <Phone className="h-4 w-4 text-white" />
+    <Card className="h-full flex flex-col justify-between p-5">
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+          {def.label}
+        </span>
       </div>
 
-      {/* Значение */}
-      <div className="z-10">
-        <div className="text-4xl font-bold text-white tracking-tight">{displayValue}</div>
-        <div className="text-sm text-white/70 mt-0.5">{def.label}</div>
-        {def.hint && <div className="text-[11px] text-white/45">{def.hint}</div>}
+      <div className={cn("text-[28px] font-semibold leading-none tracking-tight tabular-nums mb-1", ACCENT[metric])}>
+        {display}
       </div>
 
-      {/* Дельта */}
-      <div className="z-10">
-        {deltaPct !== null && deltaDir && deltaDir !== "flat"
-          ? <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
-              good ? "text-emerald-200" : "text-red-200"
-            }`}>
-              {deltaDir === "up"
-                ? <TrendingUp className="h-3.5 w-3.5"/>
-                : <TrendingDown className="h-3.5 w-3.5"/>}
-              {deltaDir === "up" ? "+" : "−"}{deltaPct}% к прошлому периоду
-            </span>
-          : <span className="inline-flex items-center gap-1 text-xs text-white/40">
-              <Minus className="h-3 w-3"/> {noDeltaLabel(deltaPct, deltaDir)}
-            </span>}
+      {def.hint && (
+        <p className="text-[11px] text-muted-foreground/60 mb-0">{def.hint}</p>
+      )}
+
+      <div className="mt-3">
+        {deltaPct !== null && deltaDir && deltaDir !== "flat" ? (
+          <span className={cn(
+            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
+            good
+              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "bg-red-500/10 text-red-600 dark:text-red-400"
+          )}>
+            {deltaDir === "up" ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+            {deltaDir === "up" ? "+" : "−"}{deltaPct}%
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/50">
+            <Minus className="h-3 w-3" />{noDeltaLabel(deltaPct, deltaDir)}
+          </span>
+        )}
       </div>
-    </div>
+    </Card>
   );
 }

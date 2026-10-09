@@ -108,7 +108,7 @@ function GridBackground({ rows, rowH }: { rows: number; rowH: number }) {
         Array.from({ length: COLS }).map((_, col) => (
           <div
             key={`${row}-${col}`}
-            className="absolute rounded-2xl"
+            className="absolute rounded-lg"
             style={{
               left:   `calc(${col} * (${colExpr} + ${GAP}px))`,
               top:    row * (rowH + GAP),
@@ -201,7 +201,7 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
 
       {editMode && (
         <div className="
-          absolute inset-0 rounded-2xl z-10
+          absolute inset-0 rounded-lg z-10
           ring-2 ring-primary/20
           flex items-center justify-center
           bg-background/40 dark:bg-black/40 backdrop-blur-[2px]
@@ -211,9 +211,7 @@ function DraggableWidget({ pw, editMode, onDelete, onResizeStart,
           <div
             {...listeners} {...attributes}
             title="Переместить"
-            className="h-10 w-10 rounded-xl bg-background border border-border shadow-sm
-              flex items-center justify-center cursor-grab active:cursor-grabbing
-              hover:bg-muted transition-colors"
+            className="h-9 w-9 rounded-lg bg-background border border-border flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted transition-colors"
           >
             <GripVertical className="h-5 w-5 text-foreground/50" />
           </div>
@@ -425,14 +423,10 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
             <p className="mt-1 text-sm text-muted-foreground">{label}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex gap-0.5 rounded-xl border border-border bg-muted/30 p-1">
+            <div className="inline-flex gap-0.5 inline-flex items-center rounded-lg border border-border bg-background p-0.5">
               {(["day","week","month"] as PeriodType[]).map(t=>(
                 <button key={t} onClick={()=>{setPeriodType(t);setOffset(0);}}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                    periodType===t
-                      ?"bg-card text-foreground shadow-sm ring-1 ring-border"
-                      :"text-muted-foreground hover:text-foreground"
-                  }`}>
+                  className={`rounded-md px-3 py-1 text-[12px] font-medium transition-all duration-150 ${ periodType===t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
                   {t==="day"?"День":t==="week"?"Неделя":"Месяц"}
                 </button>
               ))}
@@ -464,7 +458,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
         {/* Edit hint */}
         {editMode && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
             <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground"/>
             <p className="text-xs text-muted-foreground">
               Тяните виджет для перемещения
@@ -510,7 +504,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
 
             {widgets.length===0 ? (
               <div className="flex min-h-[340px] flex-col items-center justify-center gap-5">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/30">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg border-2 border-dashed border-border">
                   <Plus className="h-7 w-7 text-muted-foreground/40"/>
                 </div>
                 <div className="text-center">
@@ -539,7 +533,7 @@ export function HomeDashboard({ onNavigate }: { onNavigate:(s:Section)=>void }) 
                 <div style={{
                   width:   pxW(colPx,activeWidget.w),
                   height:  pxH(rowH,activeWidget.h),
-                  borderRadius: 12,
+                  borderRadius: 8,
                   overflow: "hidden",
                   boxShadow: "0 24px 48px rgba(0,0,0,0.18)",
                 }}>
