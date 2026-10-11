@@ -191,7 +191,7 @@ export function AppointmentsPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
                       <XAxis dataKey="date" tickFormatter={fmtDate} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval={daily.days.length>14?2:0} />
                       <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
-                      <Tooltip {...ct.tooltip} labelFormatter={(v)=>new Date(v).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} />
+                      <Tooltip {...ct.tooltip} labelFormatter={(v)=>new Date(String(v)).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} />
                       <Bar dataKey="total"   name="Записей" fill="#2563eb" radius={[3,3,0,0]} maxBarSize={20} />
                       <Bar dataKey="visits"  name="Явки"    fill="#16a34a" radius={[3,3,0,0]} maxBarSize={20} />
                       <Bar dataKey="noshow"  name="Неявки"  fill="#dc2626" radius={[3,3,0,0]} maxBarSize={20} />

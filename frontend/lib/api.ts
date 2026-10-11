@@ -126,6 +126,8 @@ export interface OperatorStats {
   avg_reaction_sec_delta_dir: DeltaDir;
   total_delta_pct:           number | null;
   total_delta_dir:           DeltaDir;
+  received_delta_pct:        number | null;
+  received_delta_dir:        DeltaDir;
 }
 
 export interface StatsResponse {
@@ -436,3 +438,23 @@ export const savePlanItems = (items: { date: string; metric: string; value: numb
   post("/api/plans/upsert", { items });
 export const fillPlan = (body: { date_from: string; date_to: string; metric: string; value: number; skip_weekends: boolean }) =>
   post("/api/plans/fill", body);
+
+// ── Compatibility aliases ─────────────────────────────────────────────
+// Старые компоненты используют эти имена
+
+export type Me = AuthUser;
+
+export const OPERATOR_COLORS = [
+  { text: "#16a34a", bg: "#f0fdf4" },
+  { text: "#2563eb", bg: "#eff6ff" },
+  { text: "#d97706", bg: "#fffbeb" },
+  { text: "#7c3aed", bg: "#f5f3ff" },
+];
+
+export const fetchPaymentDailyByType = fetchPaymentByType;
+export type PaymentDailyByTypeResponse = PaymentByTypeResponse;
+
+export const upsertPlans = savePlanItems;
+export const fillPlans   = fillPlan;
+
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";

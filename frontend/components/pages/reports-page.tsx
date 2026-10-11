@@ -142,7 +142,7 @@ export function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
                     <XAxis dataKey="period" tickFormatter={s => fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
-                    <Tooltip {...ct.tooltip} labelFormatter={s=>fmtPeriod(s,gran)} />
+                    <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
                     <Bar dataKey="incoming" name="Принятые"    fill="#16a34a" radius={[3,3,0,0]} maxBarSize={22} />
                     <Bar dataKey="outgoing" name="Исходящие"   fill="#2563eb" radius={[3,3,0,0]} maxBarSize={22} />
                     <Bar dataKey="missed"   name="Пропущенные" fill="#dc2626" radius={[3,3,0,0]} maxBarSize={22} />
@@ -194,7 +194,7 @@ export function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
                     <XAxis dataKey="period" tickFormatter={s=>fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
-                    <Tooltip {...ct.tooltip} labelFormatter={s=>fmtPeriod(s,gran)} />
+                    <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
                     <Bar dataKey="total"  name="Записей" fill="#2563eb" radius={[3,3,0,0]} maxBarSize={22} />
                     <Bar dataKey="visits" name="Явки"    fill="#16a34a" radius={[3,3,0,0]} maxBarSize={22} />
                     <Bar dataKey="noshow" name="Неявки"  fill="#dc2626" radius={[3,3,0,0]} maxBarSize={22} />
