@@ -23,3 +23,14 @@ export function canSeeSection(permissions: string[], section: Section): boolean 
 export function hasPerm(permissions: string[], perm: string): boolean {
   return permissions.includes(perm);
 }
+
+// Алиасы для совместимости с auth-gate.tsx
+export function canWith(permissions: string[], role: string, perm: string): boolean {
+  if (role === "owner") return true;
+  return permissions.includes(perm);
+}
+
+export function sectionAllowed(permissions: string[], role: string, section: Section): boolean {
+  if (role === "owner") return true;
+  return canSeeSection(permissions, section);
+}
