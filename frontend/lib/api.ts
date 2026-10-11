@@ -1,87 +1,173 @@
-import { authFetch } from "./auth";
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// ─── Базовые типы ────────────────────────────────────────────────────
 
 export type DeltaDir = "up" | "down" | "flat" | null;
 
-// Цвета для графика сравнения операторов
-export const OPERATOR_COLORS = [
-  { text: "#6366f1", bg: "bg-indigo-500"  },
-  { text: "#22c55e", bg: "bg-emerald-500" },
-  { text: "#f59e0b", bg: "bg-amber-500"   },
-  { text: "#ec4899", bg: "bg-pink-500"    },
-  { text: "#14b8a6", bg: "bg-teal-500"    },
-  { text: "#f97316", bg: "bg-orange-500"  },
-  { text: "#8b5cf6", bg: "bg-violet-500"  },
-  { text: "#06b6d4", bg: "bg-cyan-500"    },
-];
+export interface Delta {
+  delta_pct: number | null;
+  delta_dir: DeltaDir;
+}
+
+// ─── Утилиты ─────────────────────────────────────────────────────────
+
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+async function get<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
+  const url = new URL(BASE + path, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+    });
+  }
+  const res = await fetch(url.toString(), { credentials: "include" });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`);
+  return res.json();
+}
+
+async function post<T>(path: string, body?: unknown, params?: Record<string, string>): Promise<T> {
+  const url = new URL(BASE + path, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`);
+  return res.json();
+}
+
+export function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+export function formatDuration(sec: number): string {
+  if (!sec) return "—";
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return m > 0 ? `${m}м ${s}с` : `${s}с`;
+}
+
+export function formatMoney(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} млн`;
+  if (n >= 1_000)     return `${Math.round(n / 1_000)} тыс`;
+  return String(n);
+}
+
+export function fmtRub(n: number): string {
+  return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
+}
+
+// ─── Авторизация ─────────────────────────────────────────────────────
+
+export interface AuthUser {
+  id:          string;
+  name:        string;
+  role:        string;
+  permissions: string[];
+}
+
+export const fetchMe = () => get<AuthUser>("/api/auth/me");
+
+// ─── Операторы / Администраторы ──────────────────────────────────────
+
+export interface Operator { id: string; name: string; }
+export interface Admin    { surname: string; group: string; label: string; }
+
+export const fetchOperators = () => get<{ operators: Operator[] }>("/api/calls/operators");
+export const fetchAdmins    = () => get<{ admins: Admin[] }>("/api/appointments/admins");
+
+// ─── Звонки: статистика оператора ────────────────────────────────────
 
 export interface OperatorStats {
-  name: string;
-  /** Принятые входящие (отвеченные). Пропущенные сюда НЕ входят. */
-  incoming: number;
-  outgoing: number;
-  missed: number;
-  /** Поступило звонков = принятые + пропущенные. */
-  received: number;
-  /** Доля пропущенных среди поступивших, % (пропущено ÷ поступило). */
-  missed_pct: number;
-  /** Судьба пропущенных звонков — четыре взаимоисключающих исхода (сумма = missed). */
-  outcome_reached: number;   // мы перезвонили и дозвонились
-  outcome_self:    number;   // клиент дозвонился сам при повторном звонке
-  outcome_failed:  number;   // перезванивали, но не дозвонились (занято, недоступен)
-  outcome_none:    number;   // не перезванивали вообще
-  /** Потеряно = outcome_failed + outcome_none: клиент так и не был обслужен. */
-  lost: number;
-  /** Доля потерянных среди поступивших звонков, %. */
-  lost_pct: number;
-  total: number;
-  avg_duration: number;
-  avg_wait_time: number;
-  missed_total: number;
-  callback_count: number;
-  callback_pct: number;
-  avg_reaction_sec: number;
-  role?: string;
-  incoming_delta_pct:     number | null;
-  incoming_delta_dir:     DeltaDir;
-  outgoing_delta_pct:     number | null;
-  outgoing_delta_dir:     DeltaDir;
-  missed_delta_pct:       number | null;
-  missed_delta_dir:       DeltaDir;
-  received_delta_pct:     number | null;
-  received_delta_dir:     DeltaDir;
-  missed_pct_delta_pct:   number | null;
-  missed_pct_delta_dir:   DeltaDir;
-  callback_count_delta_pct: number | null;
-  callback_count_delta_dir: DeltaDir;
-  lost_delta_pct:           number | null;
-  lost_delta_dir:           DeltaDir;
-  lost_pct_delta_pct:       number | null;
-  lost_pct_delta_dir:       DeltaDir;
+  name:                string;
+  incoming:            number;
+  outgoing:            number;
+  missed:              number;
+  received:            number;
+  missed_pct:          number;
+  total:               number;
+  avg_duration:        number;
+  avg_wait_time:       number;
+  missed_total:        number;
+  callback_count:      number;
+  callback_pct:        number;
+  avg_reaction_sec:    number;
+  outcome_reached:     number;
+  outcome_self:        number;
+  outcome_failed:      number;
+  outcome_none:        number;
+  lost:                number;
+  lost_pct:            number;
+  // Дельты
+  incoming_delta_pct:        number | null;
+  incoming_delta_dir:        DeltaDir;
+  outgoing_delta_pct:        number | null;
+  outgoing_delta_dir:        DeltaDir;
+  missed_delta_pct:          number | null;
+  missed_delta_dir:          DeltaDir;
+  missed_pct_delta_pct:      number | null;
+  missed_pct_delta_dir:      DeltaDir;
+  lost_delta_pct:            number | null;
+  lost_delta_dir:            DeltaDir;
+  lost_pct_delta_pct:        number | null;
+  lost_pct_delta_dir:        DeltaDir;
+  avg_duration_delta_pct:    number | null;
+  avg_duration_delta_dir:    DeltaDir;
+  callback_count_delta_pct:  number | null;
+  callback_count_delta_dir:  DeltaDir;
+  callback_pct_delta_pct:    number | null;
+  callback_pct_delta_dir:    DeltaDir;
   avg_reaction_sec_delta_pct: number | null;
   avg_reaction_sec_delta_dir: DeltaDir;
-  total_delta_pct:        number | null;
-  total_delta_dir:        DeltaDir;
-  avg_duration_delta_pct: number | null;
-  avg_duration_delta_dir: DeltaDir;
-  callback_pct_delta_pct: number | null;
-  callback_pct_delta_dir: DeltaDir;
+  total_delta_pct:           number | null;
+  total_delta_dir:           DeltaDir;
 }
 
 export interface StatsResponse {
-  date_from: string;
-  date_to:   string;
-  prev_from: string;
-  prev_to:   string;
-  operator_id?: string;
-  operators: Record<string, OperatorStats>;
+  date_from:   string;
+  date_to:     string;
+  prev_from:   string;
+  prev_to:     string;
+  operators:   Record<string, OperatorStats>;
 }
 
+export const fetchStats = (dateFrom: string, dateTo: string, operatorId?: string) =>
+  get<StatsResponse>("/api/calls/stats", { date_from: dateFrom, date_to: dateTo, operator_id: operatorId });
+
+// ─── Звонки: по дням ─────────────────────────────────────────────────
+
+export interface DailyItem {
+  date:        string;
+  incoming:    number;
+  outgoing:    number;
+  missed:      number;
+  received:    number;
+  missed_pct:  number;
+  lost:        number;
+  total:       number;
+}
+
+export interface DailyResponse {
+  date_from: string;
+  date_to:   string;
+  days:      DailyItem[];
+}
+
+export const fetchDaily = (dateFrom: string, dateTo: string, operatorId?: string) =>
+  get<DailyResponse>("/api/calls/daily", { date_from: dateFrom, date_to: dateTo, operator_id: operatorId });
+
+// ─── Звонки: по слотам времени ────────────────────────────────────────
+
 export interface SlotItem {
-  time: string;
+  time:     string;
   incoming: number;
   outgoing: number;
-  missed: number;
+  missed:   number;
 }
 
 export interface HourlyResponse {
@@ -91,215 +177,10 @@ export interface HourlyResponse {
   slots:     SlotItem[];
 }
 
-export interface DailyItem {
-  date:     string;
-  incoming: number;
-  outgoing: number;
-  missed:   number;
-  /** Поступило = принятые + пропущенные. */
-  received: number;
-  /** Доля пропущенных среди поступивших, %. */
-  missed_pct: number;
-  /** Потеряно за день: пропущенные, по которым клиент так и не был обслужен. */
-  lost:     number;
-  total:    number;
-}
+export const fetchHourly = (dateFrom: string, dateTo: string, interval: number, operatorId?: string) =>
+  get<HourlyResponse>("/api/calls/hourly", { date_from: dateFrom, date_to: dateTo, interval, operator_id: operatorId });
 
-export interface DailyResponse {
-  date_from: string;
-  date_to:   string;
-  days:      DailyItem[];
-}
-
-export interface Operator {
-  id:   string;
-  name: string;
-}
-
-export interface Admin {
-  surname: string;
-  group:   "callcenter" | "admin" | "other";
-  label:   string;
-}
-
-// ─── Конверсия ───────────────────────────────────────────────
-
-export interface ConversionOperator {
-  operator_id:     string;
-  name:            string;
-  surname:         string;
-  incoming:        number;
-  appointments:    number;
-  conversion_pct:  number;
-}
-
-export interface ConversionResponse {
-  date_from: string;
-  date_to:   string;
-  operators: ConversionOperator[];
-  total: {
-    incoming:       number;
-    appointments:   number;
-    conversion_pct: number;
-  };
-}
-
-// ─── Выручка (payments) ──────────────────────────────────────
-
-export interface PaymentStats {
-  count:       number;
-  total_paid:  number;
-  by_cash:     number;
-  by_card:     number;
-  by_cashless: number;
-  by_credit:   number;
-  by_balance:  number;
-  count_delta_pct:      number | null;
-  count_delta_dir:      DeltaDir;
-  total_paid_delta_pct: number | null;
-  total_paid_delta_dir: DeltaDir;
-  by_cash_delta_pct:    number | null;
-  by_cash_delta_dir:    DeltaDir;
-  by_card_delta_pct:    number | null;
-  by_card_delta_dir:    DeltaDir;
-}
-
-export interface PaymentStatsResponse extends PaymentStats {
-  date_from:  string;
-  date_to:    string;
-  prev_from:  string;
-  prev_to:    string;
-  kind:       number | null;
-  kind_label: string;
-}
-
-export interface PaymentDailyItem {
-  date:        string;
-  count:       number;
-  total_paid:  number;
-  by_cash:     number;
-  by_card:     number;
-  by_cashless: number;
-  by_credit:   number;
-}
-
-export interface PaymentDailyResponse {
-  date_from: string;
-  date_to:   string;
-  days:      PaymentDailyItem[];
-}
-
-export interface PaymentDailyByTypeResponse {
-  date_from: string;
-  date_to:   string;
-  days:      string[];
-  series:    { key: string; label: string; values: number[] }[];
-}
-
-export interface PaymentDoctor {
-  doctor_id:      number;
-  doctor_name:    string;
-  doctor_surname: string;
-  count:          number;
-  total_paid:     number;
-  pct:            number;
-}
-
-export interface PaymentDoctorResponse {
-  date_from: string;
-  date_to:   string;
-  doctors:   PaymentDoctor[];
-}
-
-// ─── Продажи по услугам ───────────────────────────────────────
-
-export interface SaleService {
-  service_title: string;
-  service_id:    number | null;
-  unit:          string | null;
-  amount:        number;
-  final_sum:     number;
-  pct_of_total:  number;
-  delta_pct:     number | null;
-  delta_dir:     DeltaDir;
-}
-
-export interface SalesStatsResponse {
-  date_from: string;
-  date_to:   string;
-  total: {
-    final_sum:  number;
-    delta_pct:  number | null;
-    delta_dir:  DeltaDir;
-  };
-  services: SaleService[];
-}
-
-async function apiFetch<T>(path: string): Promise<T> {
-  const res = await authFetch(`${API_URL}${path}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Ошибка загрузки данных");
-  return res.json();
-}
-
-function opParam(operatorId?: string) {
-  return operatorId ? `&operator_id=${operatorId}` : "";
-}
-
-export function fetchStats(dateFrom: string, dateTo: string, operatorId?: string): Promise<StatsResponse> {
-  return apiFetch(`/api/calls/stats?date_from=${dateFrom}&date_to=${dateTo}${opParam(operatorId)}`);
-}
-
-export function fetchHourly(dateFrom: string, dateTo: string, interval = 60, operatorId?: string): Promise<HourlyResponse> {
-  return apiFetch(`/api/calls/hourly?date_from=${dateFrom}&date_to=${dateTo}&interval=${interval}${opParam(operatorId)}`);
-}
-
-export function fetchDaily(dateFrom: string, dateTo: string, operatorId?: string): Promise<DailyResponse> {
-  return apiFetch(`/api/calls/daily?date_from=${dateFrom}&date_to=${dateTo}${opParam(operatorId)}`);
-}
-
-export function fetchOperators(): Promise<{ operators: Operator[] }> {
-  return apiFetch("/api/calls/operators");
-}
-
-export function fetchAdmins(): Promise<{ admins: Admin[] }> {
-  return apiFetch("/api/appointments/admins");
-}
-
-export function fetchConversion(dateFrom: string, dateTo: string): Promise<ConversionResponse> {
-  return apiFetch(`/api/calls/conversion?date_from=${dateFrom}&date_to=${dateTo}`);
-}
-
-export async function collectCalls(dateFrom: string, dateTo: string) {
-  const res = await authFetch(
-    `${API_URL}/api/calls/collect?date_from=${dateFrom}&date_to=${dateTo}`,
-    { method: "POST" }
-  );
-  if (!res.ok) throw new Error("Ошибка сбора данных");
-  return res.json();
-}
-
-export function formatDuration(seconds: number): string {
-  if (!seconds) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}м ${s}с` : `${s}с`;
-}
-
-export function formatMoney(amount: number): string {
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} млн`;
-  if (amount >= 1_000)     return `${(amount / 1_000).toFixed(0)} тыс`;
-  return String(amount);
-}
-
-export function toDateStr(d: Date): string {
-  return d.toISOString().split("T")[0];
-}
-
-export function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
+// ─── Звонки: тепловая карта ───────────────────────────────────────────
 
 export interface HeatmapCell {
   weekday:      number;
@@ -317,6 +198,13 @@ export interface HeatmapResponse {
   cells:     HeatmapCell[];
 }
 
+export const fetchHeatmap = (dateFrom: string, dateTo: string, operatorId?: string) =>
+  get<HeatmapResponse>("/api/calls/heatmap", { date_from: dateFrom, date_to: dateTo, operator_id: operatorId });
+
+// ─── Звонки: сравнение операторов ────────────────────────────────────
+
+export type ComparisonMetric = "total" | "incoming" | "outgoing" | "missed";
+
 export interface ComparisonSeries {
   operator_id: string;
   name:        string;
@@ -324,63 +212,76 @@ export interface ComparisonSeries {
 }
 
 export interface ComparisonResponse {
-  date_from: string;
-  date_to:   string;
-  metric:    string;
-  dates:     string[];
-  series:    ComparisonSeries[];
+  metric:  string;
+  dates:   string[];
+  series:  ComparisonSeries[];
 }
 
-export type ComparisonMetric = "total" | "incoming" | "outgoing" | "missed";
+export const fetchComparison = (dateFrom: string, dateTo: string, metric: ComparisonMetric) =>
+  get<ComparisonResponse>("/api/calls/comparison", { date_from: dateFrom, date_to: dateTo, metric });
 
-export function fetchHeatmap(dateFrom: string, dateTo: string, operatorId?: string): Promise<HeatmapResponse> {
-  return apiFetch(`/api/calls/heatmap?date_from=${dateFrom}&date_to=${dateTo}${opParam(operatorId)}`);
+// ─── Конверсия ───────────────────────────────────────────────────────
+
+export interface ConversionOperator {
+  operator_id:    string;
+  name:           string;
+  surname:        string;
+  incoming:       number;
+  appointments:   number;
+  conversion_pct: number;
 }
 
-export function fetchComparison(dateFrom: string, dateTo: string, metric: ComparisonMetric): Promise<ComparisonResponse> {
-  return apiFetch(`/api/calls/comparison?date_from=${dateFrom}&date_to=${dateTo}&metric=${metric}`);
+export interface ConversionResponse {
+  operators: ConversionOperator[];
+  total: {
+    incoming:       number;
+    appointments:   number;
+    conversion_pct: number;
+  };
 }
 
-// ─── МедОДС ──────────────────────────────────────────────────
+export const fetchConversion = (dateFrom: string, dateTo: string) =>
+  get<ConversionResponse>("/api/calls/conversion", { date_from: dateFrom, date_to: dateTo });
+
+// ─── Сбор данных ──────────────────────────────────────────────────────
+
+export const collectCalls        = (dateFrom: string, dateTo: string) =>
+  post("/api/calls/collect", undefined, { date_from: dateFrom, date_to: dateTo });
+export const collectAppointments = (dateFrom: string, dateTo: string) =>
+  post("/api/appointments/collect", undefined, { date_from: dateFrom, date_to: dateTo });
+
+// ─── Записи: статистика ───────────────────────────────────────────────
+
+export interface AdminAppointmentStats {
+  name:            string;
+  group:           string;
+  group_label:     string;
+  is_callcenter:   boolean;
+  total:           number;
+  visits:          number;
+  noshow:          number;
+  cancels:         number;
+  pending:         number;
+  new_patients:    number;
+  callcenter_total: number;
+  visit_pct:       number;
+  noshow_pct:      number;
+  new_pct:         number;
+  cancel_pct:      number;
+  total_delta_pct:       number | null;
+  total_delta_dir:       DeltaDir;
+  visits_delta_pct:      number | null;
+  visits_delta_dir:      DeltaDir;
+  noshow_delta_pct:      number | null;
+  noshow_delta_dir:      DeltaDir;
+  new_patients_delta_pct: number | null;
+  new_patients_delta_dir: DeltaDir;
+}
 
 export interface GroupBreakdownItem {
   count: number;
   pct:   number;
   label: string;
-}
-
-export interface AdminAppointmentStats {
-  name:             string;
-  group:            "callcenter" | "admin" | "other";
-  group_label:      string;
-  is_callcenter:    boolean;
-  total:            number;
-  visits:           number;
-  noshow:           number;
-  cancels:          number;
-  pending:          number;
-  new_patients:     number;
-  callcenter_total: number;
-  visit_pct:        number;
-  noshow_pct:       number;
-  new_pct:          number;
-  cancel_pct:       number;
-  total_delta_pct:            number | null;
-  total_delta_dir:            DeltaDir;
-  visits_delta_pct:           number | null;
-  visits_delta_dir:           DeltaDir;
-  noshow_delta_pct:           number | null;
-  noshow_delta_dir:           DeltaDir;
-  new_patients_delta_pct:     number | null;
-  new_patients_delta_dir:     DeltaDir;
-  callcenter_total_delta_pct: number | null;
-  callcenter_total_delta_dir: DeltaDir;
-  visit_pct_delta_pct:        number | null;
-  visit_pct_delta_dir:        DeltaDir;
-  noshow_pct_delta_pct:       number | null;
-  noshow_pct_delta_dir:       DeltaDir;
-  cancel_pct_delta_pct:       number | null;
-  cancel_pct_delta_dir:       DeltaDir;
 }
 
 export interface AppointmentStatsResponse {
@@ -390,6 +291,11 @@ export interface AppointmentStatsResponse {
   by_group:  Record<string, GroupBreakdownItem>;
   by_admin:  Record<string, AdminAppointmentStats>;
 }
+
+export const fetchAppointmentStats = (dateFrom: string, dateTo: string, adminSurname?: string) =>
+  get<AppointmentStatsResponse>("/api/appointments/stats", { date_from: dateFrom, date_to: dateTo, admin_surname: adminSurname });
+
+// ─── Записи: по дням ──────────────────────────────────────────────────
 
 export interface AppointmentDailyItem {
   date:         string;
@@ -405,62 +311,98 @@ export interface AppointmentDailyResponse {
   days:      AppointmentDailyItem[];
 }
 
-export function fetchAppointmentStats(
-  dateFrom: string, dateTo: string, adminSurname?: string
-): Promise<AppointmentStatsResponse> {
-  const q = adminSurname ? `&admin_surname=${encodeURIComponent(adminSurname)}` : "";
-  return apiFetch(`/api/appointments/stats?date_from=${dateFrom}&date_to=${dateTo}${q}`);
+export const fetchAppointmentDaily = (dateFrom: string, dateTo: string, adminSurname?: string) =>
+  get<AppointmentDailyResponse>("/api/appointments/daily", { date_from: dateFrom, date_to: dateTo, admin_surname: adminSurname });
+
+// ─── Платежи ──────────────────────────────────────────────────────────
+
+export interface PaymentStatsResponse {
+  count:        number;
+  total_paid:   number;
+  by_cash:      number;
+  by_card:      number;
+  by_cashless:  number;
+  by_credit:    number;
+  by_balance:   number;
+  count_delta_pct:      number | null;
+  count_delta_dir:      DeltaDir;
+  total_paid_delta_pct: number | null;
+  total_paid_delta_dir: DeltaDir;
+  by_cash_delta_pct:    number | null;
+  by_cash_delta_dir:    DeltaDir;
+  by_card_delta_pct:    number | null;
+  by_card_delta_dir:    DeltaDir;
 }
 
-export function fetchAppointmentDaily(
-  dateFrom: string, dateTo: string, adminSurname?: string
-): Promise<AppointmentDailyResponse> {
-  const q = adminSurname ? `&admin_surname=${encodeURIComponent(adminSurname)}` : "";
-  return apiFetch(`/api/appointments/daily?date_from=${dateFrom}&date_to=${dateTo}${q}`);
+export interface PaymentDailyItem {
+  date:        string;
+  count:       number;
+  total_paid:  number;
+  by_cash:     number;
+  by_card:     number;
+  by_cashless: number;
+  by_credit:   number;
 }
 
-export async function collectAppointments(dateFrom: string, dateTo: string) {
-  const res = await authFetch(
-    `${API_URL}/api/appointments/collect?date_from=${dateFrom}&date_to=${dateTo}`,
-    { method: "POST" }
-  );
-  if (!res.ok) throw new Error("Ошибка сбора данных МедОДС");
-  return res.json();
+export interface PaymentDailyResponse {
+  days: PaymentDailyItem[];
 }
 
-// ─── Выручка ─────────────────────────────────────────────────
-
-export function fetchPaymentStats(
-  dateFrom: string, dateTo: string, kind = 6
-): Promise<PaymentStatsResponse> {
-  return apiFetch(`/api/payments/stats?date_from=${dateFrom}&date_to=${dateTo}&kind=${kind}`);
+export interface PaymentByTypeSeries {
+  key:    string;
+  label:  string;
+  values: number[];
 }
 
-export function fetchPaymentDaily(
-  dateFrom: string, dateTo: string, kind = 6
-): Promise<PaymentDailyResponse> {
-  return apiFetch(`/api/payments/daily?date_from=${dateFrom}&date_to=${dateTo}&kind=${kind}`);
+export interface PaymentByTypeResponse {
+  days:   string[];
+  series: PaymentByTypeSeries[];
 }
 
-export function fetchPaymentDailyByType(
-  dateFrom: string, dateTo: string
-): Promise<PaymentDailyByTypeResponse> {
-  return apiFetch(`/api/payments/daily-by-type?date_from=${dateFrom}&date_to=${dateTo}`);
+export interface PaymentDoctor {
+  doctor_id:      number;
+  doctor_name:    string;
+  doctor_surname: string;
+  count:          number;
+  total_paid:     number;
+  pct:            number;
 }
 
-export function fetchPaymentByDoctor(
-  dateFrom: string, dateTo: string, limit = 20
-): Promise<PaymentDoctorResponse> {
-  return apiFetch(`/api/payments/by-doctor?date_from=${dateFrom}&date_to=${dateTo}&limit=${limit}`);
+export interface PaymentDoctorResponse {
+  doctors: PaymentDoctor[];
 }
 
-export function fetchSalesStats(
-  dateFrom: string, dateTo: string, limit = 30
-): Promise<SalesStatsResponse> {
-  return apiFetch(`/api/sales/stats?date_from=${dateFrom}&date_to=${dateTo}&limit=${limit}`);
+export const fetchPaymentStats    = (dateFrom: string, dateTo: string) =>
+  get<PaymentStatsResponse>("/api/payments/stats", { date_from: dateFrom, date_to: dateTo, kind: 6 });
+export const fetchPaymentDaily    = (dateFrom: string, dateTo: string) =>
+  get<PaymentDailyResponse>("/api/payments/daily", { date_from: dateFrom, date_to: dateTo, kind: 6 });
+export const fetchPaymentByType   = (dateFrom: string, dateTo: string) =>
+  get<PaymentByTypeResponse>("/api/payments/daily-by-type", { date_from: dateFrom, date_to: dateTo });
+export const fetchPaymentByDoctor = (dateFrom: string, dateTo: string, limit = 15) =>
+  get<PaymentDoctorResponse>("/api/payments/by-doctor", { date_from: dateFrom, date_to: dateTo, kind: 6, limit });
+
+// ─── Продажи по услугам ──────────────────────────────────────────────
+
+export interface SaleService {
+  service_title: string;
+  service_id:    number | null;
+  unit:          string;
+  amount:        number;
+  final_sum:     number;
+  pct_of_total:  number;
+  delta_pct:     number | null;
+  delta_dir:     DeltaDir;
 }
 
-// ─── Планы ───────────────────────────────────────────────────
+export interface SalesStatsResponse {
+  total: { final_sum: number; delta_pct: number | null; delta_dir: DeltaDir };
+  services: SaleService[];
+}
+
+export const fetchSalesStats = (dateFrom: string, dateTo: string, limit = 15) =>
+  get<SalesStatsResponse>("/api/sales/stats", { date_from: dateFrom, date_to: dateTo, limit });
+
+// ─── Планы ────────────────────────────────────────────────────────────
 
 export interface PlanDay {
   date:           string;
@@ -480,62 +422,17 @@ export interface PlanMonthResponse {
 }
 
 export interface PlanRangeResponse {
-  date_from: string;
-  date_to:   string;
-  by_day:    Record<string, Record<string, number>>;
-  totals:    { calls_incoming: number; calls_outgoing: number; appt_count: number };
-  fixed:     { calls_missed_pct: number };
+  by_day:  Record<string, Record<string, number>>;
+  totals:  { calls_incoming: number; calls_outgoing: number; appt_count: number };
+  fixed:   { calls_missed_pct: number };
 }
 
-export interface PlanUpsertItem {
-  date:   string;
-  metric: string;
-  value:  number;
-}
+export const fetchPlanMonth = (year: number, month: number) =>
+  get<PlanMonthResponse>("/api/plans/month", { year, month });
+export const fetchPlanRange = (dateFrom: string, dateTo: string) =>
+  get<PlanRangeResponse>("/api/plans/range", { date_from: dateFrom, date_to: dateTo });
 
-export function fetchPlanMonth(year: number, month: number): Promise<PlanMonthResponse> {
-  return apiFetch(`/api/plans/month?year=${year}&month=${month}`);
-}
-
-export function fetchPlanRange(dateFrom: string, dateTo: string): Promise<PlanRangeResponse> {
-  return apiFetch(`/api/plans/range?date_from=${dateFrom}&date_to=${dateTo}`);
-}
-
-export async function upsertPlans(items: PlanUpsertItem[]) {
-  const res = await authFetch(`${API_URL}/api/plans/upsert`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ items }),
-  });
-  if (!res.ok) throw new Error("Ошибка сохранения планов");
-  return res.json();
-}
-
-export async function fillPlans(
-  dateFrom: string, dateTo: string,
-  metric: string, value: number,
-  skipWeekends = true,
-) {
-  const res = await authFetch(`${API_URL}/api/plans/fill`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({
-      date_from: dateFrom, date_to: dateTo,
-      metric, value, skip_weekends: skipWeekends,
-    }),
-  });
-  if (!res.ok) throw new Error("Ошибка заполнения планов");
-  return res.json();
-}
-
-// ─── Кто вошёл и что ему можно ────────────────────────────────
-export interface Me {
-  id: string;
-  name: string;
-  role: string;
-  permissions: string[];
-}
-
-export function fetchMe() {
-  return apiFetch<Me>("/api/auth/me");
-}
+export const savePlanItems = (items: { date: string; metric: string; value: number }[]) =>
+  post("/api/plans/upsert", { items });
+export const fillPlan = (body: { date_from: string; date_to: string; metric: string; value: number; skip_weekends: boolean }) =>
+  post("/api/plans/fill", body);
