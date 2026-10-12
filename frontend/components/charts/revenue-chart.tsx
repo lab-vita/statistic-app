@@ -36,7 +36,7 @@ export function RevenueChart({ data }: Props) {
         <Tooltip
           {...ct.tooltip}
           labelFormatter={fmtDateLong}
-          formatter={(v: number) => [new Intl.NumberFormat("ru-RU").format(v) + " ₽", "Выручка"]}
+          formatter={(v) => [new Intl.NumberFormat("ru-RU").format(Number(v)) + " ₽", "Выручка"]}
         />
         <Area type="monotone" dataKey="total_paid" name="Выручка"
           stroke="#16a34a" strokeWidth={2} fill={`url(#${id})`} dot={false} />

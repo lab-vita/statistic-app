@@ -455,6 +455,7 @@ export const fetchPaymentDailyByType = fetchPaymentByType;
 export type PaymentDailyByTypeResponse = PaymentByTypeResponse;
 
 export const upsertPlans = savePlanItems;
-export const fillPlans   = fillPlan;
+export const fillPlans = (dateFrom: string, dateTo: string, metric: string, value: number, skipWeekends: boolean) =>
+  fillPlan({ date_from: dateFrom, date_to: dateTo, metric, value, skip_weekends: skipWeekends });
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
