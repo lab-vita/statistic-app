@@ -10,13 +10,14 @@ import { PlansPage }        from "@/components/pages/plans-page";
 import { ReportsPage }      from "@/components/pages/reports-page";
 import { AdminPage }        from "@/components/pages/admin-page";
 import { HomePage }         from "@/components/pages/home-page";
+import { AboutPage }        from "@/components/pages/about-page";
 
 function App() {
   const { canSee } = useAuth();
   const [section, setSection] = useState<Section>("home");
 
   function handleNav(s: Section) {
-    if (canSee(s)) setSection(s);
+    if (s === "about" || canSee(s)) setSection(s);
   }
 
   return (
@@ -30,6 +31,7 @@ function App() {
         {section === "reports"      && <ReportsPage />}
         {section === "plans"        && <PlansPage />}
         {section === "admin"        && <AdminPage />}
+        {section === "about"        && <AboutPage />}
       </div>
     </div>
   );

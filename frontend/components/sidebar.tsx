@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   LayoutDashboard, Phone, Calendar, Banknote,
-  BarChart2, Target, ShieldCheck, Menu, X, Activity,
+  BarChart2, Target, ShieldCheck, Menu, X, Activity, Info,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-gate";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -13,14 +13,17 @@ import { cn } from "@/lib/utils";
 export type { Section };
 
 const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
-  { id: "home",         label: "Главная",  icon: LayoutDashboard },
-  { id: "calls",        label: "Звонки",   icon: Phone           },
-  { id: "appointments", label: "Записи",   icon: Calendar        },
-  { id: "revenue",      label: "Выручка",  icon: Banknote        },
-  { id: "reports",      label: "Отчёты",   icon: BarChart2       },
-  { id: "plans",        label: "Планы",    icon: Target          },
-  { id: "admin",        label: "Доступ",   icon: ShieldCheck     },
+  { id: "home",         label: "Главная",         icon: LayoutDashboard },
+  { id: "calls",        label: "Звонки",          icon: Phone           },
+  { id: "appointments", label: "Записи",          icon: Calendar        },
+  { id: "revenue",      label: "Выручка",         icon: Banknote        },
+  { id: "reports",      label: "Отчёты",          icon: BarChart2       },
+  { id: "plans",        label: "Планы",           icon: Target          },
+  { id: "admin",        label: "Доступ",          icon: ShieldCheck     },
 ];
+
+// Раздел «О приложении» — вынесен отдельно, всегда виден внизу сайдбара
+const ABOUT_ITEM = { id: "about" as Section, label: "О приложении", icon: Info };
 
 interface SidebarProps {
   section: Section;
@@ -44,6 +47,30 @@ function Brand() {
   );
 }
 
+function NavButton({
+  id, label, icon: Icon, active, onClick,
+}: {
+  id: Section; label: string; icon: React.ElementType; active: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-all duration-150",
+        active
+          ? "bg-foreground text-background"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
+    >
+      <Icon
+        className={cn("h-4 w-4 shrink-0", active ? "text-background" : "text-muted-foreground/60")}
+        strokeWidth={active ? 2.5 : 2}
+      />
+      {label}
+    </button>
+  );
+}
+
 function NavContent({ section, onSelectSection, onAfter }: SidebarProps & { onAfter?: () => void }) {
   const { user, canSee } = useAuth();
   return (
@@ -52,28 +79,25 @@ function NavContent({ section, onSelectSection, onAfter }: SidebarProps & { onAf
       <div className="h-px bg-border" />
 
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
-        {NAV.filter(n => canSee(n.id)).map(({ id, label, icon: Icon }) => {
-          const active = section === id;
-          return (
-            <button
-              key={id}
-              onClick={() => { onSelectSection(id); onAfter?.(); }}
-              className={cn(
-                "w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-all duration-150",
-                active
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              <Icon
-                className={cn("h-4 w-4 shrink-0", active ? "text-background" : "text-muted-foreground/60")}
-                strokeWidth={active ? 2.5 : 2}
-              />
-              {label}
-            </button>
-          );
-        })}
+        {NAV.filter(n => canSee(n.id)).map(({ id, label, icon: Icon }) => (
+          <NavButton
+            key={id} id={id} label={label} icon={Icon}
+            active={section === id}
+            onClick={() => { onSelectSection(id); onAfter?.(); }}
+          />
+        ))}
       </nav>
+
+      <div className="h-px bg-border" />
+
+      {/* О приложении — всегда внизу, над блоком пользователя */}
+      <div className="px-2 py-2">
+        <NavButton
+          id={ABOUT_ITEM.id} label={ABOUT_ITEM.label} icon={ABOUT_ITEM.icon}
+          active={section === ABOUT_ITEM.id}
+          onClick={() => { onSelectSection(ABOUT_ITEM.id); onAfter?.(); }}
+        />
+      </div>
 
       <div className="h-px bg-border" />
       <div className="px-3 py-3 flex items-center gap-2.5">

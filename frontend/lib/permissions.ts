@@ -1,4 +1,4 @@
-export type Section = "home" | "calls" | "appointments" | "revenue" | "reports" | "plans" | "admin";
+export type Section = "home" | "calls" | "appointments" | "revenue" | "reports" | "plans" | "admin" | "about";
 
 export const ROLE_LABELS: Record<string, string> = {
   owner:   "Владелец",
@@ -14,6 +14,7 @@ const SECTION_PERMISSIONS: Record<Section, string> = {
   reports:      "view:reports",
   plans:        "view:plans",
   admin:        "users:manage",
+  about:        "view:calls",   // доступен всем авторизованным пользователям
 };
 
 export function canSeeSection(permissions: string[], section: Section): boolean {
