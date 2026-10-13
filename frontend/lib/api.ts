@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/auth";
+
 // ─── Базовые типы ────────────────────────────────────────────────────
 
 export type DeltaDir = "up" | "down" | "flat" | null;
@@ -18,7 +20,7 @@ async function get<T>(path: string, params?: Record<string, string | number | bo
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
     });
   }
-  const res = await fetch(url.toString(), { credentials: "include" });
+  const res = await authFetch(url.toString());
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`);
   return res.json();
 }
@@ -26,9 +28,8 @@ async function get<T>(path: string, params?: Record<string, string | number | bo
 async function post<T>(path: string, body?: unknown, params?: Record<string, string>): Promise<T> {
   const url = new URL(BASE + path, typeof window !== "undefined" ? window.location.origin : "http://localhost");
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), {
+  const res = await authFetch(url.toString(), {
     method: "POST",
-    credentials: "include",
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
