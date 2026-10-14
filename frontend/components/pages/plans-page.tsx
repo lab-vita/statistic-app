@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchPlanRange, savePlan, createPlan,
+  fetchPlanMonth, savePlanItems,
   fetchStats, fetchAppointmentStats,
   toDateStr,
-  type PlanMonth, type PlanDay,
+  type PlanMonthResponse, type PlanDay,
 } from "@/lib/api";
 import {
   PageContent, Skeleton, Empty, ErrorBanner,
@@ -63,7 +63,7 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => ({
 export function PlansPage() {
   const [month,   setMonth]   = useState(new Date().getMonth() + 1);
   const [year]                = useState(YEAR);
-  const [plan,    setPlan]    = useState<PlanMonth | null>(null);
+  const [plan,    setPlan]    = useState<PlanMonthResponse | null>(null);
   const [actuals, setActuals] = useState<Record<string, Actuals>>({});
   const [edits,   setEdits]   = useState<Record<string, Record<string, string>>>({});
   const [saved,   setSaved]   = useState(true);
@@ -79,11 +79,11 @@ export function PlansPage() {
     setLoading(true); setError(null);
     try {
       const [planRes, statsRes, apptRes] = await Promise.all([
-        fetchPlanRange(year, month, year, month).catch(() => null),
+        fetchPlanMonth(year, month).catch(() => null),
         fetchStats(dateFrom, dateTo).catch(() => null),
         fetchAppointmentStats(dateFrom, dateTo).catch(() => null),
       ]);
-      setPlan(planRes?.plans[0] ?? null);
+      setPlan(planRes ?? null);
 
       // Строим actuals по дням (пока API даёт агрегаты, не по дням)
       const act: Record<string, Actuals> = {};
@@ -135,7 +135,10 @@ export function PlansPage() {
           for (const m of METRICS) d[m.key] = getVal(date, m.key);
           return { date, ...d };
         });
-        await createPlan(year, month, days as unknown as PlanDay[]);
+        const items = days.flatMap(d =>
+          Object.entries(d).filter(([k]) => k !== "date").map(([metric, value]) => ({ date: d.date, metric, value: Number(value) }))
+        );
+        await savePlanItems(items);
         await load();
         setSaved(true);
         setEdits({});
@@ -156,7 +159,10 @@ export function PlansPage() {
           ),
         };
       });
-      await savePlan(year, month, days);
+      const items = days.flatMap(d =>
+        METRICS.map(m => ({ date: d.date, metric: m.key, value: (d as unknown as Record<string, number>)[m.key] ?? 0 }))
+      );
+      await savePlanItems(items);
       await load();
       setSaved(true);
       setEdits({});
