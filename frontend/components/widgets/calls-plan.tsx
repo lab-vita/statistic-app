@@ -8,7 +8,7 @@ import {
   PLAN_METRICS, computePlanProgress, todayKemerovo,
   type PlanMetric, type Verdict,
 } from "@/lib/plan-forecast";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { WidgetCard, WidgetHeader, WidgetLabel, WidgetSkeleton, WidgetEmpty } from "./widget-card";
 import { cn } from "@/lib/utils";
 
 const n = (v: number) => Math.round(v).toLocaleString("ru-RU");
@@ -17,6 +17,11 @@ const VERDICT_BAR: Record<Verdict, string> = {
   good: "bg-emerald-500",
   warn: "bg-amber-500",
   bad:  "bg-red-500",
+};
+const VERDICT_TEXT: Record<Verdict, string> = {
+  good: "text-emerald-600 dark:text-emerald-400",
+  warn: "text-amber-600 dark:text-amber-400",
+  bad:  "text-red-600 dark:text-red-400",
 };
 const VERDICT_PILL: Record<Verdict, string> = {
   good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
@@ -40,129 +45,111 @@ export function CallsPlanWidget({ days, plan, dateFrom, dateTo, loading, metric:
 }) {
   const [metric, setMetric] = useState<PlanMetric>(initial);
 
-  if (loading) return <div className="h-full rounded-lg bg-muted/60 animate-pulse" />;
+  if (loading) return <WidgetSkeleton />;
 
   const p     = computePlanProgress({ byDay: plan?.by_day, metric, days, dateFrom, dateTo, today: today ?? todayKemerovo() });
   const label = PLAN_METRICS.find(m => m.key === metric)!.label;
 
-  return (
-    <Card className="h-full flex flex-col p-5">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted">
-            <Target className="h-3.5 w-3.5 text-muted-foreground/70" />
-          </div>
-          <div>
-            <p className="text-[13px] font-semibold leading-none">План и прогноз</p>
-            <p className="text-[11px] text-muted-foreground/60 mt-0.5">{label.toLowerCase()} звонки</p>
-          </div>
-        </div>
-        <div className="inline-flex items-center rounded-lg border border-border bg-background p-0.5">
-          {PLAN_METRICS.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setMetric(m.key)}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-150",
-                metric === m.key ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
+  const switcher = (
+    <div className="inline-flex items-center gap-1" role="tablist" aria-label="Показатель плана">
+      {PLAN_METRICS.map(m => (
+        <button
+          key={m.key}
+          type="button"
+          role="tab"
+          aria-selected={metric === m.key}
+          onClick={() => setMetric(m.key)}
+          className={cn(
+            "rounded-full border px-2.5 py-[3px] text-[11px] font-semibold transition-colors",
+            metric === m.key
+              ? "border-foreground bg-foreground text-background"
+              : "border-border bg-card text-text-2 hover:border-brand hover:text-brand",
+          )}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
 
-      {/* No plan */}
+  return (
+    <WidgetCard>
+      <WidgetHeader title="План и прогноз" meta={`${label.toLowerCase()} звонки`} right={switcher} />
+
       {p.state === "no-plan" ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center gap-1">
-          <Target className="h-7 w-7 text-muted-foreground/30 mb-1" />
-          <p className="text-[13px] font-medium text-muted-foreground">План на период не задан</p>
-          <p className="text-[11px] text-muted-foreground/60">Задайте его в разделе «Планы»</p>
-        </div>
+        <WidgetEmpty icon={Target} text="План на период не задан" hint="Задайте его в разделе «Планы»" />
       ) : (
-        <div className="flex-1 flex flex-col justify-between">
-          {/* Числа */}
-          <div className="flex items-end justify-between mb-3">
+        <div className="flex flex-1 flex-col">
+          <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1">Факт</p>
+              <WidgetLabel className="mb-1">Факт</WidgetLabel>
               <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">{n(p.fact)}</span>
-                <span className="text-[13px] text-muted-foreground/60">из {n(p.planTotal)}</span>
+                <span className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums">{n(p.fact)}</span>
+                <span className="text-[12px] text-text-3">из {n(p.planTotal)}</span>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1">Выполнено</p>
+              <WidgetLabel className="mb-1">Выполнено</WidgetLabel>
               <span className={cn(
-                "text-[22px] font-semibold leading-none tabular-nums",
-                p.verdict ? (p.verdict === "good" ? "text-emerald-600 dark:text-emerald-400"
-                           : p.verdict === "warn" ? "text-amber-600 dark:text-amber-400"
-                           : "text-red-600 dark:text-red-400") : "text-foreground"
+                "text-[22px] font-extrabold leading-none tabular-nums",
+                p.verdict ? VERDICT_TEXT[p.verdict] : "text-foreground",
               )}>
                 {formatPct(p.factPct ?? 0)}
               </span>
             </div>
           </div>
 
-          {/* Прогресс-бар */}
-          <div className="relative h-2 rounded-full bg-border overflow-hidden mb-1">
+          <div className="relative mb-1 h-2 overflow-hidden rounded-full bg-border">
             <div
               className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-500",
-                p.verdict ? VERDICT_BAR[p.verdict] : "bg-foreground"
-              )}
+                p.verdict ? VERDICT_BAR[p.verdict] : "bg-brand")}
               style={{ width: `${Math.min(100, p.factPct ?? 0)}%` }}
             />
             {p.forecastPct !== null && (
               <div
-                className="absolute top-0 bottom-0 w-0.5 bg-amber-400 opacity-80"
+                className="absolute inset-y-0 w-0.5 bg-amber-500"
                 style={{ left: `${Math.min(99, p.forecastPct)}%` }}
                 title={`Прогноз: ${n(p.forecast ?? 0)}`}
               />
             )}
           </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground/50 mb-4 tabular-nums">
+          <div className="mb-3 flex justify-between text-[10px] tabular-nums text-text-3">
             <span>0</span>
             {p.forecastPct !== null && p.forecast !== null && (
-              <span className="text-amber-600 dark:text-amber-400">прогноз {n(p.forecast)}</span>
+              <span className="font-semibold text-amber-600 dark:text-amber-400">прогноз {n(p.forecast)}</span>
             )}
             <span>{n(p.planTotal)}</span>
           </div>
 
-          {/* Вердикт */}
-          {p.state === "in-progress" && p.verdict && (
-            <div className="flex items-center justify-between gap-2">
-              <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium", VERDICT_PILL[p.verdict])}>
-                <TrendingUp className="h-3 w-3" />
-                {VERDICT_NOTE[p.verdict]}
-              </span>
-              {p.forecast !== null && p.forecast < p.planTotal && (
-                <span className="text-[11px] text-muted-foreground/60">
-                  не хватает {n(p.planTotal - p.forecast)}
+          <div className="mt-auto">
+            {p.state === "in-progress" && p.verdict && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className={cn("inline-flex items-center gap-1 rounded-[5px] px-2 py-1 text-[11px] font-bold", VERDICT_PILL[p.verdict])}>
+                  <TrendingUp className="h-3 w-3" />
+                  {VERDICT_NOTE[p.verdict]}
                 </span>
-              )}
-            </div>
-          )}
-          {p.state === "in-progress" && p.forecast === null && (
-            <p className="text-[11px] text-muted-foreground/60">
-              Прогноз появится после первого завершённого дня
-            </p>
-          )}
-          {p.state === "finished" && p.verdict && (
-            <div className="flex items-center justify-between gap-2">
-              <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium", VERDICT_PILL[p.verdict])}>
-                {(p.factPct ?? 0) >= 100 ? "План выполнен" : `Итог: ${formatPct(p.factPct ?? 0)}`}
-              </span>
-              {(p.factPct ?? 0) < 100 && (
-                <span className="text-[11px] text-muted-foreground/60">не хватило {n(p.planTotal - p.fact)}</span>
-              )}
-            </div>
-          )}
-          {p.state === "upcoming" && (
-            <p className="text-[11px] text-muted-foreground/60">Период ещё не начался</p>
-          )}
+                {p.forecast !== null && p.forecast < p.planTotal && (
+                  <span className="text-[11px] text-text-3">не хватает {n(p.planTotal - p.forecast)}</span>
+                )}
+              </div>
+            )}
+            {p.state === "in-progress" && p.forecast === null && (
+              <p className="text-[11px] text-text-3">Прогноз появится после первого завершённого дня</p>
+            )}
+            {p.state === "finished" && p.verdict && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className={cn("inline-flex items-center rounded-[5px] px-2 py-1 text-[11px] font-bold", VERDICT_PILL[p.verdict])}>
+                  {(p.factPct ?? 0) >= 100 ? "План выполнен" : `Итог: ${formatPct(p.factPct ?? 0)}`}
+                </span>
+                {(p.factPct ?? 0) < 100 && (
+                  <span className="text-[11px] text-text-3">не хватило {n(p.planTotal - p.fact)}</span>
+                )}
+              </div>
+            )}
+            {p.state === "upcoming" && <p className="text-[11px] text-text-3">Период ещё не начался</p>}
+          </div>
         </div>
       )}
-    </Card>
+    </WidgetCard>
   );
 }
