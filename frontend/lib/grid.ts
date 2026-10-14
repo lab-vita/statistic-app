@@ -220,19 +220,41 @@ export interface PlacedWidget {
   config?: Record<string, string>; // произвольные настройки виджета
 }
 
-// ─── Раскладка по умолчанию — повторяет прежнюю главную ──────
+// ─── Раскладка по умолчанию — все виджеты, сверху сводка ─────
+//
+// Без прав на раздел виджеты отфильтровываются, а сетка подтягивается вверх
+// (compactGrid), поэтому дыр не остаётся.
 
 export const DEFAULT_LAYOUT: PlacedWidget[] = [
-  { id: "d-incoming",   type: "calls_single",     x: 0, y: 0,  w: 3,  h: 2, config: { metric: "incoming" } },
-  { id: "d-lost",       type: "calls_single",     x: 3, y: 0,  w: 3,  h: 2, config: { metric: "lost" } },
-  { id: "d-conversion", type: "calls_single",     x: 6, y: 0,  w: 3,  h: 2, config: { metric: "conversion" } },
-  { id: "d-revenue",    type: "revenue_single",   x: 9, y: 0,  w: 3,  h: 2, config: { metric: "total_paid" } },
-  { id: "d-chart",      type: "calls_chart",      x: 0, y: 2,  w: 8,  h: 3, config: { metric: "incoming" } },
-  { id: "d-methods",    type: "revenue_methods",  x: 8, y: 2,  w: 4,  h: 3 },
-  { id: "d-funnel",     type: "calls_funnel",     x: 0, y: 5,  w: 6,  h: 5 },
-  { id: "d-appts",      type: "appt_summary",     x: 6, y: 5,  w: 6,  h: 3 },
-  { id: "d-sources",    type: "appt_sources",     x: 6, y: 8,  w: 6,  h: 2 },
-  { id: "d-operators",  type: "calls_operators",  x: 0, y: 10, w: 12, h: 4 },
+  // сводка: главные цифры и воронка
+  { id: "d-incoming",     type: "calls_single",     x: 0, y: 0,  w: 3,  h: 2, config: { metric: "incoming" } },
+  { id: "d-lost",         type: "calls_single",     x: 3, y: 0,  w: 3,  h: 2, config: { metric: "lost" } },
+  { id: "d-visits",       type: "appt_single",      x: 6, y: 0,  w: 3,  h: 2, config: { metric: "visits" } },
+  { id: "d-revenue",      type: "revenue_single",   x: 9, y: 0,  w: 3,  h: 2, config: { metric: "total_paid" } },
+  { id: "d-funnel-steps", type: "funnel_steps",     x: 0, y: 2,  w: 12, h: 2 },
+  { id: "d-chart",        type: "calls_chart",      x: 0, y: 4,  w: 8,  h: 3, config: { metric: "incoming" } },
+  { id: "d-plans",        type: "plans_progress",   x: 8, y: 4,  w: 4,  h: 3 },
+  // звонки
+  { id: "d-trio",         type: "calls_trio",       x: 0, y: 7,  w: 6,  h: 2 },
+  { id: "d-sources",      type: "appt_sources",     x: 6, y: 7,  w: 6,  h: 2 },
+  { id: "d-funnel",       type: "calls_funnel",     x: 0, y: 9,  w: 6,  h: 6 },
+  { id: "d-appts",        type: "appt_summary",     x: 6, y: 9,  w: 6,  h: 3 },
+  { id: "d-plan",         type: "calls_plan",       x: 6, y: 12, w: 6,  h: 3 },
+  { id: "d-heatmap",      type: "calls_heatmap",    x: 0, y: 15, w: 8,  h: 4, config: { metric: "total" } },
+  { id: "d-conversion",   type: "calls_conversion", x: 8, y: 15, w: 4,  h: 4 },
+  // воронка, записи, выручка по дням
+  { id: "d-funnel-trend", type: "funnel_trend",     x: 0, y: 19, w: 8,  h: 3 },
+  { id: "d-methods",      type: "revenue_methods",  x: 8, y: 19, w: 4,  h: 3 },
+  { id: "d-revenue-day",  type: "revenue_chart",    x: 0, y: 22, w: 6,  h: 3 },
+  { id: "d-appt-day",     type: "appt_chart",       x: 6, y: 22, w: 6,  h: 3 },
+  // рейтинги
+  { id: "d-doctors",      type: "doctors_top",      x: 0, y: 25, w: 4,  h: 4 },
+  { id: "d-services",     type: "revenue_services", x: 4, y: 25, w: 4,  h: 4 },
+  { id: "d-admins",       type: "appt_admins",      x: 8, y: 25, w: 4,  h: 4 },
+  // полгода и операторы
+  { id: "d-months-calls", type: "reports_months",   x: 0, y: 29, w: 6,  h: 3, config: { metric: "calls" } },
+  { id: "d-months-appts", type: "reports_months",   x: 6, y: 29, w: 6,  h: 3, config: { metric: "appts" } },
+  { id: "d-operators",    type: "calls_operators",  x: 0, y: 32, w: 12, h: 4 },
 ];
 
 // ─── localStorage ──────────────────────────────────────────────
