@@ -8,8 +8,7 @@ import {
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
-  PageContent, TabGroup, Skeleton, Empty, ErrorBanner, Delta,
-  Th, Td,
+  PageContent, Skeleton, Empty, ErrorBanner, Delta, Th, Td, PageHeader, PeriodPill, DateNav, HeaderDivider, RefreshButton,
 } from "@/components/ui/primitives";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -25,7 +24,7 @@ const P_MAP: Record<string, PeriodType> = {
 function fmt(n: number) { return n.toLocaleString("ru-RU"); }
 function fmtPct(n: number) { return n.toFixed(1) + "%"; }
 
-const COLORS = ["#16a34a","#2563eb","#d97706","#7c3aed","#dc2626","#0891b2","#65a30d","#9333ea","#ea580c","#0284c7","#4f46e5","#db2777","#059669","#7c3aed","#b45309"];
+const COLORS = ["#1a9e6e","#328fcd","#e09020","#8b5cf6","#e03a5a","#06b6d4","#1a9e6e","#8b5cf6","#e09020","#0284c7","#4f46e5","#db2777","#1a9e6e","#8b5cf6","#b8730e"];
 
 function DoctorBarChart({ doctors }: { doctors: PaymentDoctor[] }) {
   const ct = useChartTheme();
@@ -151,25 +150,23 @@ export function DoctorsPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-card px-4 lg:px-5">
-        <span className="text-[13px] font-bold">Врачи</span>
+      <PageHeader title="Врачи">
         <div className="flex-1" />
-        <TabGroup
+        <PeriodPill
           items={PERIODS}
           active={periodLabel}
           onChange={l => { setPeriodLabel(l); setPeriod(getDefaultPeriod(P_MAP[l] ?? "month")); }}
         />
-        <div className="flex items-center gap-0.5">
-          <button onClick={() => setPeriod(p => shiftPeriod(p, -1))}
-            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors text-base">‹</button>
-          <span className="text-[12px] font-medium min-w-[120px] text-center tabular-nums">{formatPeriodLabel(period)}</span>
-          <button onClick={() => setPeriod(p => shiftPeriod(p, 1))}
-            disabled={toDateStr(period.dateTo) >= yesterday}
-            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40 text-base">›</button>
-        </div>
-        <div className="h-4 w-px bg-border" />
-        <button onClick={load} className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors text-sm">↻</button>
-      </header>
+        <HeaderDivider />
+        <DateNav
+          label={formatPeriodLabel(period)}
+          onPrev={() => setPeriod(p => shiftPeriod(p, -1))}
+          onNext={() => setPeriod(p => shiftPeriod(p, 1))}
+          nextDisabled={toDateStr(period.dateTo) >= yesterday}
+        />
+        <HeaderDivider />
+        <RefreshButton onClick={load} />
+      </PageHeader>
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
@@ -186,15 +183,15 @@ export function DoctorsPage() {
             {/* KPI */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">Выручка по врачам</p>
-                <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400">
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Выручка по врачам</p>
+                <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-emerald-600 dark:text-emerald-400">
                   {fmtRub(totalByDoctors)}
                 </p>
                 <p className="text-[11px] text-muted-foreground/60 mt-1">{doctors.length} врачей</p>
               </div>
               <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">Средний чек</p>
-                <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-foreground">
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Средний чек</p>
+                <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-foreground">
                   {fmtRub(doctors.reduce((s, d) => s + d.count, 0) > 0
                     ? totalByDoctors / doctors.reduce((s, d) => s + d.count, 0)
                     : 0)}
@@ -204,13 +201,13 @@ export function DoctorsPage() {
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-4 col-span-2 sm:col-span-1">
-                <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">Лидер по выручке</p>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Лидер по выручке</p>
                 {doctors[0] && (
                   <>
                     <p className="text-[18px] font-black leading-tight tracking-tight text-foreground">
                       {doctors[0].doctor_surname || (doctors[0].doctor_name ?? "").split(" ")[0]}
                     </p>
-                    <p className="text-[22px] font-black leading-none tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 mt-1">
+                    <p className="text-[22px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-emerald-600 dark:text-emerald-400 mt-1">
                       {fmtRub(doctors[0].total_paid)}
                     </p>
                     <p className="text-[11px] text-muted-foreground/60 mt-1">

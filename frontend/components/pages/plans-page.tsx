@@ -8,8 +8,7 @@ import {
   type PlanMonthResponse, type PlanDay,
 } from "@/lib/api";
 import {
-  PageContent, Skeleton, Empty, ErrorBanner,
-  TabGroup,
+  PageContent, Skeleton, Empty, ErrorBanner, TabGroup, PageHeader, RefreshButton,
 } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
@@ -192,36 +191,38 @@ export function PlansPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-card px-4 lg:px-5">
-        <span className="text-[13px] font-bold">Планы</span>
-        <div className="flex-1" />
-        <div className="flex gap-1">
+      <PageHeader title="Планы">
+        <div className="flex flex-1 flex-wrap items-center gap-0.5" role="tablist" aria-label="Месяц плана">
           {MONTHS.map(m => (
             <button
               key={m.value}
+              type="button"
+              role="tab"
+              aria-selected={month === m.value}
               onClick={() => setMonth(m.value)}
               className={cn(
-                "px-2 py-0.5 text-[11px] rounded-md transition-colors",
+                "rounded-[5px] px-2 py-[3px] text-[11px] font-semibold transition-colors",
                 month === m.value
-                  ? "bg-foreground text-background font-bold"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  ? "bg-brand text-brand-foreground"
+                  : "text-text-3 hover:bg-accent hover:text-foreground"
               )}
             >
-              {m.label.slice(0, 3)}
+              {m.label.slice(0, 3).toLowerCase()}
             </button>
           ))}
         </div>
         {!saved && (
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
-            className="ml-2 px-3 py-1 text-[12px] font-bold rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            className="h-7 rounded-[7px] bg-brand px-4 text-[12px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong disabled:opacity-50"
           >
-            {saving ? "Сохранью..." : "Сохранить"}
+            {saving ? "Сохраняю…" : "Сохранить"}
           </button>
         )}
-        <button onClick={load} className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors text-sm">↻</button>
-      </header>
+        <RefreshButton onClick={load} />
+      </PageHeader>
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
@@ -285,10 +286,10 @@ export function PlansPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60 w-32">День</th>
-                      <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60">План</th>
-                      <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60">Факт</th>
-                      <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60">Вып</th>
+                      <th className="px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 w-32">День</th>
+                      <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">План</th>
+                      <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">Факт</th>
+                      <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">Вып</th>
                     </tr>
                   </thead>
                   <tbody>
