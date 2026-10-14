@@ -21,15 +21,15 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-// ─── Константы ──────────────────────────────────────────────────────
+// ─── Константы
 
-const PERIODS = ["День", "Неделя", "Месяц", "Квартал", "Год", "Период"];
+const PERIODS = ["День", "Неделя", "Месяц", "Квартал", "Год"];
 const P_MAP: Record<string, PeriodType> = {
   "День": "day", "Неделя": "week", "Месяц": "month",
-  "Квартал": "quarter", "Год": "year", "Период": "custom",
+  "Квартал": "quarter", "Год": "year",
 };
 
-// ─── Типы ────────────────────────────────────────────────────────────
+// ─── Типы
 
 interface FunnelData {
   calls:           number;
@@ -48,7 +48,7 @@ interface FunnelData {
   }[];
 }
 
-// ─── Вспомогательные компоненты ────────────────────────────────────
+// ─── Вспомогательные компоненты
 
 function ConvPct({ value, good, bad }: { value: number; good: number; bad: number }) {
   const color =
@@ -91,18 +91,16 @@ function Arrow({ pct, good, bad }: { pct: number; good: number; bad: number }) {
   );
 }
 
-// ─── Основная страница ───────────────────────────────────────────────
+// ─── Основная страница
 
 export function FunnelPage() {
   const [periodLabel, setPeriodLabel] = useState("Месяц");
   const [period, setPeriod]           = useState<Period>(getDefaultPeriod("month"));
-  const [customFrom, setCustomFrom]   = useState("");
-  const [customTo,   setCustomTo]     = useState("");
 
-  const [data,      setData]      = useState<FunnelData | null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [refreshing,setRefreshing]= useState(false);
-  const [error,     setError]     = useState<string | null>(null);
+  const [data,       setData]      = useState<FunnelData | null>(null);
+  const [loading,    setLoading]   = useState(true);
+  const [refreshing, setRefreshing]= useState(false);
+  const [error,      setError]     = useState<string | null>(null);
 
   const dateFrom = toDateStr(period.dateFrom);
   const dateTo   = toDateStr(period.dateTo);
@@ -127,9 +125,9 @@ export function FunnelPage() {
       const visits  = apptRes.total.visits ?? 0;
       const revenue = payRes.total_paid ?? 0;
 
-      const callsToAppt    = totalCalls > 0 ? (appt / totalCalls) * 100 : 0;
-      const apptToVisit    = appt > 0       ? (visits / appt) * 100    : 0;
-      const revenuePerVisit = visits > 0    ? revenue / visits          : 0;
+      const callsToAppt     = totalCalls > 0 ? (appt / totalCalls) * 100 : 0;
+      const apptToVisit     = appt > 0       ? (visits / appt) * 100    : 0;
+      const revenuePerVisit = visits > 0     ? revenue / visits          : 0;
 
       const operators = convRes.operators.map((op: ConversionOperator) => ({
         id:           op.operator_id,
@@ -167,10 +165,6 @@ export function FunnelPage() {
         onPrev={() => setPeriod(p => shiftPeriod(p, -1))}
         onNext={() => setPeriod(p => shiftPeriod(p, 1))}
         nextDisabled={toDateStr(period.dateTo) >= yesterday}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFrom={setCustomFrom}
-        onCustomTo={setCustomTo}
         onRefresh={() => load(true)}
         refreshing={refreshing}
       />
