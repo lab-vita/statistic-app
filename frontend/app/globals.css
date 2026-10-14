@@ -2,8 +2,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+ * Пульс — дизайн-система (см. DESIGN.md)
+ * Светлая сине-голубая палитра, белые карточки на голубоватом фоне,
+ * один акцент #328FCD, Montserrat.
+ */
+
 @theme inline {
-  --font-sans: var(--font-montserrat);
+  --font-sans: var(--font-montserrat), "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono);
 
   --color-background:           var(--background);
@@ -30,104 +36,166 @@
   --color-sidebar-accent:       var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 
+  /* Бренд и вторичные оттенки текста */
+  --color-brand:            var(--brand);
+  --color-brand-strong:     var(--brand-strong);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft:       var(--brand-soft);
+  --color-text-2:           var(--text-2);
+  --color-text-3:           var(--text-3);
+  --color-hairline:         var(--hairline);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  --radius-sm:  calc(var(--radius) - 2px);
-  --radius-md:  var(--radius);
-  --radius-lg:  calc(var(--radius) + 2px);
-  --radius-xl:  calc(var(--radius) + 6px);
+  --radius-sm:  5px;
+  --radius-md:  7px;
+  --radius-lg:  12px;
+  --radius-xl:  14px;
+
+  --shadow-card: var(--card-shadow);
+  --shadow-pop:  var(--pop-shadow);
+}
+
+/* Статусные цвета приводим к палитре макета: компоненты продолжают
+   писать emerald / red / amber / blue, а получают цвета «Пульса». */
+@theme {
+  --color-emerald-50:  #eafaf4;
+  --color-emerald-400: #3cc493;
+  --color-emerald-500: #1a9e6e;
+  --color-emerald-600: #178c61;
+  --color-emerald-700: #127352;
+
+  --color-red-50:  #fff0f2;
+  --color-red-400: #f0657f;
+  --color-red-500: #e03a5a;
+  --color-red-600: #d02e4e;
+  --color-red-700: #b2233f;
+
+  --color-amber-50:  #fef8ec;
+  --color-amber-400: #f2b04c;
+  --color-amber-500: #e09020;
+  --color-amber-600: #b8730e;
+  --color-amber-700: #985e0a;
+
+  --color-blue-50:  #e6f3fb;
+  --color-blue-400: #5cafe3;
+  --color-blue-500: #328fcd;
+  --color-blue-600: #2a7fb9;
+  --color-blue-700: #2070a8;
 }
 
 @custom-variant dark (&:is(.dark *));
 
 /* ── LIGHT ── */
 :root {
-  --background:          oklch(0.962 0.002 247);
-  --foreground:          oklch(0.12 0.010 255);
+  --background:          #f1f7fc;
+  --foreground:          #0d2236;
 
-  --card:                oklch(1 0 0);
-  --card-foreground:     oklch(0.12 0.010 255);
+  --card:                #ffffff;
+  --card-foreground:     #0d2236;
 
-  --popover:             oklch(1 0 0);
-  --popover-foreground:  oklch(0.12 0.010 255);
+  --popover:             #ffffff;
+  --popover-foreground:  #0d2236;
 
-  --primary:             oklch(0.13 0.012 255);
-  --primary-foreground:  oklch(0.98 0 0);
+  --primary:             #328fcd;
+  --primary-foreground:  #ffffff;
 
-  --secondary:           oklch(0.95 0.003 247);
-  --secondary-foreground:oklch(0.13 0.012 255);
+  --secondary:           #e6f3fb;
+  --secondary-foreground:#0d2236;
 
-  --muted:               oklch(0.94 0.003 247);
-  --muted-foreground:    oklch(0.50 0.008 255);
+  --muted:               #eaf3fa;
+  --muted-foreground:    #5f8aa8;
 
-  --accent:              oklch(0.92 0.004 247);
-  --accent-foreground:   oklch(0.13 0.012 255);
+  --accent:              #e5f1fa;
+  --accent-foreground:   #0d2236;
 
-  --destructive:         oklch(0.577 0.245 27.325);
+  --destructive:         #e03a5a;
 
-  --border:              oklch(0.885 0.004 247);
-  --input:               oklch(0.885 0.004 247);
-  --ring:                oklch(0.50 0.010 255);
+  --border:              #d6e8f5;
+  --hairline:            #e8f2f9;
+  --input:               #d6e8f5;
+  --ring:                #328fcd;
 
-  --chart-1:             oklch(0.62 0.17 145);
-  --chart-2:             oklch(0.55 0.20 255);
-  --chart-3:             oklch(0.56 0.24 27);
-  --chart-4:             oklch(0.72 0.16 84);
-  --chart-5:             oklch(0.60 0.19 302);
+  --brand:               #328fcd;
+  --brand-strong:        #2070a8;
+  --brand-foreground:    #ffffff;
+  --brand-soft:          #e6f3fb;
+  --text-2:              #3a6080;
+  --text-3:              #6f9fbd;
 
-  --sidebar:             oklch(0.980 0.001 247);
-  --sidebar-foreground:  oklch(0.12 0.010 255);
-  --sidebar-border:      oklch(0.885 0.004 247);
-  --sidebar-accent:      oklch(0.92 0.004 247);
-  --sidebar-accent-foreground: oklch(0.12 0.010 255);
+  --chart-1:             #328fcd;
+  --chart-2:             #1a9e6e;
+  --chart-3:             #e03a5a;
+  --chart-4:             #e09020;
+  --chart-5:             #8b5cf6;
+
+  --sidebar:             #ffffff;
+  --sidebar-foreground:  #0d2236;
+  --sidebar-border:      #d6e8f5;
+  --sidebar-accent:      #e5f1fa;
+  --sidebar-accent-foreground: #0d2236;
+
+  --card-shadow: 0 1px 4px rgba(15, 60, 100, .07), 0 1px 2px rgba(15, 60, 100, .04);
+  --pop-shadow:  0 8px 24px rgba(15, 60, 100, .12), 0 2px 6px rgba(15, 60, 100, .06);
 
   --radius: 0.5rem;
 }
 
-/* ── DARK ── */
+/* ── DARK ── глубокий navy в той же гамме */
 .dark {
-  --background:          oklch(0.115 0.006 255);
-  --foreground:          oklch(0.94 0.004 255);
+  --background:          #0b1724;
+  --foreground:          #e4eef7;
 
-  --card:                oklch(0.155 0.006 255);
-  --card-foreground:     oklch(0.94 0.004 255);
+  --card:                #112131;
+  --card-foreground:     #e4eef7;
 
-  --popover:             oklch(0.175 0.007 255);
-  --popover-foreground:  oklch(0.94 0.004 255);
+  --popover:             #142739;
+  --popover-foreground:  #e4eef7;
 
-  --primary:             oklch(0.93 0.003 255);
-  --primary-foreground:  oklch(0.155 0.006 255);
+  --primary:             #4aa3e0;
+  --primary-foreground:  #06121e;
 
-  --secondary:           oklch(0.21 0.007 255);
-  --secondary-foreground:oklch(0.94 0.004 255);
+  --secondary:           #17304a;
+  --secondary-foreground:#e4eef7;
 
-  --muted:               oklch(0.21 0.007 255);
-  --muted-foreground:    oklch(0.54 0.008 255);
+  --muted:               #162a3e;
+  --muted-foreground:    #86a9c4;
 
-  --accent:              oklch(0.24 0.008 255);
-  --accent-foreground:   oklch(0.94 0.004 255);
+  --accent:              #1a3249;
+  --accent-foreground:   #e4eef7;
 
-  --destructive:         oklch(0.65 0.20 22);
+  --destructive:         #f0657f;
 
-  --border:              oklch(1 0 0 / 9%);
-  --input:               oklch(1 0 0 / 11%);
-  --ring:                oklch(0.55 0.008 255);
+  --border:              #1f3a54;
+  --hairline:            #192f45;
+  --input:               #24425e;
+  --ring:                #4aa3e0;
 
-  --chart-1:             oklch(0.68 0.16 145);
-  --chart-2:             oklch(0.62 0.19 255);
-  --chart-3:             oklch(0.63 0.22 27);
-  --chart-4:             oklch(0.76 0.15 84);
-  --chart-5:             oklch(0.66 0.17 302);
+  --brand:               #3d9ad8;
+  --brand-strong:        #5cafe3;
+  --brand-foreground:    #ffffff;
+  --brand-soft:          #15324c;
+  --text-2:              #a9c4da;
+  --text-3:              #7b9db8;
 
-  --sidebar:             oklch(0.138 0.006 255);
-  --sidebar-foreground:  oklch(0.94 0.004 255);
-  --sidebar-border:      oklch(1 0 0 / 8%);
-  --sidebar-accent:      oklch(0.22 0.008 255);
-  --sidebar-accent-foreground: oklch(0.94 0.004 255);
+  --chart-1:             #4aa3e0;
+  --chart-2:             #3cc493;
+  --chart-3:             #f0657f;
+  --chart-4:             #f2b04c;
+  --chart-5:             #a78bfa;
+
+  --sidebar:             #0e1d2c;
+  --sidebar-foreground:  #e4eef7;
+  --sidebar-border:      #1f3a54;
+  --sidebar-accent:      #1a3249;
+  --sidebar-accent-foreground: #e4eef7;
+
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 0 0 1px rgba(255, 255, 255, .03);
+  --pop-shadow:  0 10px 28px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .05);
 }
 
 /* ── BASE ── */
@@ -142,30 +210,59 @@
 
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "cv02","cv03","cv04","cv11";
+    font-size: 13px;
+    line-height: 1.5;
   }
 
-  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  /* Нативные поля дат/селекты в тон теме */
+  input[type="date"] { color-scheme: light; }
+  .dark input[type="date"] { color-scheme: dark; }
+
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track  { background: transparent; }
   ::-webkit-scrollbar-thumb  { @apply bg-border rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/30; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-text-3/50; }
+}
+
+/* ── COMPONENTS ──
+   Карточка «Пульса»: белая, радиус 12px, мягкая тень, без рамки.
+   Любой блок с bg-card + border-border + скруглением получает этот вид,
+   поэтому старая разметка «rounded-lg border border-border bg-card» тоже
+   рендерится как карточка из макета. Слой utilities + составной селектор,
+   чтобы перебить одиночный border-border. */
+@layer utilities {
+  .card-surface,
+  .rounded-lg.bg-card.border,
+  .rounded-xl.bg-card.border {
+    @apply rounded-lg bg-card;
+    border-color: transparent;
+    box-shadow: var(--card-shadow);
+  }
+  .dark .card-surface,
+  .dark .rounded-lg.bg-card.border,
+  .dark .rounded-xl.bg-card.border {
+    border-color: var(--hairline);
+  }
 }
 
 /* ── UTILITIES ── */
 @layer utilities {
   .metric-value {
-    @apply text-[26px] font-semibold leading-none tracking-tight tabular-nums;
+    @apply text-[30px] font-extrabold leading-none tracking-[-0.04em] tabular-nums;
   }
   .metric-label {
-    @apply text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60;
+    @apply text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3;
   }
-  .pill-green  { @apply inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400; }
-  .pill-red    { @apply inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400; }
-  .pill-amber  { @apply inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400; }
-  .pill-blue   { @apply inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400; }
-  .pill-muted  { @apply inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground; }
-  .tab-btn     { @apply rounded-md px-3 py-1 text-[12px] font-medium transition-all duration-150; }
+  .section-title {
+    @apply text-[13px] font-bold text-foreground;
+  }
+  .pill-green  { @apply inline-flex items-center rounded-[5px] bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400; }
+  .pill-red    { @apply inline-flex items-center rounded-[5px] bg-red-500/10 px-1.5 py-0.5 text-[11px] font-bold text-red-600 dark:text-red-400; }
+  .pill-amber  { @apply inline-flex items-center rounded-[5px] bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400; }
+  .pill-blue   { @apply inline-flex items-center rounded-[5px] bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-bold text-blue-600 dark:text-blue-400; }
+  .pill-muted  { @apply inline-flex items-center rounded-[5px] bg-accent px-1.5 py-0.5 text-[11px] font-bold text-text-2; }
+  .tab-btn     { @apply rounded-full px-3.5 py-1 text-[12px] font-semibold transition-all duration-150; }
   .tab-btn-active  { @apply bg-foreground text-background; }
-  .tab-btn-idle    { @apply text-muted-foreground hover:text-foreground; }
-  .tab-group   { @apply inline-flex items-center rounded-lg border border-border bg-background p-0.5; }
+  .tab-btn-idle    { @apply text-text-2 hover:text-brand; }
+  .tab-group   { @apply inline-flex items-center gap-1; }
 }

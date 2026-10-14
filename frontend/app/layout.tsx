@@ -22,7 +22,7 @@ export default function RootLayout({
     <html lang="ru" suppressHydrationWarning
       className={`${montserrat.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-background text-foreground font-[var(--font-montserrat)]">
+      <body className="min-h-full bg-background text-foreground font-sans">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
