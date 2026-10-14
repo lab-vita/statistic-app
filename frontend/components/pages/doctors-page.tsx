@@ -58,7 +58,7 @@ function DoctorBarChart({ doctors }: { doctors: PaymentDoctor[] }) {
           tickLine={false}
         />
         <Tooltip
-          formatter={(v: number) => [fmtRub(v), "Выручка"]}
+          formatter={(v) => [typeof v === "number" ? fmtRub(v) : "—", "Выручка"]}
           {...ct.tooltip}
         />
         <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={20}>
