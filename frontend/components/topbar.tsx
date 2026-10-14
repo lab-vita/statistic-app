@@ -1,1 +1,233 @@
-InVzZSBjbGllbnQiOwoKaW1wb3J0IHsgdXNlU3RhdGUsIHVzZVJlZiwgdXNlRWZmZWN0IH0gZnJvbSAicmVhY3QiOwppbXBvcnQgeyBDaGV2cm9uTGVmdCwgQ2hldnJvblJpZ2h0LCBSZWZyZXNoQ3csIENoZXZyb25Eb3duLCBDYWxlbmRhckRheXMgfSBmcm9tICJsdWNpZGUtcmVhY3QiOwppbXBvcnQgeyBQZXJpb2QsIFBlcmlvZFR5cGUsIHNoaWZ0UGVyaW9kLCBmb3JtYXRQZXJpb2RMYWJlbCB9IGZyb20gIkAvbGliL3BlcmlvZHMiOwppbXBvcnQgeyB0b0RhdGVTdHIsIE9wZXJhdG9yLCBBZG1pbiB9IGZyb20gIkAvbGliL2FwaSI7CmltcG9ydCB7IHR5cGUgU2VjdGlvbiB9IGZyb20gIkAvY29tcG9uZW50cy9zaWRlYmFyIjsKaW1wb3J0IHsgY24gfSBmcm9tICJAL2xpYi91dGlscyI7Cgpjb25zdCBQRVJJT0RTOiB7IHR5cGU6IFBlcmlvZFR5cGU7IGxhYmVsOiBzdHJpbmcgfVtdID0gWwogIHsgdHlwZTogImRheSIsICAgICBsYWJlbDogItCU0LXQvdGMIiAgICB9LAogIHsgdHlwZTogIndlZWsiLCAgICBsYWJlbDogItCd0LXQtNC10LvRjyIgIH0sCiAgeyB0eXBlOiAibW9udGgiLCAgIGxhYmVsOiAi0JzQtdGB0Y/RhiIgICB9LAogIHsgdHlwZTogInF1YXJ0ZXIiLCBsYWJlbDogItCa0LLQsNGA0YLQsNC7IiB9LAogIHsgdHlwZTogInllYXIiLCAgICBsYWJlbDogItCT0L7QtCIgICAgIH0sCiAgeyB0eXBlOiAiY3VzdG9tIiwgIGxhYmVsOiAi0J/QtdGA0LjQvtC0IiAgfSwKXTsKCmNvbnN0IFNFQ1RJT05fTEFCRUxTOiBSZWNvcmQ8U2VjdGlvbiwgc3RyaW5nPiA9IHsKICBob21lOiAi0JPQu9Cw0LLQvdCw0Y8iLCBjYWxsczogItCX0LLQvtC90LrQuCIsIGFwcG9pbnRtZW50czogItCX0LDQv9C40YHQuCIsCiAgcmV2ZW51ZTogItCS0YvRgNGD0YfQutCwIiwgcmVwb3J0czogItCe0YLRh9GR0YLRiyIsIHBsYW5zOiAi0J/Qu9Cw0L3RiyIsIGFkbWluOiAi0JTQvtGB0YLRg9C/IiwKICBhYm91dDogItCeINC/0YDQuNC70L7QttC10L3QuNC4IiwKfTsKCmNvbnN0IEdST1VQX09SREVSICA9IFsiY2FsbGNlbnRlciIsICJhZG1pbiIsICJvdGhlciJdIGFzIGNvbnN0Owpjb25zdCBHUk9VUF9MQUJFTFM6IFJlY29yZDxzdHJpbmcsIHN0cmluZz4gPSB7CiAgY2FsbGNlbnRlcjogItCa0L7Qu9C7LdGG0LXQvdGC0YAiLCBhZG1pbjogItCQ0LTQvNC40L3QuNGB0YLRgNCw0YLQvtGA0YsiLCBvdGhlcjogItCf0YDQvtGH0LjQtSIsCn07CgppbnRlcmZhY2UgVG9wYmFyUHJvcHMgewogIHNlY3Rpb246ICAgICAgICAgICAgICBTZWN0aW9uOwogIHBlcmlvZDogICAgICAgICAgICAgICBQZXJpb2Q7CiAgb25DaGFuZ2U6ICAgICAgICAgICAgIChwOiBQZXJpb2QpID0+IHZvaWQ7CiAgb25UeXBlQ2hhbmdlOiAgICAgICAgICh0OiBQZXJpb2RUeXBlKSA9PiB2b2lkOwogIGN1c3RvbUZyb20/OiAgICAgICAgICBzdHJpbmc7CiAgY3VzdG9tVG8/OiAgICAgICAgICAgIHN0cmluZzsKICBvbkN1c3RvbUZyb21DaGFuZ2U/OiAgKHY6IHN0cmluZykgPT4gdm9pZDsKICBvbkN1c3RvbVRvQ2hhbmdlPzogICAgKHY6IHN0cmluZykgPT4gdm9pZDsKICBvblJlZnJlc2g6ICAgICAgICAgICAgKCkgPT4gdm9pZDsKICByZWZyZXNoaW5nOiAgICAgICAgICAgYm9vbGVhbjsKICBvcGVyYXRvcnM/OiAgICAgICAgICAgT3BlcmF0b3JbXTsKICBzZWxlY3RlZE9wZXJhdG9yPzogICAgc3RyaW5nIHwgbnVsbDsKICBvblNlbGVjdE9wZXJhdG9yPzogICAgKGlkOiBzdHJpbmcgfCBudWxsKSA9PiB2b2lkOwogIGFkbWlucz86ICAgICAgICAgICAgICBBZG1pbltdOwogIHNlbGVjdGVkQWRtaW4/OiAgICAgICBzdHJpbmcgfCBudWxsOwogIG9uU2VsZWN0QWRtaW4/OiAgICAgICAoczogc3RyaW5nIHwgbnVsbCkgPT4gdm9pZDsKfQoKZnVuY3Rpb24gRHJvcGRvd24oeyB0cmlnZ2VyLCBjaGlsZHJlbiB9OiB7IHRyaWdnZXI6IFJlYWN0LlJlYWN0Tm9kZTsgY2hpbGRyZW46IFJlYWN0LlJlYWN0Tm9kZSB9KSB7CiAgY29uc3QgW29wZW4sIHNldE9wZW5dID0gdXNlU3RhdGUoZmFsc2UpOwogIGNvbnN0IHJlZiA9IHVzZVJlZjxIVE1MRGl2RWxlbWVudD4obnVsbCk7CiAgdXNlRWZmZWN0KCgpID0+IHsKICAgIGNvbnN0IGggPSAoZTogTW91c2VFdmVudCkgPT4geyBpZiAocmVmLmN1cnJlbnQgJiYgIXJlZi5jdXJyZW50LmNvbnRhaW5zKGUudGFyZ2V0IGFzIE5vZGUpKSBzZXRPcGVuKGZhbHNlKTsgfTsKICAgIGRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoIm1vdXNlZG93biIsIGgpOwogICAgcmV0dXJuICgpID0+IGRvY3VtZW50LnJlbW92ZUV2ZW50TGlzdGVuZXIoIm1vdXNlZG93biIsIGgpOwogIH0sIFtdKTsKICByZXR1cm4gKAogICAgPGRpdiBjbGFzc05hbWU9InJlbGF0aXZlIiByZWY9e3JlZn0+CiAgICAgIDxkaXYgb25DbGljaz17KCkgPT4gc2V0T3Blbih2ID0+ICF2KX0+e3RyaWdnZXJ9PC9kaXY+CiAgICAgIHtvcGVuICYmICgKICAgICAgICA8ZGl2IGNsYXNzTmFtZT0iYWJzb2x1dGUgbGVmdC0wIHRvcC1mdWxsIHotNTAgbXQtMSBtaW4tdy1bMTgwcHhdIG1heC1oLTY0IG92ZXJmbG93LXktYXV0byByb3VuZGVkLWxnIGJvcmRlciBib3JkZXItYm9yZGVyIGJnLXBvcG92ZXIgcHktMSBzaGFkb3ctbGciPgogICAgICAgICAgPGRpdiBvbkNsaWNrPXsoKSA9PiBzZXRPcGVuKGZhbHNlKX0+e2NoaWxkcmVufTwvZGl2PgogICAgICAgIDwvZGl2PgogICAgICApfQogICAgPC9kaXY+CiAgKTsKfQoKZnVuY3Rpb24gRHJvcEl0ZW0oeyBhY3RpdmUsIG9uQ2xpY2ssIGNoaWxkcmVuIH06IHsgYWN0aXZlPzogYm9vbGVhbjsgb25DbGljazogKCkgPT4gdm9pZDsgY2hpbGRyZW46IFJlYWN0LlJlYWN0Tm9kZSB9KSB7CiAgcmV0dXJuICgKICAgIDxidXR0b24KICAgICAgb25DbGljaz17b25DbGlja30KICAgICAgY2xhc3NOYW1lPXtjbigKICAgICAgICAidy1mdWxsIHB4LTMgcHktMS41IHRleHQtbGVmdCB0ZXh0LVsxMnB4XSB0cmFuc2l0aW9uLWNvbG9ycyIsCiAgICAgICAgYWN0aXZlID8gImJnLWFjY2VudCBmb250LW1lZGl1bSB0ZXh0LWZvcmVncm91bmQiIDogInRleHQtbXV0ZWQtZm9yZWdyb3VuZCBob3ZlcjpiZy1hY2NlbnQgaG92ZXI6dGV4dC1mb3JlZ3JvdW5kIgogICAgICApfQogICAgPgogICAgICB7Y2hpbGRyZW59CiAgICA8L2J1dHRvbj4KICApOwp9CgpmdW5jdGlvbiBEcm9wTGFiZWwoeyBjaGlsZHJlbiB9OiB7IGNoaWxkcmVuOiBSZWFjdC5SZWFjdE5vZGUgfSkgewogIHJldHVybiA8ZGl2IGNsYXNzTmFtZT0icHgtMyBwdC0yIHBiLTEgdGV4dC1bMTBweF0gZm9udC1zZW1pYm9sZCB1cHBlcmNhc2UgdHJhY2tpbmctd2lkZXN0IHRleHQtbXV0ZWQtZm9yZWdyb3VuZC81MCI+e2NoaWxkcmVufTwvZGl2PjsKfQoKZnVuY3Rpb24gRHJvcERpdmlkZXIoKSB7CiAgcmV0dXJuIDxkaXYgY2xhc3NOYW1lPSJteC0yIG15LTEgaC1weCBiZy1ib3JkZXIiIC8+Owp9CgpleHBvcnQgZnVuY3Rpb24gVG9wYmFyKHsKICBzZWN0aW9uLCBwZXJpb2QsIG9uQ2hhbmdlLCBvblR5cGVDaGFuZ2UsCiAgY3VzdG9tRnJvbSwgY3VzdG9tVG8sIG9uQ3VzdG9tRnJvbUNoYW5nZSwgb25DdXN0b21Ub0NoYW5nZSwKICBvblJlZnJlc2gsIHJlZnJlc2hpbmcsCiAgb3BlcmF0b3JzID0gW10sIHNlbGVjdGVkT3BlcmF0b3IsIG9uU2VsZWN0T3BlcmF0b3IsCiAgYWRtaW5zID0gW10sIHNlbGVjdGVkQWRtaW4sIG9uU2VsZWN0QWRtaW4sCn06IFRvcGJhclByb3BzKSB7CiAgY29uc3QgeWVzdGVyZGF5ID0gbmV3IERhdGUoKTsKICB5ZXN0ZXJkYXkuc2V0RGF0ZSh5ZXN0ZXJkYXkuZ2V0RGF0ZSgpIC0gMSk7CiAgY29uc3QgaXNNYXggPSB0b0RhdGVTdHIocGVyaW9kLmRhdGVUbykgPj0gdG9EYXRlU3RyKHllc3RlcmRheSk7CgogIGNvbnN0IHNob3dPcEZpbHRlciAgID0gc2VjdGlvbiA9PT0gImNhbGxzIiAgICAgICAgJiYgISFvblNlbGVjdE9wZXJhdG9yICYmIG9wZXJhdG9ycy5sZW5ndGggPiAwOwogIGNvbnN0IHNob3dBZG1GaWx0ZXIgID0gc2VjdGlvbiA9PT0gImFwcG9pbnRtZW50cyIgJiYgISFvblNlbGVjdEFkbWluICAgICYmIGFkbWlucy5sZW5ndGggPiAwOwoKICBjb25zdCBmaWx0ZXJMYWJlbCA9IHNob3dPcEZpbHRlcgogICAgPyAoc2VsZWN0ZWRPcGVyYXRvciA/IG9wZXJhdG9ycy5maW5kKG8gPT4gby5pZCA9PT0gc2VsZWN0ZWRPcGVyYXRvcik/Lm5hbWUgPz8gItCS0YHQtSIgOiAi0JLRgdC1INC+0L/QtdGA0LDRgtC+0YDRiyIpCiAgICA6IHNob3dBZG1GaWx0ZXIKICAgID8gKHNlbGVjdGVkQWRtaW4gPz8gItCS0YHQtSDRgdC+0YLRgNGD0LTQvdC40LrQuCIpCiAgICA6IG51bGw7CgogIGNvbnN0IGFkbWluc0J5R3JvdXAgPSBHUk9VUF9PUkRFUi5yZWR1Y2UoCiAgICAoYWNjLCBnKSA9PiB7IGFjY1tnXSA9IGFkbWlucy5maWx0ZXIoYSA9PiBhLmdyb3VwID09PSBnKTsgcmV0dXJuIGFjYzsgfSwKICAgIHt9IGFzIFJlY29yZDxzdHJpbmcsIEFkbWluW10+LAogICk7CgogIHJldHVybiAoCiAgICA8aGVhZGVyIGNsYXNzTmFtZT0iZmxleCBoLTEyIHNocmluay0wIGl0ZW1zLWNlbnRlciBnYXAtMyBib3JkZXItYiBib3JkZXItYm9yZGVyIGJnLXNpZGViYXIgcHgtNCBsZzpweC01Ij4KCiAgICAgIHsvKiBUaXRsZSArIGZpbHRlciAqL30KICAgICAgPGRpdiBjbGFzc05hbWU9ImZsZXggaXRlbXMtY2VudGVyIGdhcC0yIHNocmluay0wIj4KICAgICAgICA8aDIgY2xhc3NOYW1lPSJ0ZXh0LVsxM3B4XSBmb250LXNlbWlib2xkIHdoaXRlc3BhY2Utbm93cmFwIj57U0VDVElPTl9MQUJFTFNbc2VjdGlvbl19PC9oMj4KCiAgICAgICAgeyshIShzaG93T3BGaWx0ZXIgfHwgc2hvd0FkbUZpbHRlcikgJiYgZmlsdGVyTGFiZWwgJiYgKAogICAgICAgICAgPERyb3Bkb3duCiAgICAgICAgICAgIHRyaWdnZXI9ewogICAgICAgICAgICAgIDxidXR0b24gY2xhc3NOYW1lPSJpbmxpbmUtZmxleCBpdGVtcy1jZW50ZXIgZ2FwLTEgcm91bmRlZC1tZCBib3JkZXIgYm9yZGVyLWJvcmRlciBiZy1iYWNrZ3JvdW5kIHB4LTIuNSBweS0xIHRleHQtWzEycHhdIGZvbnQtbWVkaXVtIHRleHQtbXV0ZWQtZm9yZWdyb3VuZCBob3Zlcjpib3JkZXItZm9yZWdyb3VuZC8yMCBob3Zlcjp0ZXh0LWZvcmVncm91bmQgdHJhbnNpdGlvbi1jb2xvcnMiPgogICAgICAgICAgICAgICAge2ZpbHRlckxhYmVsfQogICAgICAgICAgICAgICAgPENoZXZyb25Eb3duIGNsYXNzTmFtZT0iaC0zIHctMyIgLz4KICAgICAgICAgICAgICA8L2J1dHRvbj4KICAgICAgICAgICAgfQogICAgICAgICAgPgogICAgICAgICAgICB7c2hvd09wRmlsdGVyICYmIG9uU2VsZWN0T3BlcmF0b3IgJiYgKAogICAgICAgICAgICAgIDw+CiAgICAgICAgICAgICAgICA8RHJvcEl0ZW0gYWN0aXZlPXshc2VsZWN0ZWRPcGVyYXRvcn0gb25DbGljaz17KCkgPT4gb25TZWxlY3RPcGVyYXRvcihudWxsKX0+0JLRgdC1INC+0L/QtdGA0LDRgtC+0YDRizwvRHJvcEl0ZW0+CiAgICAgICAgICAgICAgICA8RHJvcERpdmlkZXIgLz4KICAgICAgICAgICAgICAgIHtvcGVyYXRvcnMubWFwKG9wID0+ICgKICAgICAgICAgICAgICAgICAgPERyb3BJdGVtIGtleT17b3AuaWR9IGFjdGl2ZT17c2VsZWN0ZWRPcGVyYXRvciA9PT0gb3AuaWR9IG9uQ2xpY2s9eygpID0+IG9uU2VsZWN0T3BlcmF0b3Iob3AuaWQpfT4KICAgICAgICAgICAgICAgICAgICB7b3AubmFtZX0KICAgICAgICAgICAgICAgICAgPC9Ecm9wSXRlbT4KICAgICAgICAgICAgICAgICkpfQogICAgICAgICAgICAgIDwvPgogICAgICAgICAgICApfQogICAgICAgICAgICB7c2hvd0FkbUZpbHRlciAmJiBvblNlbGVjdEFkbWluICYmICgKICAgICAgICAgICAgICA8PgogICAgICAgICAgICAgICAgPERyb3BJdGVtIGFjdGl2ZT17IXNlbGVjdGVkQWRtaW59IG9uQ2xpY2s9eygpID0+IG9uU2VsZWN0QWRtaW4obnVsbCl9PtCS0YHQtSDRgdC+0YLRgNGD0LTQvdC40LrQuDwvRHJvcEl0ZW0+CiAgICAgICAgICAgICAgICA8RHJvcERpdmlkZXIgLz4KICAgICAgICAgICAgICAgIHtHUk9VUF9PUkRFUi5tYXAoZyA9PiB7CiAgICAgICAgICAgICAgICAgIGNvbnN0IGl0ZW1zID0gYWRtaW5zQnlHcm91cFtnXTsKICAgICAgICAgICAgICAgICAgaWYgKCFpdGVtcz8ubGVuZ3RoKSByZXR1cm4gbnVsbDsKICAgICAgICAgICAgICAgICAgcmV0dXJuICgKICAgICAgICAgICAgICAgICAgICA8ZGl2IGtleT17Z30+CiAgICAgICAgICAgICAgICAgICAgICA8RHJvcExhYmVsPntHUk9VUF9MQUJFTFNbZ119PC9Ecm9wTGFiZWw+CiAgICAgICAgICAgICAgICAgICAgICB7aXRlbXMubWFwKGEgPT4gKAogICAgICAgICAgICAgICAgICAgICAgICA8RHJvcEl0ZW0ga2V5PXthLnN1cm5hbWV9IGFjdGl2ZT17c2VsZWN0ZWRBZG1pbiA9PT0gYS5zdXJuYW1lfSBvbkNsaWNrPXsoKSA9PiBvblNlbGVjdEFkbWluKGEuc3VybmFtZSl9PgogICAgICAgICAgICAgICAgICAgICAgICAgIHthLnN1cm5hbWV9CiAgICAgICAgICAgICAgICAgICAgICAgIDwvRHJvcEl0ZW0+CiAgICAgICAgICAgICAgICAgICAgICApKX0KICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgKTsKICAgICAgICAgICAgICAgIH0pfQogICAgICAgICAgICAgIDwvPgogICAgICAgICAgICApfQogICAgICAgICAgPC9Ecm9wZG93bj4KICAgICAgICApfQogICAgICA8L2Rpdj4KCiAgICAgIHsvKiBQZXJpb2QgdGFicyAqL30KICAgICAgPGRpdiBjbGFzc05hbWU9ImZsZXggZmxleC0xIGp1c3RpZnktY2VudGVyIj4KICAgICAgICA8ZGl2IGNsYXNzTmFtZT0idGFiLWdyb3VwIj4KICAgICAgICAgIHtQRVJJT0RTLm1hcCgoeyB0eXBlLCBsYWJlbCB9KSA9PiAoCiAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICBrZXk9e3R5cGV9CiAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gb25UeXBlQ2hhbmdlKHR5cGUpfQogICAgICAgICAgICAgIGNsYXNzTmFtZT17Y24oInRhYi1idG4iLCBwZXJpb2QudHlwZSA9PT0gdHlwZSA/ICJ0YWItYnRuLWFjdGl2ZSIgOiAidGFiLWJ0bi1pZGxlIil9CiAgICAgICAgICAgID4KICAgICAgICAgICAgICB7bGFiZWx9CiAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgKSl9CiAgICAgICAgPC9kaXY+CiAgICAgIDwvZGl2PgoKICAgICAgey8qIFJpZ2h0IGNvbnRyb2xzICovfQogICAgICA8ZGl2IGNsYXNzTmFtZT0iZmxleCBzaHJpbmstMCBpdGVtcy1jZW50ZXIgZ2FwLTEiPgogICAgICAgIHtwZXJpb2QudHlwZSA9PT0gImN1c3RvbSIgPyAoCiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT0iaGlkZGVuIHNtOmZsZXggaXRlbXMtY2VudGVyIGdhcC0xLjUiPgogICAgICAgICAgICB7WwogICAgICAgICAgICAgIHsgdmFsOiBjdXN0b21Gcm9tLCBvbkNoYW5nZTogb25DdXN0b21Gcm9tQ2hhbmdlIH0sCiAgICAgICAgICAgICAgeyB2YWw6IGN1c3RvbVRvLCAgIG9uQ2hhbmdlOiBvbkN1c3RvbVRvQ2hhbmdlICAgfSwKICAgICAgICAgICAgXS5tYXAoKGlucCwgaSkgPT4gKAogICAgICAgICAgICAgIDxkaXYga2V5PXtpfSBjbGFzc05hbWU9InJlbGF0aXZlIj4KICAgICAgICAgICAgICAgIDxDYWxlbmRhckRheXMgY2xhc3NOYW1lPSJwb2ludGVyLWV2ZW50cy1ub25lIGFic29sdXRlIGxlZnQtMiB0b3AtMS8yIC10cmFuc2xhdGUteS0xLzIgaC0zIHctMyB0ZXh0LW11dGVkLWZvcmVncm91bmQvNTAiIC8+CiAgICAgICAgICAgICAgICA8aW5wdXQKICAgICAgICAgICAgICAgICAgdHlwZT0iZGF0ZSIgdmFsdWU9e2lucC52YWx9CiAgICAgICAgICAgICAgICAgIG9uQ2hhbmdlPXtlID0+IGlucC5vbkNoYW5nZT8uKGUudGFyZ2V0LnZhbHVlKX0KICAgICAgICAgICAgICAgICAgY2xhc3NOYW1lPSJyb3VuZGVkLW1kIGJvcmRlciBib3JkZXItYm9yZGVyIGJnLWJhY2tncm91bmQgcHktMSBwbC03IHByLTIgdGV4dC1bMTJweF0gb3V0bGluZS1ub25lIGZvY3VzOmJvcmRlci1mb3JlZ3JvdW5kLzMwIHRyYW5zaXRpb24tY29sb3JzIgogICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgKSl9CiAgICAgICAgICA8L2Rpdj4KICAgICAgICApIDogKAogICAgICAgICAgPGRpdiBjbGFzc05hbWU9ImZsZXggaXRlbXMtY2VudGVyIGdhcC0wLjUiPgogICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gb25DaGFuZ2Uoc2hpZnRQZXJpb2QocGVyaW9kLCAtMSkpfQogICAgICAgICAgICAgIGNsYXNzTmFtZT0iaC03IHctNyBmbGV4IGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWNlbnRlciByb3VuZGVkLW1kIHRleHQtbXV0ZWQtZm9yZWdyb3VuZCBob3ZlcjpiZy1hY2NlbnQgaG92ZXI6dGV4dC1mb3JlZ3JvdW5kIHRyYW5zaXRpb24tY29sb3JzIgogICAgICAgICAgICA+CiAgICAgICAgICAgICAgPENoZXZyb25MZWZ0IGNsYXNzTmFtZT0iaC0zLjUgdy0zLjUiIC8+CiAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9ImhpZGRlbiBzbTppbmxpbmUgbWluLXctWzExMHB4XSB0ZXh0LWNlbnRlciB0ZXh0LVsxMnB4XSBmb250LW1lZGl1bSB0YWJ1bGFyLW51bXMiPgogICAgICAgICAgICAgIHtmb3JtYXRQZXJpb2RMYWJlbChwZXJpb2QpfQogICAgICAgICAgICA8L3NwYW4+CiAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBvbkNoYW5nZShzaGlmdFBlcmlvZChwZXJpb2QsIDEpKX0KICAgICAgICAgICAgICBkaXNhYmxlZD17aXNNYXh9CiAgICAgICAgICAgICAgY2xhc3NOYW1lPSJoLTcgdy03IGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIHJvdW5kZWQtbWQgdGV4dC1tdXRlZC1mb3JlZ3JvdW5kIGhvdmVyOmJnLWFjY2VudCBob3Zlcjp0ZXh0LWZvcmVncm91bmQgdHJhbnNpdGlvbi1jb2xvcnMgZGlzYWJsZWQ6b3BhY2l0eS00MCBkaXNhYmxlZDpwb2ludGVyLWV2ZW50cy1ub25lIgogICAgICAgICAgICA+CiAgICAgICAgICAgICAgPENoZXZyb25SaWdodCBjbGFzc05hbWU9ImgtMy41IHctMy41IiAvPgogICAgICAgICAgICA8L2J1dHRvbj4KICAgICAgICAgIDwvZGl2PgogICAgICAgICl9CgogICAgICAgIDxkaXYgY2xhc3NOYW1lPSJoaWRkZW4gc206YmxvY2sgbXgtMSBoLTQgdy1weCBiZy1ib3JkZXIiIC8+CgogICAgICAgIDxidXR0b24KICAgICAgICAgIG9uQ2xpY2s9e29uUmVmcmVzaH0KICAgICAgICAgIGRpc2FibGVkPXtyZWZyZXNoaW5nfQogICAgICAgICAgY2xhc3NOYW1lPSJoLTcgdy03IGZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyIHJvdW5kZWQtbWQgdGV4dC1tdXRlZC1mb3JlZ3JvdW5kIGhvdmVyOmJnLWFjY2VudCBob3Zlcjp0ZXh0LWZvcmVncm91bmQgdHJhbnNpdGlvbi1jb2xvcnMgZGlzYWJsZWQ6b3BhY2l0eS00MCIKICAgICAgICA+CiAgICAgICAgICA8UmVmcmVzaEN3IGNsYXNzTmFtZT17Y24oImgtMy41IHctMy41IiwgcmVmcmVzaGluZyAmJiAiYW5pbWF0ZS1zcGluIil9IC8+CiAgICAgICAgPC9idXR0b24+CiAgICAgIDwvZGl2PgogICAgPC9oZWFkZXI+CiAgKTsKfQo=
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { ChevronLeft, ChevronRight, RefreshCw, ChevronDown, CalendarDays } from "lucide-react";
+import { Period, PeriodType, shiftPeriod, formatPeriodLabel } from "@/lib/periods";
+import { toDateStr, Operator, Admin } from "@/lib/api";
+import { type Section } from "@/components/sidebar";
+import { cn } from "@/lib/utils";
+
+const PERIODS: { type: PeriodType; label: string }[] = [
+  { type: "day",     label: "День"    },
+  { type: "week",    label: "Неделя"  },
+  { type: "month",   label: "Месяц"   },
+  { type: "quarter", label: "Квартал" },
+  { type: "year",    label: "Год"     },
+  { type: "custom",  label: "Период"  },
+];
+
+const SECTION_LABELS: Record<Section, string> = {
+  home: "Главная", calls: "Звонки", appointments: "Записи",
+  revenue: "Выручка", reports: "Отчёты", funnel: "Воронка", plans: "Планы", admin: "Доступ",
+  about: "О приложении",
+};
+
+const GROUP_ORDER  = ["callcenter", "admin", "other"] as const;
+const GROUP_LABELS: Record<string, string> = {
+  callcenter: "Колл-центр", admin: "Администраторы", other: "Прочие",
+};
+
+interface TopbarProps {
+  section:              Section;
+  period:               Period;
+  onChange:             (p: Period) => void;
+  onTypeChange:         (t: PeriodType) => void;
+  customFrom?:          string;
+  customTo?:            string;
+  onCustomFromChange?:  (v: string) => void;
+  onCustomToChange?:    (v: string) => void;
+  onRefresh:            () => void;
+  refreshing:           boolean;
+  operators?:           Operator[];
+  selectedOperator?:    string | null;
+  onSelectOperator?:    (id: string | null) => void;
+  admins?:              Admin[];
+  selectedAdmin?:       string | null;
+  onSelectAdmin?:       (s: string | null) => void;
+}
+
+function Dropdown({ trigger, children }: { trigger: React.ReactNode; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  return (
+    <div className="relative" ref={ref}>
+      <div onClick={() => setOpen(v => !v)}>{trigger}</div>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[180px] max-h-64 overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-lg">
+          <div onClick={() => setOpen(false)}>{children}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropItem({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full px-3 py-1.5 text-left text-[12px] transition-colors",
+        active ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DropLabel({ children }: { children: React.ReactNode }) {
+  return <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">{children}</div>;
+}
+
+function DropDivider() {
+  return <div className="mx-2 my-1 h-px bg-border" />;
+}
+
+export function Topbar({
+  section, period, onChange, onTypeChange,
+  customFrom, customTo, onCustomFromChange, onCustomToChange,
+  onRefresh, refreshing,
+  operators = [], selectedOperator, onSelectOperator,
+  admins = [], selectedAdmin, onSelectAdmin,
+}: TopbarProps) {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isMax = toDateStr(period.dateTo) >= toDateStr(yesterday);
+
+  const showOpFilter   = section === "calls"        && !!onSelectOperator && operators.length > 0;
+  const showAdmFilter  = section === "appointments" && !!onSelectAdmin    && admins.length > 0;
+
+  const filterLabel = showOpFilter
+    ? (selectedOperator ? operators.find(o => o.id === selectedOperator)?.name ?? "Все" : "Все операторы")
+    : showAdmFilter
+    ? (selectedAdmin ?? "Все сотрудники")
+    : null;
+
+  const adminsByGroup = GROUP_ORDER.reduce(
+    (acc, g) => { acc[g] = admins.filter(a => a.group === g); return acc; },
+    {} as Record<string, Admin[]>,
+  );
+
+  return (
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 lg:px-5">
+
+      {/* Title + filter */}
+      <div className="flex items-center gap-2 shrink-0">
+        <h2 className="text-[13px] font-semibold whitespace-nowrap">{SECTION_LABELS[section]}</h2>
+
+        {(!!(showOpFilter || showAdmFilter) && filterLabel && (
+          <Dropdown
+            trigger={
+              <button className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:border-foreground/20 hover:text-foreground transition-colors">
+                {filterLabel}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            }
+          >
+            {showOpFilter && onSelectOperator && (
+              <>
+                <DropItem active={!selectedOperator} onClick={() => onSelectOperator(null)}>Все операторы</DropItem>
+                <DropDivider />
+                {operators.map(op => (
+                  <DropItem key={op.id} active={selectedOperator === op.id} onClick={() => onSelectOperator(op.id)}>
+                    {op.name}
+                  </DropItem>
+                ))}
+              </>
+            )}
+            {showAdmFilter && onSelectAdmin && (
+              <>
+                <DropItem active={!selectedAdmin} onClick={() => onSelectAdmin(null)}>Все сотрудники</DropItem>
+                <DropDivider />
+                {GROUP_ORDER.map(g => {
+                  const items = adminsByGroup[g];
+                  if (!items?.length) return null;
+                  return (
+                    <div key={g}>
+                      <DropLabel>{GROUP_LABELS[g]}</DropLabel>
+                      {items.map(a => (
+                        <DropItem key={a.surname} active={selectedAdmin === a.surname} onClick={() => onSelectAdmin(a.surname)}>
+                          {a.surname}
+                        </DropItem>
+                      ))}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </Dropdown>
+        ))}
+      </div>
+
+      {/* Period tabs */}
+      <div className="flex flex-1 justify-center">
+        <div className="tab-group">
+          {PERIODS.map(({ type, label }) => (
+            <button
+              key={type}
+              onClick={() => onTypeChange(type)}
+              className={cn("tab-btn", period.type === type ? "tab-btn-active" : "tab-btn-idle")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Right controls */}
+      <div className="flex shrink-0 items-center gap-1">
+        {period.type === "custom" ? (
+          <div className="hidden sm:flex items-center gap-1.5">
+            {[
+              { val: customFrom, onChange: onCustomFromChange },
+              { val: customTo,   onChange: onCustomToChange   },
+            ].map((inp, i) => (
+              <div key={i} className="relative">
+                <CalendarDays className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/50" />
+                <input
+                  type="date" value={inp.val}
+                  onChange={e => inp.onChange?.(e.target.value)}
+                  className="rounded-md border border-border bg-background py-1 pl-7 pr-2 text-[12px] outline-none focus:border-foreground/30 transition-colors"
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => onChange(shiftPeriod(period, -1))}
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="hidden sm:inline min-w-[110px] text-center text-[12px] font-medium tabular-nums">
+              {formatPeriodLabel(period)}
+            </span>
+            <button
+              onClick={() => onChange(shiftPeriod(period, 1))}
+              disabled={isMax}
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        <div className="hidden sm:block mx-1 h-4 w-px bg-border" />
+
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+        </button>
+      </div>
+    </header>
+  );
+}

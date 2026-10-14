@@ -11,6 +11,7 @@ import { ReportsPage }      from "@/components/pages/reports-page";
 import { AdminPage }        from "@/components/pages/admin-page";
 import { HomePage }         from "@/components/pages/home-page";
 import { AboutPage }        from "@/components/pages/about-page";
+import { FunnelPage }       from "@/components/pages/funnel-page";
 
 function App() {
   const { canSee } = useAuth();
@@ -29,6 +30,7 @@ function App() {
         {section === "appointments" && <AppointmentsPage />}
         {section === "revenue"      && <RevenuePage />}
         {section === "reports"      && <ReportsPage />}
+        {section === "funnel"       && <FunnelPage />}
         {section === "plans"        && <PlansPage />}
         {section === "admin"        && <AdminPage />}
         {section === "about"        && <AboutPage />}

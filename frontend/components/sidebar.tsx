@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   LayoutDashboard, Phone, Calendar, Banknote,
-  BarChart2, Target, ShieldCheck, Menu, X, Activity, Info,
+  BarChart2, Target, ShieldCheck, Menu, X, Activity, Info, TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-gate";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,6 +18,7 @@ const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "appointments", label: "Записи",          icon: Calendar        },
   { id: "revenue",      label: "Выручка",         icon: Banknote        },
   { id: "reports",      label: "Отчёты",          icon: BarChart2       },
+  { id: "funnel",       label: "Воронка",         icon: TrendingUp      },
   { id: "plans",        label: "Планы",           icon: Target          },
   { id: "admin",        label: "Доступ",          icon: ShieldCheck     },
 ];
