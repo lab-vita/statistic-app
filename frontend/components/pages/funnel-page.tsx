@@ -3,21 +3,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, TrendingDown, Minus, ArrowRight, Users } from "lucide-react";
 import {
+  ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend,
+} from "recharts";
+import {
   Topbar, PageContent, Skeleton, Empty, ErrorBanner,
 } from "@/components/ui/primitives";
+import { useChartTheme } from "@/components/charts/base-chart";
 import {
   getDefaultPeriod, shiftPeriod, formatPeriodLabel,
   type Period, type PeriodType,
 } from "@/lib/periods";
 import {
-  fetchStats,
-  fetchConversion,
-  fetchAppointmentStats,
-  fetchPaymentStats,
-  toDateStr,
-  addDays,
-  fmtRub,
-  type ConversionOperator,
+  fetchStats, fetchConversion, fetchAppointmentStats, fetchPaymentStats,
+  fetchDaily, fetchAppointmentDaily,
+  toDateStr, addDays, fmtRub,
+  type ConversionOperator, type DailyItem, type AppointmentDailyItem,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,13 @@ interface FunnelData {
   }[];
 }
 
+interface DayPoint {
+  date:       string;
+  calls:      number;
+  appt:       number;
+  conversion: number; // %
+}
+
 // ─── Вспомогательные компоненты
 
 function ConvPct({ value, good, bad }: { value: number; good: number; bad: number }) {
@@ -64,14 +72,9 @@ function ConvPct({ value, good, bad }: { value: number; good: number; bad: numbe
   );
 }
 
-function FunnelCard({
-  label, value, sub, accentBg, accentText,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accentBg: string;
-  accentText: string;
+function FunnelCard({ label, value, sub, accentBg, accentText }: {
+  label: string; value: string; sub?: string;
+  accentBg: string; accentText: string;
 }) {
   return (
     <div className={cn("flex-1 min-w-0 rounded-xl border border-border p-5", accentBg)}>
@@ -91,6 +94,98 @@ function Arrow({ pct, good, bad }: { pct: number; good: number; bad: number }) {
   );
 }
 
+// ─── График динамики
+
+function TrendChart({ points }: { points: DayPoint[] }) {
+  const ct = useChartTheme();
+  if (points.length < 2) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <p className="text-[14px] font-semibold">Динамика воронки по дням</p>
+        <div className="flex items-center gap-4 text-[11px] text-muted-foreground/60">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-0.5 bg-blue-500 inline-block rounded" />Звонки
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-0.5 bg-violet-500 inline-block rounded" />Записи
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-0.5 border-b-2 border-dashed border-emerald-500 inline-block" />Конверсия
+          </span>
+        </div>
+      </div>
+      <div className="p-4">
+        <ResponsiveContainer width="100%" height={220}>
+          <ComposedChart data={points} margin={{ top: 4, right: 40, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 10, fill: ct.axis }}
+              axisLine={false} tickLine={false}
+              interval={Math.max(0, Math.floor(points.length / 10) - 1)}
+            />
+            {/* Левая ось — количество */}
+            <YAxis
+              yAxisId="cnt"
+              tick={{ fontSize: 10, fill: ct.axis }}
+              axisLine={false} tickLine={false}
+            />
+            {/* Правая ось — % конверсии */}
+            <YAxis
+              yAxisId="pct"
+              orientation="right"
+              tick={{ fontSize: 10, fill: ct.axis }}
+              axisLine={false} tickLine={false}
+              tickFormatter={v => `${v}%`}
+              domain={[0, 100]}
+            />
+            <Tooltip
+              {...ct.tooltip}
+              formatter={(val: number, name: string) =>
+                name === "Конверсия" ? [`${val.toFixed(1)}%`, name] : [val, name]
+              }
+            />
+            <Bar
+              yAxisId="cnt"
+              dataKey="calls"
+              name="Звонки"
+              fill="#3b82f6"
+              fillOpacity={0.35}
+              radius={[3, 3, 0, 0]}
+              maxBarSize={24}
+            />
+            <Bar
+              yAxisId="cnt"
+              dataKey="appt"
+              name="Записи"
+              fill="#8b5cf6"
+              fillOpacity={0.5}
+              radius={[3, 3, 0, 0]}
+              maxBarSize={24}
+            />
+            <Line
+              yAxisId="pct"
+              type="monotone"
+              dataKey="conversion"
+              name="Конверсия"
+              stroke="#10b981"
+              strokeWidth={2}
+              strokeDasharray="4 2"
+              dot={false}
+              activeDot={{ r: 4, fill: "#10b981" }}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="px-5 pb-3 text-[11px] text-muted-foreground/50">
+        Синие столбцы — звонки, фиолетовые — записи. Зелёная пунктирная линия — конверсия (%), шкала справа.
+      </div>
+    </div>
+  );
+}
+
 // ─── Основная страница
 
 export function FunnelPage() {
@@ -98,28 +193,44 @@ export function FunnelPage() {
   const [period, setPeriod]           = useState<Period>(getDefaultPeriod("month"));
 
   const [data,       setData]      = useState<FunnelData | null>(null);
+  const [trend,      setTrend]     = useState<DayPoint[]>([]);
   const [loading,    setLoading]   = useState(true);
   const [refreshing, setRefreshing]= useState(false);
   const [error,      setError]     = useState<string | null>(null);
 
-  const dateFrom = toDateStr(period.dateFrom);
-  const dateTo   = toDateStr(period.dateTo);
+  const dateFrom  = toDateStr(period.dateFrom);
+  const dateTo    = toDateStr(period.dateTo);
   const yesterday = toDateStr(addDays(new Date(), -1));
+  const isDay     = period.type === "day";
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
-      const [statsRes, convRes, apptRes, payRes] = await Promise.all([
+      const requests: Promise<unknown>[] = [
         fetchStats(dateFrom, dateTo),
         fetchConversion(dateFrom, dateTo),
         fetchAppointmentStats(dateFrom, dateTo),
         fetchPaymentStats(dateFrom, dateTo),
-      ]);
+      ];
+      if (!isDay) {
+        requests.push(fetchDaily(dateFrom, dateTo));
+        requests.push(fetchAppointmentDaily(dateFrom, dateTo));
+      }
 
-      const totalCalls = Object.values(statsRes.operators)
-        .filter((_, k) => Object.keys(statsRes.operators)[k] !== "total")
-        .reduce((sum, op) => sum + (op.incoming ?? 0), 0);
+      const results = await Promise.all(requests);
+      const [statsRes, convRes, apptRes, payRes] = results as [
+        Awaited<ReturnType<typeof fetchStats>>,
+        Awaited<ReturnType<typeof fetchConversion>>,
+        Awaited<ReturnType<typeof fetchAppointmentStats>>,
+        Awaited<ReturnType<typeof fetchPaymentStats>>,
+        ...unknown[]
+      ];
+
+      // Данные воронки
+      const totalCalls = Object.entries(statsRes.operators)
+        .filter(([k]) => k !== "total")
+        .reduce((sum, [, op]) => sum + (op.incoming ?? 0), 0);
 
       const appt    = convRes.total.appointments ?? 0;
       const visits  = apptRes.total.visits ?? 0;
@@ -138,13 +249,32 @@ export function FunnelPage() {
       }));
 
       setData({ calls: totalCalls, appointments: appt, visits, revenue, callsToAppt, apptToVisit, revenuePerVisit, operators });
+
+      // Динамика по дням
+      if (!isDay && results.length >= 6) {
+        const callsDaily = (results[4] as Awaited<ReturnType<typeof fetchDaily>>).days;
+        const apptDaily  = (results[5] as Awaited<ReturnType<typeof fetchAppointmentDaily>>).days;
+
+        const apptMap: Record<string, AppointmentDailyItem> = {};
+        for (const d of apptDaily) apptMap[d.date] = d;
+
+        const points: DayPoint[] = callsDaily.map((d: DailyItem) => {
+          const a = apptMap[d.date]?.total ?? 0;
+          const conv = d.incoming > 0 ? (a / d.incoming) * 100 : 0;
+          const label = new Date(d.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+          return { date: label, calls: d.incoming, appt: a, conversion: Math.round(conv * 10) / 10 };
+        });
+        setTrend(points);
+      } else {
+        setTrend([]);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки данных");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, isDay]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -177,6 +307,7 @@ export function FunnelPage() {
             <div className="flex gap-3">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="flex-1 h-28" />)}
             </div>
+            <Skeleton className="h-56" />
             <Skeleton className="h-40" />
             <Skeleton className="h-48" />
           </>
@@ -227,6 +358,9 @@ export function FunnelPage() {
               />
             </div>
 
+            {/* График динамики */}
+            {trend.length >= 2 && <TrendChart points={trend} />}
+
             {/* Подсказка */}
             <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Как читать воронку</p>
@@ -271,8 +405,7 @@ export function FunnelPage() {
                         .sort((a, b) => b.appointments - a.appointments)
                         .map((op, i) => {
                           const share = data.appointments > 0
-                            ? (op.appointments / data.appointments) * 100
-                            : 0;
+                            ? (op.appointments / data.appointments) * 100 : 0;
                           return (
                             <tr key={op.id} className={cn(
                               "border-b border-border last:border-0 hover:bg-muted/40 transition-colors",
