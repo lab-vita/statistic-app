@@ -24,8 +24,8 @@ export function RevenueChart({ data }: Props) {
       <AreaChart data={data} margin={{ top: 4, right: 4, left: -4, bottom: 0 }}>
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#16a34a" stopOpacity={0.18} />
-            <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+            <stop offset="5%"  stopColor="#1a9e6e" stopOpacity={0.18} />
+            <stop offset="95%" stopColor="#1a9e6e" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
@@ -39,7 +39,7 @@ export function RevenueChart({ data }: Props) {
           formatter={(v) => [new Intl.NumberFormat("ru-RU").format(Number(v)) + " ₽", "Выручка"]}
         />
         <Area type="monotone" dataKey="total_paid" name="Выручка"
-          stroke="#16a34a" strokeWidth={2} fill={`url(#${id})`} dot={false} />
+          stroke="#1a9e6e" strokeWidth={2} fill={`url(#${id})`} dot={false} />
       </AreaChart>
     </ResponsiveContainer>
   );

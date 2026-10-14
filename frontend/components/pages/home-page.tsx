@@ -8,8 +8,7 @@ import {
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
-  PageContent, SectionCard, SrcBar, Delta, ProgressBar,
-  TabGroup, Skeleton, Empty, ErrorBanner, SparkLine,
+  PageContent, SectionCard, SrcBar, Delta, ProgressBar, Skeleton, Empty, ErrorBanner, SparkLine, PageHeader, PeriodPill, DateNav, HeaderDivider, RefreshButton,
 } from "@/components/ui/primitives";
 import { fetchDaily, type DailyResponse } from "@/lib/api";
 import type { Section } from "@/lib/permissions";
@@ -24,10 +23,10 @@ const GROUP_LABELS: Record<string, string> = {
   callcenter:"Колл-центр", admin:"Администраторы", other:"Прочие", unknown:"Не указан"
 };
 const GROUP_COLORS: Record<string, { text: string; bar: string }> = {
-  callcenter: { text: "#1d4ed8", bar: "#2563eb" },
-  admin:      { text: "#15803d", bar: "#16a34a" },
-  other:      { text: "#6d28d9", bar: "#7c3aed" },
-  unknown:    { text: "#9ca3af", bar: "#d1d5db" },
+  callcenter: { text: "#2070a8", bar: "#328fcd" },
+  admin:      { text: "#127352", bar: "#1a9e6e" },
+  other:      { text: "#7c4ddb", bar: "#8b5cf6" },
+  unknown:    { text: "#94b3c9", bar: "#d6e8f5" },
 };
 
 function fmt(n: number) { return n.toLocaleString("ru-RU"); }
@@ -56,10 +55,10 @@ function KpiCard({ label, value, sub, color, spark, sparkColor, dir, pct, invert
       )}
     >
       <div className="flex items-start justify-between mb-1">
-        <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70">{label}</p>
+        <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">{label}</p>
         {spark && <SparkLine values={spark} color={sparkColor} />}
       </div>
-      <p className={cn("text-[36px] font-black leading-none tracking-tight tabular-nums mb-1", color)}>
+      <p className={cn("text-[36px] font-extrabold leading-none tracking-[-0.04em] tabular-nums mb-1", color)}>
         {value}
       </p>
       <p className="text-[11px] text-muted-foreground/60 mb-3">{sub}</p>
@@ -69,12 +68,12 @@ function KpiCard({ label, value, sub, color, spark, sparkColor, dir, pct, invert
 }
 
 function FunnelCard({ s }: { s: NonNullable<StatsResponse["operators"]["total"]> }) {
-  const segs1 = [{ v: s.incoming, c: "#16a34a" }, { v: s.missed, c: "#f59e0b" }];
+  const segs1 = [{ v: s.incoming, c: "#1a9e6e" }, { v: s.missed, c: "#e09020" }];
   const segs2 = [
-    { v: s.outcome_reached, c: "#16a34a" },
-    { v: s.outcome_self,    c: "#2563eb"  },
-    { v: s.outcome_failed,  c: "#f59e0b"  },
-    { v: s.outcome_none,    c: "#dc2626"  },
+    { v: s.outcome_reached, c: "#1a9e6e" },
+    { v: s.outcome_self,    c: "#328fcd"  },
+    { v: s.outcome_failed,  c: "#e09020"  },
+    { v: s.outcome_none,    c: "#e03a5a"  },
   ];
   return (
     <SectionCard title="Судьба звонков" right={`${fmt(s.received)} поступило`}>
@@ -85,8 +84,8 @@ function FunnelCard({ s }: { s: NonNullable<StatsResponse["operators"]["total"]>
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {[
-              {c:"#16a34a",l:"Принято",  v:s.incoming, p:fmtPct(s.received>0?s.incoming/s.received*100:0)},
-              {c:"#f59e0b",l:"Пропущено",v:s.missed,   p:fmtPct(s.missed_pct)},
+              {c:"#1a9e6e",l:"Принято",  v:s.incoming, p:fmtPct(s.received>0?s.incoming/s.received*100:0)},
+              {c:"#e09020",l:"Пропущено",v:s.missed,   p:fmtPct(s.missed_pct)},
             ].map((r,i) => (
               <div key={i} className="flex items-center gap-1.5 text-[11px]">
                 <span className="w-2 h-2 rounded-full" style={{background:r.c}} />
@@ -105,10 +104,10 @@ function FunnelCard({ s }: { s: NonNullable<StatsResponse["operators"]["total"]>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               {[
-                {c:"#16a34a",l:"Перезв., дозв.",  v:s.outcome_reached, p:fmtPct(s.missed>0?s.outcome_reached/s.missed*100:0)},
-                {c:"#2563eb",l:"Клиент сам",       v:s.outcome_self,    p:fmtPct(s.missed>0?s.outcome_self/s.missed*100:0)},
-                {c:"#f59e0b",l:"Перезв., нет",     v:s.outcome_failed,  p:fmtPct(s.missed>0?s.outcome_failed/s.missed*100:0)},
-                {c:"#dc2626",l:"Не перезвонили",   v:s.outcome_none,    p:fmtPct(s.missed>0?s.outcome_none/s.missed*100:0)},
+                {c:"#1a9e6e",l:"Перезв., дозв.",  v:s.outcome_reached, p:fmtPct(s.missed>0?s.outcome_reached/s.missed*100:0)},
+                {c:"#328fcd",l:"Клиент сам",       v:s.outcome_self,    p:fmtPct(s.missed>0?s.outcome_self/s.missed*100:0)},
+                {c:"#e09020",l:"Перезв., нет",     v:s.outcome_failed,  p:fmtPct(s.missed>0?s.outcome_failed/s.missed*100:0)},
+                {c:"#e03a5a",l:"Не перезвонили",   v:s.outcome_none,    p:fmtPct(s.missed>0?s.outcome_none/s.missed*100:0)},
               ].map((r,i) => (
                 <div key={i} className="flex items-center gap-1.5 text-[11px]">
                   <span className="w-2 h-2 rounded-full" style={{background:r.c}} />
@@ -123,7 +122,7 @@ function FunnelCard({ s }: { s: NonNullable<StatsResponse["operators"]["total"]>
         <div className="pt-3 border-t border-border flex justify-between items-end">
           <div>
             <p className="text-[11px] text-muted-foreground/60 mb-1">Потеряно навсегда</p>
-            <p className="text-[30px] font-black tabular-nums leading-none text-red-600 dark:text-red-400">{fmt(s.lost)}</p>
+            <p className="text-[30px] font-extrabold tabular-nums leading-none text-red-600 dark:text-red-400">{fmt(s.lost)}</p>
           </div>
           <div className="text-right">
             <p className="text-[15px] font-bold tabular-nums">{fmtPct(s.lost_pct)}</p>
@@ -178,25 +177,23 @@ export function HomePage({ onNavigate }: Props) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-card px-4 lg:px-5">
-        <span className="text-[13px] font-bold">Главная</span>
+      <PageHeader title="Главная">
         <div className="flex-1" />
-        <TabGroup
+        <PeriodPill
           items={PERIODS}
           active={periodLabel}
           onChange={l => { setPeriodLabel(l); setPeriod(getDefaultPeriod(P_MAP[l] ?? "month")); }}
         />
-        <div className="flex items-center gap-0.5">
-          <button onClick={() => setPeriod(p => shiftPeriod(p, -1))}
-            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors text-base">‹</button>
-          <span className="text-[12px] font-medium min-w-[120px] text-center tabular-nums">{formatPeriodLabel(period)}</span>
-          <button onClick={() => setPeriod(p => shiftPeriod(p, 1))}
-            disabled={toDateStr(period.dateTo) >= yesterday}
-            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40 text-base">›</button>
-        </div>
-        <div className="h-4 w-px bg-border" />
-        <button onClick={load} className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors text-sm">↻</button>
-      </header>
+        <HeaderDivider />
+        <DateNav
+          label={formatPeriodLabel(period)}
+          onPrev={() => setPeriod(p => shiftPeriod(p, -1))}
+          onNext={() => setPeriod(p => shiftPeriod(p, 1))}
+          nextDisabled={toDateStr(period.dateTo) >= yesterday}
+        />
+        <HeaderDivider />
+        <RefreshButton onClick={load} />
+      </PageHeader>
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
@@ -222,7 +219,7 @@ export function HomePage({ onNavigate }: Props) {
                 sub={`из ${fmt(total.received)} поступивших · ${fmtPct(total.received>0?total.incoming/total.received*100:0)}`}
                 color="text-emerald-600 dark:text-emerald-400"
                 spark={spark}
-                sparkColor="#16a34a"
+                sparkColor="#1a9e6e"
                 dir={total.incoming_delta_dir}
                 pct={total.incoming_delta_pct}
                 onClick={() => onNavigate("calls")}
@@ -233,7 +230,7 @@ export function HomePage({ onNavigate }: Props) {
                 sub={`${fmtPct(total.lost_pct)} от поступивших · не дозвонились`}
                 color="text-red-600 dark:text-red-400"
                 spark={daily?.days.map(d=>d.lost)??[]}
-                sparkColor="#dc2626"
+                sparkColor="#e03a5a"
                 dir={total.lost_delta_dir}
                 pct={total.lost_delta_pct}
                 invert
@@ -242,10 +239,10 @@ export function HomePage({ onNavigate }: Props) {
               {/* Conversion */}
               <div className="rounded-lg border border-border bg-card p-4 flex flex-col cursor-pointer hover:border-foreground/20 transition-colors"
                 onClick={() => onNavigate("calls")}>
-                <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">
                   Конверсия звонок → запись
                 </p>
-                <p className="text-[36px] font-black leading-none tracking-tight tabular-nums text-blue-600 dark:text-blue-400 mb-1">
+                <p className="text-[36px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-blue-600 dark:text-blue-400 mb-1">
                   {conv ? `${conv.total.conversion_pct}%` : "—"}
                 </p>
                 <p className="text-[11px] text-muted-foreground/60 mb-3">
@@ -258,7 +255,7 @@ export function HomePage({ onNavigate }: Props) {
                       <div className="h-full rounded-full transition-all duration-500"
                         style={{
                           width: `${Math.min(op.conversion_pct, 100)}%`,
-                          background: op.conversion_pct>=70?"#16a34a":op.conversion_pct>=40?"#d97706":"#dc2626"
+                          background: op.conversion_pct>=70?"#1a9e6e":op.conversion_pct>=40?"#e09020":"#e03a5a"
                         }}
                       />
                     </div>
@@ -280,8 +277,8 @@ export function HomePage({ onNavigate }: Props) {
                   className="rounded-lg border border-border bg-card p-4 flex flex-col cursor-pointer hover:border-foreground/20 transition-colors"
                   onClick={() => onNavigate("revenue")}
                 >
-                  <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">Выручка</p>
-                  <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 mb-1">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Выручка</p>
+                  <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-emerald-600 dark:text-emerald-400 mb-1">
                     {fmtRub(payments.total_paid)}
                   </p>
                   <p className="text-[11px] text-muted-foreground/60">{payments.count} платежей</p>
@@ -293,8 +290,8 @@ export function HomePage({ onNavigate }: Props) {
                   className="rounded-lg border border-border bg-card p-4 flex flex-col cursor-pointer hover:border-foreground/20 transition-colors"
                   onClick={() => onNavigate("revenue")}
                 >
-                  <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">Средний чек</p>
-                  <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-foreground mb-1">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Средний чек</p>
+                  <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-foreground mb-1">
                     {fmtRub(avgCheck)}
                   </p>
                   <p className="text-[11px] text-muted-foreground/60">за визит</p>
@@ -303,13 +300,13 @@ export function HomePage({ onNavigate }: Props) {
                   className="rounded-lg border border-border bg-card p-4 flex flex-col cursor-pointer hover:border-foreground/20 transition-colors sm:col-span-2"
                   onClick={() => onNavigate("revenue")}
                 >
-                  <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-2">Способы оплаты</p>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-2">Способы оплаты</p>
                   <div className="space-y-2 flex-1">
                     {[
-                      { label: "Наличными", val: payments.by_cash,    color: "#16a34a" },
-                      { label: "Картой",    val: payments.by_card,    color: "#2563eb" },
-                      { label: "Безнал",    val: payments.by_cashless, color: "#d97706" },
-                      { label: "Кредит",   val: payments.by_credit,  color: "#7c3aed" },
+                      { label: "Наличными", val: payments.by_cash,    color: "#1a9e6e" },
+                      { label: "Картой",    val: payments.by_card,    color: "#328fcd" },
+                      { label: "Безнал",    val: payments.by_cashless, color: "#e09020" },
+                      { label: "Кредит",   val: payments.by_credit,  color: "#8b5cf6" },
                     ].filter(x => x.val > 0).map(x => {
                       const pct = payments.total_paid > 0 ? Math.round(x.val / payments.total_paid * 100) : 0;
                       return (
@@ -339,7 +336,7 @@ export function HomePage({ onNavigate }: Props) {
                   <div className="rounded-lg border border-border bg-card p-4 cursor-pointer hover:border-foreground/20 transition-colors"
                     onClick={() => onNavigate("appointments")}>
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70">Записи за период</p>
+                      <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">Записи за период</p>
                       <span className="text-[11px] text-muted-foreground/50">всего {fmt(appt.total)}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mb-4">
@@ -351,7 +348,7 @@ export function HomePage({ onNavigate }: Props) {
                       ].map(x => (
                         <div key={x.l} className="bg-muted/40 rounded-lg px-3 py-2.5">
                           <p className="text-[10px] font-bold uppercase tracking-[.07em] text-muted-foreground/60 mb-1">{x.l}</p>
-                          <p className={cn("text-[22px] font-black tabular-nums leading-none", x.c)}>{fmt(x.v)}</p>
+                          <p className={cn("text-[22px] font-extrabold tabular-nums leading-none", x.c)}>{fmt(x.v)}</p>
                           <p className="text-[10px] text-muted-foreground/50 mt-0.5">{x.s}</p>
                         </div>
                       ))}

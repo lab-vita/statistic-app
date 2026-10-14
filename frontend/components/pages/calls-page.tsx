@@ -14,7 +14,7 @@ import {
 import { useChartTheme, fmtDate } from "@/components/charts/base-chart";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
-  Topbar, PageContent, MetricCard, SectionCard,
+  Topbar, MenuItem, MenuDivider, PageContent, MetricCard, SectionCard,
   Delta, StatusPill, ProgressBar, TabGroup,
   Th, Td, SkeletonCards, Skeleton, Empty, ErrorBanner, SrcBar,
 } from "@/components/ui/primitives";
@@ -39,7 +39,7 @@ const COMPARISON_METRICS: { key: ComparisonMetric; label: string }[] = [
 ];
 
 // Palette for up to 8 operators
-const OP_COLORS = ["#16a34a","#2563eb","#d97706","#7c3aed","#dc2626","#0891b2","#65a30d","#9333ea"];
+const OP_COLORS = ["#1a9e6e","#328fcd","#e09020","#8b5cf6","#e03a5a","#06b6d4","#1a9e6e","#8b5cf6"];
 
 function OperatorComparisonChart({ data, metric }: { data: ComparisonResponse; metric: ComparisonMetric }) {
   const ct = useChartTheme();
@@ -99,14 +99,14 @@ function OperatorComparisonChart({ data, metric }: { data: ComparisonResponse; m
 
 function CallsFunnel({ s }: { s: ReturnType<typeof buildTotal> }) {
   const segs1 = [
-    { v: s.incoming, c: "#16a34a" },
-    { v: s.missed,   c: "#f59e0b" },
+    { v: s.incoming, c: "#1a9e6e" },
+    { v: s.missed,   c: "#e09020" },
   ];
   const segs2 = [
-    { v: s.outcome_reached, c: "#16a34a" },
-    { v: s.outcome_self,    c: "#2563eb" },
-    { v: s.outcome_failed,  c: "#f59e0b" },
-    { v: s.outcome_none,    c: "#dc2626" },
+    { v: s.outcome_reached, c: "#1a9e6e" },
+    { v: s.outcome_self,    c: "#328fcd" },
+    { v: s.outcome_failed,  c: "#e09020" },
+    { v: s.outcome_none,    c: "#e03a5a" },
   ];
   return (
     <SectionCard title="Судьба звонков" right={`поступило ${fmt(s.received)}`}>
@@ -125,8 +125,8 @@ function CallsFunnel({ s }: { s: ReturnType<typeof buildTotal> }) {
           </div>
           <div className="grid grid-cols-2 gap-x-4 mt-2">
             {[
-              { c:"#16a34a", l:"Принято",   v:s.incoming, p:fmtPct(s.received>0?s.incoming/s.received*100:0) },
-              { c:"#f59e0b", l:"Пропущено", v:s.missed,   p:fmtPct(s.missed_pct) },
+              { c:"#1a9e6e", l:"Принято",   v:s.incoming, p:fmtPct(s.received>0?s.incoming/s.received*100:0) },
+              { c:"#e09020", l:"Пропущено", v:s.missed,   p:fmtPct(s.missed_pct) },
             ].map((row, i) => (
               <div key={i} className="flex items-center gap-1.5 text-[11px]">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: row.c }} />
@@ -152,10 +152,10 @@ function CallsFunnel({ s }: { s: ReturnType<typeof buildTotal> }) {
             </div>
             <div className="grid grid-cols-2 gap-x-4 mt-2">
               {[
-                { c:"#16a34a", l:"Перезв., дозв.",  v:s.outcome_reached, p:fmtPct(s.missed>0?s.outcome_reached/s.missed*100:0) },
-                { c:"#2563eb", l:"Клиент сам",       v:s.outcome_self,    p:fmtPct(s.missed>0?s.outcome_self/s.missed*100:0) },
-                { c:"#f59e0b", l:"Перезв., нет",     v:s.outcome_failed,  p:fmtPct(s.missed>0?s.outcome_failed/s.missed*100:0) },
-                { c:"#dc2626", l:"Не перезвонили",   v:s.outcome_none,    p:fmtPct(s.missed>0?s.outcome_none/s.missed*100:0) },
+                { c:"#1a9e6e", l:"Перезв., дозв.",  v:s.outcome_reached, p:fmtPct(s.missed>0?s.outcome_reached/s.missed*100:0) },
+                { c:"#328fcd", l:"Клиент сам",       v:s.outcome_self,    p:fmtPct(s.missed>0?s.outcome_self/s.missed*100:0) },
+                { c:"#e09020", l:"Перезв., нет",     v:s.outcome_failed,  p:fmtPct(s.missed>0?s.outcome_failed/s.missed*100:0) },
+                { c:"#e03a5a", l:"Не перезвонили",   v:s.outcome_none,    p:fmtPct(s.missed>0?s.outcome_none/s.missed*100:0) },
               ].map((row, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-[11px]">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: row.c }} />
@@ -172,7 +172,7 @@ function CallsFunnel({ s }: { s: ReturnType<typeof buildTotal> }) {
         <div className="pt-3 border-t border-border flex justify-between items-end">
           <div>
             <p className="text-[11px] text-muted-foreground/60 mb-1">Потеряно навсегда</p>
-            <p className="text-[30px] font-black tabular-nums leading-none text-red-600 dark:text-red-400 tracking-tight">
+            <p className="text-[30px] font-extrabold tabular-nums leading-none text-red-600 dark:text-red-400 tracking-[-0.04em]">
               {fmt(s.lost)}
             </p>
           </div>
@@ -199,7 +199,6 @@ export function CallsPage() {
   const [period,      setPeriod]      = useState<Period>(getDefaultPeriod("day"));
   const [interval,    setInterval]    = useState(60);
   const [opId,        setOpId]        = useState<string | null>(null);
-  const [opMenuOpen,  setOpMenuOpen]  = useState(false);
   const [operators,   setOperators]   = useState<Operator[]>([]);
 
   const [compMetric, setCompMetric] = useState<ComparisonMetric>("incoming");
@@ -270,7 +269,17 @@ export function CallsPage() {
       <Topbar
         title="Звонки"
         filterLabel={opName}
-        onFilterClick={() => setOpMenuOpen(v => !v)}
+        filterMenu={close => (
+          <>
+            <MenuItem active={!opId} onClick={() => { setOpId(null); close(); }}>Все операторы</MenuItem>
+            <MenuDivider />
+            {operators.map(op => (
+              <MenuItem key={op.id} active={opId === op.id} onClick={() => { setOpId(op.id); close(); }}>
+                {op.name}
+              </MenuItem>
+            ))}
+          </>
+        )}
         periodItems={PERIODS}
         period={periodLabel}
         onPeriod={handlePeriod}
@@ -281,23 +290,6 @@ export function CallsPage() {
         onRefresh={load}
         refreshing={refreshing}
       />
-
-      {/* Operator dropdown */}
-      {opMenuOpen && (
-        <div className="absolute top-[100px] left-[216px] z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px]">
-          <button onClick={() => { setOpId(null); setOpMenuOpen(false); }}
-            className={cn("w-full px-3 py-1.5 text-left text-[12px] hover:bg-accent transition-colors", !opId && "font-semibold")}>
-            Все операторы
-          </button>
-          <div className="h-px bg-border mx-2 my-1" />
-          {operators.map(op => (
-            <button key={op.id} onClick={() => { setOpId(op.id); setOpMenuOpen(false); }}
-              className={cn("w-full px-3 py-1.5 text-left text-[12px] hover:bg-accent transition-colors", opId === op.id && "font-semibold")}>
-              {op.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
@@ -482,8 +474,8 @@ export function CallsPage() {
                                 </span>
                               )}
                             </Td>
-                            <Td right color="#16a34a" bold>{op.incoming}</Td>
-                            <Td right color="#2563eb">{op.outgoing}</Td>
+                            <Td right color="#1a9e6e" bold>{op.incoming}</Td>
+                            <Td right color="#328fcd">{op.outgoing}</Td>
                             <Td right>
                               {plain ? (
                                 <span className="text-muted-foreground/60 tabular-nums">{op.missed}</span>
@@ -512,8 +504,8 @@ export function CallsPage() {
                     <tfoot>
                       <tr className="bg-muted/30 border-t border-border">
                         <Td bold>Итого</Td>
-                        <Td right color="#16a34a" bold>{total.incoming}</Td>
-                        <Td right color="#2563eb">{total.outgoing}</Td>
+                        <Td right color="#1a9e6e" bold>{total.incoming}</Td>
+                        <Td right color="#328fcd">{total.outgoing}</Td>
                         <Td right>
                           <StatusPill color={total.missed_pct > 10 ? "red" : total.missed_pct > 6 ? "amber" : "green"}>
                             {total.missed} ({fmtPct(total.missed_pct)})

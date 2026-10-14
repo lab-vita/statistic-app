@@ -46,10 +46,10 @@ function AuthCard({
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="flex w-full max-w-sm flex-col items-center rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+      <div className="card-surface flex w-full max-w-sm flex-col items-center p-8 text-center">
         {/* Brand */}
         <div className="mb-6 flex items-center gap-2.5">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-background">
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-[9px] bg-brand text-brand-foreground">
             <Activity className="h-4.5 w-4.5" strokeWidth={2.5} />
             <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
           </div>

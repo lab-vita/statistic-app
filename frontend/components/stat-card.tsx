@@ -76,7 +76,7 @@ export function StatCard({
   return (
     <Card className="flex flex-col p-5 gap-0 transition-all duration-150 hover:border-foreground/20">
       <div className="flex items-start justify-between mb-3">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">
           {title}
         </span>
         {icon && (
@@ -86,7 +86,7 @@ export function StatCard({
         )}
       </div>
 
-      <div className={cn("text-[26px] font-semibold leading-none tracking-tight tabular-nums mb-1", color)}>
+      <div className={cn("text-[26px] font-extrabold leading-none tracking-[-0.04em] tabular-nums mb-1", color)}>
         {value}
       </div>
 

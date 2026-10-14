@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-import { PageContent, MetricCard, SectionCard, StatusPill, Th, Td, TabGroup, Skeleton, Empty, ErrorBanner } from "@/components/ui/primitives";
+import {
+  PageContent, MetricCard, SectionCard, StatusPill, Th, Td, TabGroup, Skeleton, Empty, ErrorBanner, PageHeader, FilterButton, MenuItem, MenuDivider, HeaderDivider,
+} from "@/components/ui/primitives";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -87,34 +89,48 @@ export function ReportsPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-4 lg:px-5 flex-wrap">
-        <span className="text-[13px] font-bold">Отчёты</span>
+      <PageHeader title="Отчёты">
         <TabGroup items={TAB_ITEMS} active={tab} onChange={t => { setTab(t); setReport(null); }} />
         <div className="flex-1" />
         <TabGroup items={GRAN_ITEMS} active={gran} onChange={setGran} small />
         {tab === "Звонки" ? (
-          <select value={opId} onChange={e => setOpId(e.target.value)}
-            className="rounded-md border border-border bg-background px-2.5 py-1 text-[12px] font-medium text-muted-foreground">
-            <option value="">Все операторы</option>
-            {operators.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
+          <FilterButton label={operators.find(o => o.id === opId)?.name ?? "Все операторы"}>
+            {close => (
+              <>
+                <MenuItem active={!opId} onClick={() => { setOpId(""); close(); }}>Все операторы</MenuItem>
+                <MenuDivider />
+                {operators.map(o => (
+                  <MenuItem key={o.id} active={opId === o.id} onClick={() => { setOpId(o.id); close(); }}>{o.name}</MenuItem>
+                ))}
+              </>
+            )}
+          </FilterButton>
         ) : (
-          <select value={admin} onChange={e => setAdmin(e.target.value)}
-            className="rounded-md border border-border bg-background px-2.5 py-1 text-[12px] font-medium text-muted-foreground">
-            <option value="">Все сотрудники</option>
-            {admins.map(a => <option key={a.surname} value={a.surname}>{a.surname}</option>)}
-          </select>
+          <FilterButton label={admin || "Все сотрудники"}>
+            {close => (
+              <>
+                <MenuItem active={!admin} onClick={() => { setAdmin(""); close(); }}>Все сотрудники</MenuItem>
+                <MenuDivider />
+                {admins.map(a => (
+                  <MenuItem key={a.surname} active={admin === a.surname} onClick={() => { setAdmin(a.surname); close(); }}>{a.surname}</MenuItem>
+                ))}
+              </>
+            )}
+          </FilterButton>
         )}
+        <HeaderDivider />
         <div className="flex items-center gap-1.5">
-          <input type="date" value={dates.from}
+          <label className="sr-only" htmlFor="rep-from">С даты</label>
+          <input id="rep-from" type="date" value={dates.from}
             onChange={e => setDates(d => ({ ...d, from: e.target.value }))}
-            className="rounded-md border border-border bg-background px-2 py-1 text-[12px]" />
-          <span className="text-[12px] text-muted-foreground/50">—</span>
-          <input type="date" value={dates.to}
+            className="h-7 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand" />
+          <span className="text-[12px] text-text-3">—</span>
+          <label className="sr-only" htmlFor="rep-to">По дату</label>
+          <input id="rep-to" type="date" value={dates.to}
             onChange={e => setDates(d => ({ ...d, to: e.target.value }))}
-            className="rounded-md border border-border bg-background px-2 py-1 text-[12px]" />
+            className="h-7 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand" />
         </div>
-      </header>
+      </PageHeader>
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
@@ -144,9 +160,9 @@ export function ReportsPage() {
                     <XAxis dataKey="period" tickFormatter={s => fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
                     <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
-                    <Bar dataKey="incoming" name="Принятые"    fill="#16a34a" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="outgoing" name="Исходящие"   fill="#2563eb" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="missed"   name="Пропущенные" fill="#dc2626" radius={[3,3,0,0]} maxBarSize={22} />
+                    <Bar dataKey="incoming" name="Принятые"    fill="#1a9e6e" radius={[3,3,0,0]} maxBarSize={22} />
+                    <Bar dataKey="outgoing" name="Исходящие"   fill="#328fcd" radius={[3,3,0,0]} maxBarSize={22} />
+                    <Bar dataKey="missed"   name="Пропущенные" fill="#e03a5a" radius={[3,3,0,0]} maxBarSize={22} />
                   </BarChart>
                 </ResponsiveContainer>
               </SectionCard>
@@ -163,15 +179,15 @@ export function ReportsPage() {
                     {periods.map((r: any, i: number) => (
                       <tr key={i} className="hover:bg-muted/40 transition-colors">
                         <Td>{fmtPeriod(r.period, gran)}</Td>
-                        <Td right color="#16a34a" bold>{fmt(r.incoming)}</Td>
-                        <Td right color="#2563eb">{fmt(r.outgoing)}</Td>
+                        <Td right color="#1a9e6e" bold>{fmt(r.incoming)}</Td>
+                        <Td right color="#328fcd">{fmt(r.outgoing)}</Td>
                         <Td right>{fmt(r.missed)}</Td>
                         <Td right>
                           <StatusPill color={r.missed_pct>10?"red":r.missed_pct>6?"amber":"green"}>
                             {fmtPct(r.missed_pct ?? (r.received>0?r.missed/r.received*100:0))}
                           </StatusPill>
                         </Td>
-                        <Td right color="#dc2626">{fmt(r.lost ?? 0)}</Td>
+                        <Td right color="#e03a5a">{fmt(r.lost ?? 0)}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -196,9 +212,9 @@ export function ReportsPage() {
                     <XAxis dataKey="period" tickFormatter={s=>fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
                     <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
-                    <Bar dataKey="total"  name="Записей" fill="#2563eb" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="visits" name="Явки"    fill="#16a34a" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="noshow" name="Неявки"  fill="#dc2626" radius={[3,3,0,0]} maxBarSize={22} />
+                    <Bar dataKey="total"  name="Записей" fill="#328fcd" radius={[3,3,0,0]} maxBarSize={22} />
+                    <Bar dataKey="visits" name="Явки"    fill="#1a9e6e" radius={[3,3,0,0]} maxBarSize={22} />
+                    <Bar dataKey="noshow" name="Неявки"  fill="#e03a5a" radius={[3,3,0,0]} maxBarSize={22} />
                   </BarChart>
                 </ResponsiveContainer>
               </SectionCard>
@@ -215,14 +231,14 @@ export function ReportsPage() {
                       <tr key={i} className="hover:bg-muted/40 transition-colors">
                         <Td>{fmtPeriod(r.period, gran)}</Td>
                         <Td right bold>{fmt(r.total)}</Td>
-                        <Td right color="#16a34a" bold>{fmt(r.visits)}</Td>
+                        <Td right color="#1a9e6e" bold>{fmt(r.visits)}</Td>
                         <Td right>
                           <StatusPill color={r.visit_pct>=80?"green":r.visit_pct>=60?"amber":"red"}>
                             {fmtPct(r.visit_pct ?? (r.total>0?r.visits/r.total*100:0))}
                           </StatusPill>
                         </Td>
-                        <Td right color="#dc2626">{fmt(r.noshow)}</Td>
-                        <Td right color="#7c3aed">{fmt(r.new_patients)}</Td>
+                        <Td right color="#e03a5a">{fmt(r.noshow)}</Td>
+                        <Td right color="#8b5cf6">{fmt(r.new_patients)}</Td>
                       </tr>
                     ))}
                   </tbody>
