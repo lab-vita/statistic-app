@@ -190,15 +190,15 @@ export function RevenuePage() {
               />
               {/* Способы оплаты */}
               <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-3">
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-3">
                   Способы оплаты
                 </p>
                 <div className="space-y-2.5">
                   {[
-                    { label: "Наличными",   val: stats.by_cash,    color: "#16a34a" },
-                    { label: "Картой",     val: stats.by_card,    color: "#2563eb" },
-                    { label: "Безнал",      val: stats.by_cashless, color: "#d97706" },
-                    { label: "Кредит",     val: stats.by_credit,  color: "#7c3aed" },
+                    { label: "Наличными",   val: stats.by_cash,    color: "#1a9e6e" },
+                    { label: "Картой",     val: stats.by_card,    color: "#328fcd" },
+                    { label: "Безнал",      val: stats.by_cashless, color: "#e09020" },
+                    { label: "Кредит",     val: stats.by_credit,  color: "#8b5cf6" },
                   ].filter(x => x.val > 0).map(x => {
                     const pct = stats.total_paid > 0
                       ? Math.round(x.val / stats.total_paid * 100) : 0;
@@ -240,10 +240,10 @@ export function RevenuePage() {
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
                         <th className="px-4 py-2.5 text-left w-8"></th>
-                        <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60">Врач</th>
-                        <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60">Платежей</th>
-                        <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60">Выручка</th>
-                        <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60 hidden md:table-cell">Ср. чек</th>
+                        <th className="px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">Врач</th>
+                        <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">Платежей</th>
+                        <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">Выручка</th>
+                        <th className="px-4 py-2.5 text-right text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 hidden md:table-cell">Ср. чек</th>
                       </tr>
                     </thead>
                     <tbody>
