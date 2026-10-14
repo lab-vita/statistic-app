@@ -3,10 +3,15 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   fetchStats, fetchHourly, fetchDaily, fetchHeatmap, fetchConversion,
-  fetchOperators, toDateStr, addDays, formatDuration,
+  fetchOperators, fetchComparison, toDateStr, addDays, formatDuration,
   type StatsResponse, type HourlyResponse, type DailyResponse,
   type HeatmapResponse, type ConversionResponse, type Operator,
+  type ComparisonResponse, type ComparisonMetric,
 } from "@/lib/api";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from "recharts";
+import { useChartTheme, fmtDate } from "@/components/charts/base-chart";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
   Topbar, PageContent, MetricCard, SectionCard,
@@ -25,6 +30,72 @@ const PROFOSMOTR = new Set(["544"]);
 
 function fmt(n: number) { return n.toLocaleString("ru-RU"); }
 function fmtPct(n: number) { return n.toFixed(1) + "%"; }
+
+const COMPARISON_METRICS: { key: ComparisonMetric; label: string }[] = [
+  { key: "total",    label: "Все звонки" },
+  { key: "incoming", label: "Принятые" },
+  { key: "outgoing", label: "Исходящие" },
+  { key: "missed",   label: "Пропущенные" },
+];
+
+// Palette for up to 8 operators
+const OP_COLORS = ["#16a34a","#2563eb","#d97706","#7c3aed","#dc2626","#0891b2","#65a30d","#9333ea"];
+
+function OperatorComparisonChart({ data, metric }: { data: ComparisonResponse; metric: ComparisonMetric }) {
+  const ct = useChartTheme();
+  if (!data.series.length) return null;
+
+  const chartData = data.dates.map((date, di) => {
+    const row: Record<string, string | number> = { date };
+    data.series.forEach(s => { row[s.operator_id] = s.values[di]?.value ?? 0; });
+    return row;
+  });
+
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+        <XAxis
+          dataKey="date"
+          tickFormatter={fmtDate}
+          tick={{ fontSize: 11, fill: ct.axis }}
+          axisLine={false}
+          tickLine={false}
+          interval="preserveStartEnd"
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: ct.axis }}
+          axisLine={false}
+          tickLine={false}
+          width={28}
+        />
+        <Tooltip
+          formatter={(v: number) => [v, ""]}
+          labelFormatter={(l: string) => fmtDate(l)}
+          {...ct.tooltip}
+        />
+        <Legend
+          wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+          formatter={(_, entry) => {
+            const s = data.series.find(s => s.operator_id === String(entry.dataKey));
+            return s?.name.split(" ")[0] ?? entry.dataKey;
+          }}
+        />
+        {data.series.map((s, i) => (
+          <Line
+            key={s.operator_id}
+            type="monotone"
+            dataKey={s.operator_id}
+            stroke={OP_COLORS[i % OP_COLORS.length]}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3 }}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
 
 function CallsFunnel({ s }: { s: ReturnType<typeof buildTotal> }) {
   const segs1 = [
@@ -131,11 +202,14 @@ export function CallsPage() {
   const [opMenuOpen,  setOpMenuOpen]  = useState(false);
   const [operators,   setOperators]   = useState<Operator[]>([]);
 
+  const [compMetric, setCompMetric] = useState<ComparisonMetric>("incoming");
+
   const [stats,      setStats]      = useState<StatsResponse | null>(null);
   const [hourly,     setHourly]     = useState<HourlyResponse | null>(null);
   const [daily,      setDaily]      = useState<DailyResponse | null>(null);
   const [heatmap,    setHeatmap]    = useState<HeatmapResponse | null>(null);
   const [conversion, setConversion] = useState<ConversionResponse | null>(null);
+  const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
 
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -153,12 +227,13 @@ export function CallsPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [s, hm, conv] = await Promise.all([
+      const [s, hm, conv, comp] = await Promise.all([
         fetchStats(dateFrom, dateTo, opId ?? undefined),
         fetchHeatmap(dateFrom, dateTo, opId ?? undefined),
         !opId ? fetchConversion(dateFrom, dateTo) : Promise.resolve(null),
+        !opId && !isDay ? fetchComparison(dateFrom, dateTo, compMetric).catch(() => null) : Promise.resolve(null),
       ]);
-      setStats(s); setHeatmap(hm); setConversion(conv);
+      setStats(s); setHeatmap(hm); setConversion(conv); setComparison(comp);
 
       if (isDay) {
         const h = await fetchHourly(dateFrom, dateTo, interval, opId ?? undefined);
@@ -170,7 +245,7 @@ export function CallsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally { setLoading(false); }
-  }, [dateFrom, dateTo, isDay, interval, opId]);
+  }, [dateFrom, dateTo, isDay, interval, opId, compMetric]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -340,6 +415,34 @@ export function CallsPage() {
             {/* Heatmap */}
             {heatmap && heatmap.cells.length > 0 && (
               <HeatmapChart cells={heatmap.cells} />
+            )}
+
+            {/* Operator comparison chart (не для дня и не при фильтре по оператору) */}
+            {!opId && !isDay && comparison && comparison.series.length > 1 && (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+                  <h3 className="text-[13px] font-semibold">Динамика по операторам</h3>
+                  <div className="flex gap-1">
+                    {COMPARISON_METRICS.map(m => (
+                      <button
+                        key={m.key}
+                        onClick={() => setCompMetric(m.key)}
+                        className={cn(
+                          "px-2.5 py-1 rounded text-[11px] font-medium transition-colors",
+                          compMetric === m.key
+                            ? "bg-foreground text-background"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                        )}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-4">
+                  <OperatorComparisonChart data={comparison} metric={compMetric} />
+                </div>
+              </div>
             )}
 
             {/* Operators table */}

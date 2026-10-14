@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchStats, fetchAppointmentStats, fetchConversion,
-  toDateStr, addDays, formatDuration,
-  type StatsResponse, type AppointmentStatsResponse, type ConversionResponse,
+  fetchStats, fetchAppointmentStats, fetchConversion, fetchPaymentStats,
+  toDateStr, addDays, formatDuration, fmtRub,
+  type StatsResponse, type AppointmentStatsResponse, type ConversionResponse, type PaymentStatsResponse,
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
@@ -145,6 +145,7 @@ export function HomePage({ onNavigate }: Props) {
   const [appts,       setAppts]       = useState<AppointmentStatsResponse | null>(null);
   const [conv,        setConv]        = useState<ConversionResponse | null>(null);
   const [daily,       setDaily]       = useState<DailyResponse | null>(null);
+  const [payments,    setPayments]    = useState<PaymentStatsResponse | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
 
@@ -155,13 +156,14 @@ export function HomePage({ onNavigate }: Props) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [s, a, c, d] = await Promise.all([
+      const [s, a, c, d, pay] = await Promise.all([
         fetchStats(dateFrom, dateTo),
         fetchAppointmentStats(dateFrom, dateTo),
         fetchConversion(dateFrom, dateTo),
         fetchDaily(dateFrom, dateTo),
+        fetchPaymentStats(dateFrom, dateTo).catch(() => null),
       ]);
-      setStats(s); setAppts(a); setConv(c); setDaily(d);
+      setStats(s); setAppts(a); setConv(c); setDaily(d); setPayments(pay);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка");
     } finally { setLoading(false); }
@@ -169,9 +171,10 @@ export function HomePage({ onNavigate }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  const total = stats?.operators["total"];
-  const appt  = appts?.total;
-  const spark  = daily?.days.map(d => d.incoming) ?? [];
+  const total   = stats?.operators["total"];
+  const appt    = appts?.total;
+  const spark   = daily?.days.map(d => d.incoming) ?? [];
+  const avgCheck = payments && payments.count > 0 ? Math.round(payments.total_paid / payments.count) : 0;
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -269,6 +272,62 @@ export function HomePage({ onNavigate }: Props) {
                 ))}
               </div>
             </div>
+
+            {/* Revenue KPI strip */}
+            {payments && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div
+                  className="rounded-lg border border-border bg-card p-4 flex flex-col cursor-pointer hover:border-foreground/20 transition-colors"
+                  onClick={() => onNavigate("revenue")}
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">Выручка</p>
+                  <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 mb-1">
+                    {fmtRub(payments.total_paid)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/60">{payments.count} платежей</p>
+                  <div className="mt-auto pt-2">
+                    <Delta dir={payments.total_paid_delta_dir} pct={payments.total_paid_delta_pct} />
+                  </div>
+                </div>
+                <div
+                  className="rounded-lg border border-border bg-card p-4 flex flex-col cursor-pointer hover:border-foreground/20 transition-colors"
+                  onClick={() => onNavigate("revenue")}
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-1">Средний чек</p>
+                  <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-foreground mb-1">
+                    {fmtRub(avgCheck)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/60">за визит</p>
+                </div>
+                <div
+                  className="rounded-lg border border-border bg-card p-4 flex flex-col cursor-pointer hover:border-foreground/20 transition-colors sm:col-span-2"
+                  onClick={() => onNavigate("revenue")}
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-2">Способы оплаты</p>
+                  <div className="space-y-2 flex-1">
+                    {[
+                      { label: "Наличными", val: payments.by_cash,    color: "#16a34a" },
+                      { label: "Картой",    val: payments.by_card,    color: "#2563eb" },
+                      { label: "Безнал",    val: payments.by_cashless, color: "#d97706" },
+                      { label: "Кредит",   val: payments.by_credit,  color: "#7c3aed" },
+                    ].filter(x => x.val > 0).map(x => {
+                      const pct = payments.total_paid > 0 ? Math.round(x.val / payments.total_paid * 100) : 0;
+                      return (
+                        <div key={x.label}>
+                          <div className="flex justify-between mb-0.5">
+                            <span className="text-[11px] text-muted-foreground/60">{x.label}</span>
+                            <span className="text-[11px] font-bold tabular-nums">{pct}%</span>
+                          </div>
+                          <div className="h-1 w-full rounded-full bg-border overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: pct + "%", background: x.color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Funnel + Appointments */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
