@@ -143,8 +143,10 @@ function TrendChart({ points }: { points: DayPoint[] }) {
             />
             <Tooltip
               {...ct.tooltip}
-              formatter={(val: number, name: string) =>
-                name === "Конверсия" ? [`${val.toFixed(1)}%`, name] : [val, name]
+              formatter={(val, name) =>
+                name === "Конверсия"
+                  ? [`${typeof val === "number" ? val.toFixed(1) : "0"}%`, name]
+                  : [val, name]
               }
             />
             <Bar
