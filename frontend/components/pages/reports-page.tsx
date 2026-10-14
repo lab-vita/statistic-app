@@ -8,13 +8,14 @@ import {
 } from "recharts";
 import { useChartTheme } from "@/components/charts/base-chart";
 import { fetchOperators, fetchAdmins, type Operator, type Admin } from "@/lib/api";
+import { authFetch } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 // Internal fetch helper that proxies to the API directly
 async function fetchReport(path: string, params: Record<string, string>) {
   const url = new URL((process.env.NEXT_PUBLIC_API_URL ?? "") + path, typeof window !== "undefined" ? window.location.origin : "http://localhost");
   Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
-  const res = await fetch(url.toString(), { credentials: "include" });
+  const res = await authFetch(url.toString());
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }
