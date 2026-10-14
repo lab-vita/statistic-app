@@ -12,7 +12,7 @@ import {
   TabGroup, Skeleton, Empty, ErrorBanner, SparkLine,
 } from "@/components/ui/primitives";
 import { fetchDaily, type DailyResponse } from "@/lib/api";
-import type { Section } from "@/components/sidebar";
+import type { Section } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const PERIODS = ["День","Неделя","Месяц","Квартал","Год"];
