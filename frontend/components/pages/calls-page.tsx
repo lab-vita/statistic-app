@@ -70,15 +70,15 @@ function OperatorComparisonChart({ data, metric }: { data: ComparisonResponse; m
           width={28}
         />
         <Tooltip
-          formatter={(v: number) => [v, ""]}
-          labelFormatter={(l: string) => fmtDate(l)}
+          formatter={(v) => [typeof v === "number" ? v : "—", ""]}
+          labelFormatter={(l) => fmtDate(String(l))}
           {...ct.tooltip}
         />
         <Legend
           wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-          formatter={(_, entry) => {
+          formatter={(_: unknown, entry: { dataKey?: unknown }) => {
             const s = data.series.find(s => s.operator_id === String(entry.dataKey));
-            return s?.name.split(" ")[0] ?? entry.dataKey;
+            return s?.name.split(" ")[0] ?? String(entry.dataKey ?? "");
           }}
         />
         {data.series.map((s, i) => (
