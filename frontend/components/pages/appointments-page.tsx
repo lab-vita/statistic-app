@@ -2,17 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchAppointmentStats, fetchAppointmentDaily, fetchAdmins,
+  fetchAppointmentStats, fetchAppointmentDaily, fetchAdmins, fetchPlanRange,
   toDateStr, addDays,
-  type AppointmentStatsResponse, type AppointmentDailyResponse, type Admin,
+  type AppointmentStatsResponse, type AppointmentDailyResponse, type Admin, type PlanRangeResponse,
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
   Topbar, PageContent, MetricCard, SectionCard, SrcBar,
-  StatusPill, Th, Td, SkeletonCards, Skeleton, Empty, ErrorBanner,
+  StatusPill, Th, Td, SkeletonCards, Skeleton, Empty, ErrorBanner, ProgressBar,
 } from "@/components/ui/primitives";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart,
+  ComposedChart, Bar, ReferenceLine, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line,
 } from "recharts";
 import { useChartTheme, fmtDate } from "@/components/charts/base-chart";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,109 @@ const GROUP_COLORS: Record<string, { text: string; bar: string }> = {
 function fmt(n: number) { return n.toLocaleString("ru-RU"); }
 function fmtPct(n: number) { return n.toFixed(1) + "%"; }
 
+// ─── Блок план / факт
+
+interface PlanFactProps {
+  plan: PlanRangeResponse | null;
+  daily: AppointmentDailyResponse | null;
+}
+
+function PlanFactSection({ plan, daily }: PlanFactProps) {
+  const ct = useChartTheme();
+  if (!plan || plan.totals.appt_count === 0) return null;
+
+  const planTotal = plan.totals.appt_count;
+  const factTotal = daily ? daily.days.reduce((s, d) => s + d.total, 0) : 0;
+  const pct = planTotal > 0 ? Math.round(factTotal / planTotal * 100) : 0;
+  const color = pct >= 80 ? "text-emerald-600 dark:text-emerald-400"
+    : pct >= 50 ? "text-amber-600 dark:text-amber-400"
+    : "text-red-600 dark:text-red-400";
+
+  // Данные для графика
+  const chartData = daily ? daily.days.map(d => {
+    const p = plan.by_day[d.date]?.appt_count ?? 0;
+    return {
+      date: d.date,
+      fact: d.total,
+      plan: p,
+      below: p > 0 && d.total < p,
+    };
+  }) : [];
+
+  return (
+    <>
+      {/* Карточка выполнения плана */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-3">Выполнение плана</p>
+        <div className="flex items-baseline gap-2 mb-2">
+          <span className="text-[30px] font-black tabular-nums">{fmt(factTotal)}</span>
+          <span className="text-[14px] text-muted-foreground/60">из {fmt(planTotal)} запланированных</span>
+          <span className={cn("ml-auto text-[18px] font-black tabular-nums", color)}>{pct}%</span>
+        </div>
+        <ProgressBar pct={pct} />
+      </div>
+
+      {/* График план/факт по дням */}
+      {chartData.length > 1 && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <p className="text-[14px] font-semibold">Записи: план / факт по дням</p>
+            <div className="flex items-center gap-4 text-[11px] text-muted-foreground/60">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-2 rounded-sm bg-violet-500/70 inline-block" />Факт
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-0.5 border-b-2 border-dashed border-emerald-500 inline-block" />План
+              </span>
+            </div>
+          </div>
+          <div className="p-4">
+            <ResponsiveContainer width="100%" height={180}>
+              <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={fmtDate}
+                  tick={{ fontSize: 10, fill: ct.axis }}
+                  axisLine={false} tickLine={false}
+                  interval={chartData.length > 14 ? 2 : 0}
+                />
+                <YAxis tick={{ fontSize: 10, fill: ct.axis }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  {...ct.tooltip}
+                  labelFormatter={v => new Date(String(v)).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                />
+                <Bar
+                  dataKey="fact"
+                  name="Факт"
+                  fill="#7c3aed"
+                  fillOpacity={0.7}
+                  radius={[3, 3, 0, 0]}
+                  maxBarSize={20}
+                />
+                <Line
+                  dataKey="plan"
+                  name="План"
+                  type="monotone"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  strokeDasharray="4 2"
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="px-5 pb-3 text-[11px] text-muted-foreground/50">
+            Красный фон на верхней полосе таблицы оповещает дни где факт ниже плана.
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Основная страница
+
 export function AppointmentsPage() {
   const [periodLabel, setPeriodLabel] = useState("День");
   const [period,      setPeriod]      = useState<Period>(getDefaultPeriod("day"));
@@ -43,6 +146,7 @@ export function AppointmentsPage() {
   const [admins,      setAdmins]      = useState<Admin[]>([]);
   const [stats,       setStats]       = useState<AppointmentStatsResponse | null>(null);
   const [daily,       setDaily]       = useState<AppointmentDailyResponse | null>(null);
+  const [planRange,   setPlanRange]   = useState<PlanRangeResponse | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
 
@@ -58,11 +162,12 @@ export function AppointmentsPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [s, d] = await Promise.all([
+      const [s, d, p] = await Promise.all([
         fetchAppointmentStats(dateFrom, dateTo, adminId ?? undefined),
         fetchAppointmentDaily(dateFrom, dateTo, adminId ?? undefined),
+        fetchPlanRange(dateFrom, dateTo).catch(() => null),
       ]);
-      setStats(s); setDaily(d);
+      setStats(s); setDaily(d); setPlanRange(p);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally { setLoading(false); }
@@ -134,6 +239,8 @@ export function AppointmentsPage() {
           <>
             <SkeletonCards cols={4} />
             <SkeletonCards cols={2} count={2} />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-48" />
             <Skeleton className="h-48" />
           </>
         ) : !s ? (
@@ -153,6 +260,9 @@ export function AppointmentsPage() {
               <MetricCard label="Ожидают"  value={fmt(s.pending)}  sub="не подтверждены / одобрены" />
               <MetricCard label="Отмены"   value={fmt(s.cancels)}  sub="отменено пациентами" />
             </div>
+
+            {/* Блок план / факт */}
+            {!adminId && <PlanFactSection plan={planRange} daily={daily} />}
 
             {/* Sources */}
             {stats?.by_group && Object.keys(stats.by_group).length > 0 && !adminId && (
