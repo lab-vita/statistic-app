@@ -10,7 +10,8 @@ interface User { id: string; name: string; role: string; last_seen?: string; }
 async function fetchUsers(): Promise<User[]> {
   const res = await fetch("/api/admin/users", { credentials: "include" });
   if (!res.ok) throw new Error("Ошибка загрузки");
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.users ?? []);
 }
 async function addUser(id: string, name: string, role: string) {
   const res = await fetch("/api/admin/users", {
