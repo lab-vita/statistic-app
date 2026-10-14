@@ -24,7 +24,7 @@ import { loadHomeData, emptyHomeData, type HomeData } from "@/lib/home-data";
 import type { ChartMetric } from "@/components/widgets/calls-chart";
 import type { PlanMetric } from "@/lib/plan-forecast";
 import { Plus, Settings2, ChevronLeft, ChevronRight, GripVertical, X } from "lucide-react";
-import { Section } from "@/components/sidebar";
+import type { Section } from "@/lib/permissions";
 import { CallsSingleMetric } from "@/components/widgets/calls-single";
 
 // ─ Period ───────────────────────────────────────────────────────
