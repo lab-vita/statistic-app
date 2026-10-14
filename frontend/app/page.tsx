@@ -27,7 +27,7 @@ function App() {
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar section={section} onSelectSection={handleNav} />
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {section === "home"         && <HomePage         onNavigate={handleNav} />}
+        {section === "home"         && <HomePage />}
         {section === "calls"        && <CallsPage />}
         {section === "appointments" && <AppointmentsPage />}
         {section === "revenue"      && <RevenuePage />}

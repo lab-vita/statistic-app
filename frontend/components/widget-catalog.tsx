@@ -1,234 +1,285 @@
 "use client";
 
-import { useState } from "react";
-import { X, Plus, Phone, Check } from "lucide-react";
-import { WIDGET_TYPES } from "@/lib/grid";
-import { CALLS_SINGLE_METRICS, CallsSingleMetric } from "@/components/widgets/calls-single";
-import { CallsSinglePreview    } from "@/components/widget-previews";
-import { CallsTrioPreview      } from "@/components/widget-previews";
-import { CallsChartPreview     } from "@/components/widget-previews";
-import { CallsFunnelPreview    } from "@/components/widget-previews";
-import { CallsOperatorsPreview } from "@/components/widget-previews";
-import { CallsPlanPreview      } from "@/components/widget-previews";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X, Plus, Phone, Calendar, TrendingUp, ArrowLeft, Check } from "lucide-react";
+import {
+  WIDGET_TYPES, WIDGET_GROUPS, COLS, GAP, ROW_H,
+  type WidgetGroup, type WidgetTypeDef, type WidgetTypeId, type WidgetPermission,
+} from "@/lib/grid";
+import { sampleHomeData } from "@/lib/home-sample";
+import { WidgetContent, WIDGET_OPTIONS } from "@/components/widgets/registry";
+import { cn } from "@/lib/utils";
 
-const GROUPS = ["Звонки"];
+const GROUP_ICON: Record<WidgetGroup, React.ElementType> = {
+  "Звонки":  Phone,
+  "Записи":  Calendar,
+  "Выручка": TrendingUp,
+};
 
-function Preview({ type }: { type: string }) {
-  switch (type) {
-    case "calls_single":    return <CallsSinglePreview />;
-    case "calls_trio":      return <CallsTrioPreview />;
-    case "calls_chart":     return <CallsChartPreview />;
-    case "calls_funnel":    return <CallsFunnelPreview />;
-    case "calls_plan":      return <CallsPlanPreview />;
-    case "calls_operators": return <CallsOperatorsPreview />;
-    default: return <div className="h-full bg-muted/20 rounded-xl" />;
-  }
-}
+/** Ширина колонки, на которой рисуется превью (как на экране 1280px). */
+const PREVIEW_COL = 86;
 
-// Виджеты с настройками — показываем шаг выбора перед добавлением
-const CONFIGURABLE = ["calls_single"];
+// ─── Превью: настоящий виджет на демо-данных, уменьшенный под карточку ──
 
-interface WidgetCatalogProps {
-  onAdd:   (type: string, config?: Record<string, string>) => void;
-  onClose: () => void;
-}
+export function ScaledPreview({ type, config, w, h, className }: {
+  type: WidgetTypeId; config?: Record<string, string>; w: number; h: number; className?: string;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const data = useMemo(() => sampleHomeData(), []);
 
-export function WidgetCatalog({ onAdd, onClose }: WidgetCatalogProps) {
-  const [group, setGroup] = useState(GROUPS[0]);
-  // Если не null — показываем шаг конфигурации для этого виджета
-  const [configuring, setConfiguring] = useState<string | null>(null);
-  const [selectedMetric, setSelectedMetric] = useState<CallsSingleMetric>("incoming");
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setBox({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-  const items = WIDGET_TYPES.filter(w => w.group === group);
-
-  function handleAdd(typeId: string) {
-    if (CONFIGURABLE.includes(typeId)) {
-      setConfiguring(typeId);
-    } else {
-      onAdd(typeId);
-    }
-  }
-
-  function handleConfirm() {
-    if (configuring === "calls_single") {
-      onAdd(configuring, { metric: selectedMetric });
-    }
-    setConfiguring(null);
-  }
+  const natW = w * PREVIEW_COL + (w - 1) * GAP;
+  const natH = h * ROW_H + (h - 1) * GAP;
+  const scale = box.w && box.h ? Math.min(box.w / natW, box.h / natH, 1) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+    <div ref={boxRef} aria-hidden="true" className={cn("relative overflow-hidden", className)}>
+      {scale > 0 && (
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 origin-center"
+          style={{ width: natW, height: natH, transform: `translate(-50%, -50%) scale(${scale})` }}
+        >
+          <WidgetContent pw={{ type, config }} data={data} loading={false} />
+        </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Шапка */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-5">
-          <div>
-            {configuring ? (
-              <>
-                <h2 className="text-base font-semibold tracking-tight">Настройка виджета</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">Выберите метрику для отображения</p>
-              </>
-            ) : (
-              <>
-                <h2 className="text-base font-semibold tracking-tight">Добавить виджет</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">Выберите виджет и добавьте его на главный экран</p>
-              </>
-            )}
+// ─── Выбор настройки (метрики) ─────────────────────────────────────
+
+export function WidgetOptionsPicker({ type, value, onChange }: {
+  type: WidgetTypeId; value: string; onChange: (v: string) => void;
+}) {
+  const opt = WIDGET_OPTIONS[type];
+  if (!opt) return null;
+  return (
+    <fieldset>
+      <legend className="metric-label mb-2.5">{opt.title}</legend>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {opt.options.map(o => {
+          const selected = o.value === value;
+          return (
+            <label
+              key={o.value}
+              className={cn(
+                "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors",
+                selected ? "border-brand bg-brand-soft" : "border-border bg-card hover:border-brand/50",
+              )}
+            >
+              <input
+                type="radio" name={`opt-${type}`} value={o.value} checked={selected}
+                onChange={() => onChange(o.value)} className="sr-only"
+              />
+              <span className={cn(
+                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                selected ? "border-brand bg-brand text-brand-foreground" : "border-border",
+              )}>
+                {selected && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold text-foreground">{o.label}</span>
+                {o.hint && <span className="block text-[11px] text-text-3">{o.hint}</span>}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+// ─── Диалог ────────────────────────────────────────────────────────────────
+
+function Dialog({ title, subtitle, onClose, children, back }: {
+  title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; back?: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d2236]/40 p-4 backdrop-blur-[2px]"
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
+        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-card shadow-pop outline-none"
+      >
+        <div className="flex shrink-0 items-center gap-3 border-b border-border px-6 py-4">
+          {back && (
+            <button type="button" onClick={back} aria-label="Назад"
+              className="flex h-8 w-8 items-center justify-center rounded-[7px] text-text-3 transition-colors hover:bg-accent hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[15px] font-bold tracking-[-0.02em]">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-[12px] text-text-3">{subtitle}</p>}
           </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted transition-colors hover:bg-accent"
-            aria-label="Закрыть"
-          >
+          <button type="button" onClick={onClose} aria-label="Закрыть"
+            className="flex h-8 w-8 items-center justify-center rounded-[7px] text-text-3 transition-colors hover:bg-accent hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
-
-        {/* Шаг конфигурации */}
-{configuring === "calls_single" ? (
-  <div className="flex flex-col p-6 gap-5">
-
-    <div className="grid grid-cols-4 gap-2">
-      {CALLS_SINGLE_METRICS.map(m => {
-        const selected = selectedMetric === m.key;
-        const COLORS: Record<string, { from: string; to: string }> = {
-          incoming:       { from: "#2563eb", to: "#1d4ed8" },
-          received:       { from: "#0891b2", to: "#0e7490" },
-          lost:           { from: "#e11d48", to: "#be123c" },
-          lost_pct:       { from: "#db2777", to: "#be185d" },
-          reaction:       { from: "#f97316", to: "#ea580c" },
-          outgoing:       { from: "#7c3aed", to: "#6d28d9" },
-          missed:         { from: "#dc2626", to: "#b91c1c" },
-          missed_pct:     { from: "#e11d48", to: "#be123c" },
-          callback_count: { from: "#0d9488", to: "#0f766e" },
-          callback_pct:   { from: "#059669", to: "#047857" },
-          avg_duration:   { from: "#d97706", to: "#b45309" },
-          conversion:     { from: "#16a34a", to: "#15803d" },
-        };
-        const EXAMPLE: Record<string, string> = {
-          incoming:       "2 239",
-          received:       "2 507",
-          lost:           "72",
-          lost_pct:       "3,4%",
-          reaction:       "39 мин",
-          outgoing:       "3 099",
-          missed:         "268",
-          missed_pct:     "10,7%",
-          callback_count: "214",
-          callback_pct:   "79.9%",
-          avg_duration:   "3м 12с",
-          conversion:     "34.5%",
-        };
-        const c = COLORS[m.key];
-        return (
-          <button
-            key={m.key}
-            onClick={() => setSelectedMetric(m.key)}
-            className={`relative rounded-2xl overflow-hidden text-left transition-all duration-150
-              ring-2 ${selected ? "ring-primary scale-[1.03]" : "ring-transparent hover:scale-[1.01]"}`}
-          >
-            {/* Цветной блок */}
-            <div
-              className="h-16 w-full flex flex-col justify-between p-3 relative overflow-hidden"
-              style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}
-            >
-              <div className="absolute -right-3 -top-3 h-10 w-10 rounded-full bg-white/10" />
-              <div className="text-lg font-bold text-white tracking-tight z-10">
-                {EXAMPLE[m.key]}
-              </div>
-              {selected && (
-                <div className="absolute top-2 right-2 h-4 w-4 rounded-full bg-white/30
-                  flex items-center justify-center">
-                  <Check className="h-2.5 w-2.5 text-white" />
-                </div>
-              )}
-            </div>
-
-            {/* Подпись */}
-            <div className={`px-3 py-2 border-t text-[11px] font-medium leading-tight
-              ${selected
-                ? "bg-primary/5 border-primary/20 text-foreground"
-                : "bg-card border-border text-muted-foreground"
-              }`}>
-              {m.label}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-
-    <div className="flex gap-3">
-      <button
-        onClick={() => setConfiguring(null)}
-        className="flex-1 py-2.5 rounded-xl border border-border text-sm
-          text-muted-foreground hover:bg-muted/40 transition-colors"
-      >
-        Назад
-      </button>
-      <button
-        onClick={handleConfirm}
-        className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90
-          text-primary-foreground text-sm font-semibold transition-colors"
-      >
-        Добавить
-      </button>
-    </div>
-  </div>
-) : (
-          /* Галерея */
-          <div className="flex flex-1 min-h-0">
-            {/* Боковая панель */}
-            <div className="w-44 flex-shrink-0 border-r border-border p-3 space-y-1">
-              {GROUPS.map(g => (
-                <button key={g} onClick={() => setGroup(g)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-sm
-                    transition-colors ${
-                      group === g
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    }`}>
-                  <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-                  {g}
-                </button>
-              ))}
-            </div>
-
-            {/* Карточки */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-2 gap-4">
-                {items.map(def => (
-                  <div key={def.id}
-                    className="rounded-2xl border border-border bg-muted/20 overflow-hidden
-                      hover:bg-muted/30 transition-all duration-200">
-                    <div className="h-44 p-3 bg-muted/10">
-                      <Preview type={def.id} />
-                    </div>
-                    <div className="p-4 border-t border-border">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold">{def.name}</div>
-                          <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{def.description}</div>
-                          <span className="inline-block mt-2 text-[10px] text-muted-foreground/50
-                            bg-muted/50 px-2 py-0.5 rounded-md">
-                            {def.defaultW} × {def.defaultH}
-                          </span>
-                        </div>
-                        <button onClick={() => handleAdd(def.id)}
-                          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl
-                            bg-primary hover:bg-primary/90 text-primary-foreground
-                            text-xs font-semibold transition-colors">
-                          <Plus className="h-3.5 w-3.5" />
-                          Добавить
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {children}
       </div>
     </div>
+  );
+}
+
+// ─── Каталог виджетов ──────────────────────────────────────────────────────
+
+interface WidgetCatalogProps {
+  can:     (perm: WidgetPermission) => boolean;
+  onAdd:   (type: WidgetTypeId, config?: Record<string, string>) => void;
+  onClose: () => void;
+}
+
+export function WidgetCatalog({ can, onAdd, onClose }: WidgetCatalogProps) {
+  const groups = WIDGET_GROUPS.filter(g => WIDGET_TYPES.some(d => d.group === g && can(d.permission)));
+  const [group, setGroup] = useState<WidgetGroup>(groups[0] ?? "Звонки");
+  const [configuring, setConfiguring] = useState<WidgetTypeDef | null>(null);
+  const [value, setValue] = useState("");
+
+  const items = WIDGET_TYPES.filter(d => d.group === group && can(d.permission));
+
+  function pick(def: WidgetTypeDef) {
+    const opt = WIDGET_OPTIONS[def.id];
+    if (opt) {
+      setConfiguring(def);
+      setValue(opt.options[0].value);
+    } else {
+      onAdd(def.id);
+    }
+  }
+
+  if (configuring) {
+    const def = configuring;
+    return (
+      <Dialog title={def.name} subtitle="Выберите, что показывать в виджете" onClose={onClose} back={() => setConfiguring(null)}>
+        <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto p-6 lg:grid-cols-[1fr_300px]">
+          <WidgetOptionsPicker type={def.id} value={value} onChange={setValue} />
+          <div className="flex flex-col gap-3">
+            <p className="metric-label">Как будет выглядеть</p>
+            <ScaledPreview type={def.id} config={{ metric: value }} w={def.defaultW} h={def.defaultH}
+              className="h-48 rounded-lg bg-background" />
+            <button
+              type="button"
+              onClick={() => onAdd(def.id, { metric: value })}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[7px] bg-brand px-4 text-[13px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong"
+            >
+              <Plus className="h-4 w-4" /> Добавить на главную
+            </button>
+          </div>
+        </div>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog title="Добавить виджет" subtitle="Превью показаны на примерных данных" onClose={onClose}>
+      <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border p-3 sm:w-48 sm:flex-col sm:border-b-0 sm:border-r" aria-label="Группы виджетов">
+          {groups.map(g => {
+            const Icon = GROUP_ICON[g];
+            const active = g === group;
+            return (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGroup(g)}
+                aria-current={active ? "true" : undefined}
+                className={cn(
+                  "flex h-9 shrink-0 items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[13px] font-medium transition-colors",
+                  active ? "bg-brand text-brand-foreground" : "text-text-2 hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" strokeWidth={1.6} />
+                {g}
+                <span className={cn("ml-auto text-[11px] tabular-nums", active ? "text-brand-foreground/80" : "text-text-3")}>
+                  {WIDGET_TYPES.filter(d => d.group === g && can(d.permission)).length}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="min-h-0 flex-1 overflow-y-auto bg-background p-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {items.map(def => (
+              <div key={def.id} className="card-surface flex flex-col overflow-hidden">
+                <ScaledPreview
+                  type={def.id}
+                  config={WIDGET_OPTIONS[def.id] ? { metric: WIDGET_OPTIONS[def.id]!.options[0].value } : undefined}
+                  w={def.defaultW} h={def.defaultH}
+                  className="h-44 border-b border-hairline bg-background"
+                />
+                <div className="flex flex-1 flex-col p-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="section-title">{def.name}</h3>
+                    <span className="shrink-0 text-[10px] font-semibold tabular-nums text-text-3">
+                      {def.defaultW}/{COLS} ширины
+                    </span>
+                  </div>
+                  <p className="mt-1 flex-1 text-[12px] leading-relaxed text-text-2">{def.description}</p>
+                  <button
+                    type="button"
+                    onClick={() => pick(def)}
+                    className="mt-3 inline-flex h-8 items-center justify-center gap-1.5 self-start rounded-[7px] bg-brand px-3.5 text-[12px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {WIDGET_OPTIONS[def.id] ? "Выбрать метрику" : "Добавить"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+// ─── Настройки уже добавленного виджета ───────────────────────────
+
+export function WidgetSettingsDialog({ type, name, value, onSave, onClose }: {
+  type: WidgetTypeId; name: string; value: string;
+  onSave: (v: string) => void; onClose: () => void;
+}) {
+  const [v, setV] = useState(value);
+  const def = WIDGET_TYPES.find(d => d.id === type)!;
+  return (
+    <Dialog title={name} subtitle="Настройка виджета" onClose={onClose}>
+      <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto p-6 lg:grid-cols-[1fr_300px]">
+        <WidgetOptionsPicker type={type} value={v} onChange={setV} />
+        <div className="flex flex-col gap-3">
+          <p className="metric-label">Как будет выглядеть</p>
+          <ScaledPreview type={type} config={{ metric: v }} w={def.defaultW} h={def.defaultH}
+            className="h-48 rounded-lg bg-background" />
+          <button
+            type="button"
+            onClick={() => onSave(v)}
+            className="inline-flex h-9 items-center justify-center rounded-[7px] bg-brand px-4 text-[13px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong"
+          >
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
