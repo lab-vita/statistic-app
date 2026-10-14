@@ -2,32 +2,33 @@
 
 import { useState, useEffect } from "react";
 import { fetchMe, type AuthUser } from "@/lib/api";
+import { authFetch } from "@/lib/auth";
 import { PageContent, SectionCard, Skeleton, ErrorBanner } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
 interface User { id: string; name: string; role: string; last_seen?: string; }
 
 async function fetchUsers(): Promise<User[]> {
-  const res = await fetch("/api/admin/users", { credentials: "include" });
+  const res = await authFetch("/api/admin/users");
   if (!res.ok) throw new Error("Ошибка загрузки");
   const data = await res.json();
   return Array.isArray(data) ? data : (data.users ?? []);
 }
 async function addUser(id: string, name: string, role: string) {
-  const res = await fetch("/api/admin/users", {
-    method: "POST", credentials: "include",
+  const res = await authFetch("/api/admin/users", {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, name, role }),
   });
   if (!res.ok) throw new Error("Ошибка добавления");
 }
 async function deleteUser(id: string) {
-  const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE", credentials: "include" });
+  const res = await authFetch(`/api/admin/users/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Ошибка удаления");
 }
 async function updateUserRole(id: string, role: string) {
-  const res = await fetch(`/api/admin/users/${id}`, {
-    method: "PATCH", credentials: "include",
+  const res = await authFetch(`/api/admin/users/${id}`, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role }),
   });
