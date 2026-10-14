@@ -3,7 +3,7 @@
  * виджеты на этих числах, поэтому превью всегда совпадает с тем, что
  * появится на главной. Числа условные, ни на что не влияют.
  */
-import type { DailyItem, DeltaDir, OperatorStats } from "@/lib/api";
+import type { AdminAppointmentStats, DailyItem, DeltaDir, OperatorStats } from "@/lib/api";
 import type { HomeData } from "@/lib/home-data";
 
 function op(name: string, k: number): OperatorStats {
@@ -47,8 +47,20 @@ function days(offset: number, seed: number): DailyItem[] {
   return out;
 }
 
+function admin(name: string, group_label: string, total: number, visitPct: number, noshowPct: number, newP: number): AdminAppointmentStats {
+  const visits = Math.round(total * visitPct / 100), noshow = Math.round(total * noshowPct / 100);
+  return {
+    name, group: "", group_label, is_callcenter: group_label === "Колл-центр",
+    total, visits, noshow, cancels: 0, pending: total - visits - noshow, new_patients: newP, callcenter_total: 0,
+    visit_pct: visitPct, noshow_pct: noshowPct, new_pct: Math.round(newP / total * 1000) / 10, cancel_pct: 0,
+    total_delta_pct: null, total_delta_dir: null, visits_delta_pct: null, visits_delta_dir: null,
+    noshow_delta_pct: null, noshow_delta_dir: null, new_patients_delta_pct: null, new_patients_delta_dir: null,
+  };
+}
+
 export function sampleHomeData(): HomeData {
   const daily = days(0, 0);
+  const months = ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"];
   return {
     dateFrom: daily[0].date,
     dateTo: daily[daily.length - 1].date,
@@ -64,8 +76,8 @@ export function sampleHomeData(): HomeData {
     daily: { date_from: "", date_to: "", days: daily },
     prevDaily: { date_from: "", date_to: "", days: days(-14, 3) },
     plan: {
-      by_day: Object.fromEntries(daily.map(d => [d.date, { calls_incoming: 50, calls_outgoing: 22 }])),
-      totals: { calls_incoming: 50 * daily.length, calls_outgoing: 22 * daily.length, appt_count: 0 },
+      by_day: Object.fromEntries(daily.map(d => [d.date, { calls_incoming: 50, calls_outgoing: 22, appt_count: 26 }])),
+      totals: { calls_incoming: 50 * daily.length, calls_outgoing: 22 * daily.length, appt_count: 26 * daily.length },
       fixed: { calls_missed_pct: 6 },
     },
     conversion: { value: 56.8, deltaPct: 3, deltaDir: "up" },
@@ -91,7 +103,80 @@ export function sampleHomeData(): HomeData {
         admin:      { count: 99,  pct: 28, label: "Администраторы" },
         other:      { count: 42,  pct: 12, label: "Прочие" },
       },
-      by_admin: {},
+      by_admin: {
+        a1: admin("Иванова Анна",    "Колл-центр",     96, 76.0, 11.5, 31),
+        a2: admin("Петрова Ольга",   "Колл-центр",     71, 73.2, 12.7, 24),
+        a3: admin("Кузнецова Елена", "Администраторы", 58, 81.0, 6.9,  12),
+        a4: admin("Смирнова Ирина",  "Администраторы", 41, 68.3, 17.1, 9),
+        a5: admin("Сидорова Мария",  "Колл-центр",     46, 71.7, 13.0, 15),
+      },
+    },
+    apptDaily: {
+      date_from: "", date_to: "",
+      days: daily.map((d, i) => {
+        const total = Math.round(d.incoming * 0.55);
+        const visits = Math.round(total * (0.7 + Math.sin(i) * 0.05));
+        const noshow = Math.round(total * 0.13);
+        return { date: d.date, total, visits, noshow, new_patients: Math.round(total * 0.3) };
+      }),
+    },
+    heatmap: {
+      date_from: "", date_to: "",
+      cells: Array.from({ length: 7 }).flatMap((_, wd) => Array.from({ length: 13 }).map((__, j) => {
+        const hour = 8 + j;
+        const day = wd < 5 ? 1 : wd === 5 ? 0.45 : 0.15;
+        const curve = Math.exp(-((hour - 11) ** 2) / 8) + 0.6 * Math.exp(-((hour - 16) ** 2) / 6);
+        const total = Math.round(40 * day * curve);
+        const missed = Math.round(total * (hour >= 10 && hour <= 12 ? 0.22 : 0.1));
+        return { weekday: wd, weekday_name: "", hour, incoming: total - missed, outgoing: Math.round(total * 0.3), missed, total };
+      })),
+    },
+    paymentDaily: {
+      days: daily.map((d, i) => ({
+        date: d.date, count: 40 + (i % 5) * 4,
+        total_paid: Math.round((140000 + Math.sin(i / 1.6) * 38000 + i * 1500) / 100) * 100,
+        by_cash: 0, by_card: 0, by_cashless: 0, by_credit: 0,
+      })),
+    },
+    doctors: {
+      doctors: [
+        { doctor_id: 1, doctor_name: "Соколова Наталья Викторовна", doctor_surname: "Соколова", count: 112, total_paid: 412000, pct: 18.9 },
+        { doctor_id: 2, doctor_name: "Морозов Андрей Петрович",     doctor_surname: "Морозов",  count: 96,  total_paid: 356500, pct: 16.3 },
+        { doctor_id: 3, doctor_name: "Волкова Татьяна Сергеевна",   doctor_surname: "Волкова",  count: 88,  total_paid: 298000, pct: 13.6 },
+        { doctor_id: 4, doctor_name: "Лебедев Игорь Олегович",      doctor_surname: "Лебедев",  count: 71,  total_paid: 241300, pct: 11.0 },
+        { doctor_id: 5, doctor_name: "Новикова Юлия Андреевна",     doctor_surname: "Новикова", count: 64,  total_paid: 187900, pct: 8.6 },
+        { doctor_id: 6, doctor_name: "Козлов Дмитрий Ильич",        doctor_surname: "Козлов",   count: 52,  total_paid: 152400, pct: 7.0 },
+      ],
+    },
+    sales: {
+      total: { final_sum: 2184500, delta_pct: 14, delta_dir: "up" },
+      services: [
+        { service_title: "Приём терапевта первичный",     service_id: 1, unit: "шт", amount: 214, final_sum: 385200, pct_of_total: 17.6, delta_pct: 6,  delta_dir: "up" },
+        { service_title: "УЗИ брюшной полости",           service_id: 2, unit: "шт", amount: 98,  final_sum: 264600, pct_of_total: 12.1, delta_pct: 11, delta_dir: "up" },
+        { service_title: "Общий анализ крови",            service_id: 3, unit: "шт", amount: 412, final_sum: 197800, pct_of_total: 9.1,  delta_pct: 3,  delta_dir: "down" },
+        { service_title: "Приём кардиолога",              service_id: 4, unit: "шт", amount: 76,  final_sum: 182400, pct_of_total: 8.3,  delta_pct: 9,  delta_dir: "up" },
+        { service_title: "ЭКГ с расшифровкой",            service_id: 5, unit: "шт", amount: 131, final_sum: 131000, pct_of_total: 6.0,  delta_pct: null, delta_dir: null },
+        { service_title: "Приём невролога повторный",     service_id: 6, unit: "шт", amount: 64,  final_sum: 102400, pct_of_total: 4.7,  delta_pct: 2,  delta_dir: "up" },
+      ],
+    },
+    reports: {
+      from: "2026-04-01", to: "2026-09-30",
+      calls: {
+        granularity: "month",
+        rows: months.map((period, i) => {
+          const incoming = 1180 + i * 60 + (i % 2) * 90;
+          const missed = 230 - i * 12;
+          return { period, incoming, missed, outgoing: Math.round(incoming * 0.4), total: incoming + missed };
+        }),
+      },
+      appts: {
+        granularity: "month",
+        rows: months.map((period, i) => {
+          const total = 690 + i * 35 + (i % 2) * 40;
+          const visits = Math.round(total * (0.72 + i * 0.01));
+          return { period, total, visits, noshow: Math.round(total * 0.13), cancels: 20, new_patients: Math.round(total * 0.3), visit_pct: visits / total * 100 };
+        }),
+      },
     },
     payments: {
       count: 625, total_paid: 2184500, by_cash: 310000, by_card: 1500000, by_cashless: 300000, by_credit: 50000, by_balance: 24500,

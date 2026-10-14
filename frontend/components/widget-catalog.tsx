@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Plus, Phone, Calendar, TrendingUp, ArrowLeft, Check } from "lucide-react";
+import { X, Plus, Phone, Calendar, TrendingUp, ArrowLeft, Check, Users, Filter, Clock, FileText } from "lucide-react";
 import {
   WIDGET_TYPES, WIDGET_GROUPS, COLS, GAP, ROW_H,
   type WidgetGroup, type WidgetTypeDef, type WidgetTypeId, type WidgetPermission,
@@ -14,6 +14,10 @@ const GROUP_ICON: Record<WidgetGroup, React.ElementType> = {
   "Звонки":  Phone,
   "Записи":  Calendar,
   "Выручка": TrendingUp,
+  "Врачи":   Users,
+  "Воронка": Filter,
+  "Планы":   Clock,
+  "Отчёты":  FileText,
 };
 
 /** Ширина колонки, на которой рисуется превью (как на экране 1280px). */

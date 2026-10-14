@@ -317,7 +317,7 @@ export interface AppointmentDailyResponse {
 export const fetchAppointmentDaily = (dateFrom: string, dateTo: string, adminSurname?: string) =>
   get<AppointmentDailyResponse>("/api/appointments/daily", { date_from: dateFrom, date_to: dateTo, admin_surname: adminSurname });
 
-// ─── Платежи ──────────────────────────────────────────────────────────
+// ─── Платежи ────────────────────────────────────────────────────────────
 
 export interface PaymentStatsResponse {
   count:        number;
@@ -405,7 +405,7 @@ export interface SalesStatsResponse {
 export const fetchSalesStats = (dateFrom: string, dateTo: string, limit = 15) =>
   get<SalesStatsResponse>("/api/sales/stats", { date_from: dateFrom, date_to: dateTo, limit });
 
-// ─── Планы ────────────────────────────────────────────────────────────
+// ─── Планы ──────────────────────────────────────────────────────────────
 
 export interface PlanDay {
   date:           string;
@@ -439,6 +439,21 @@ export const savePlanItems = (items: { date: string; metric: string; value: numb
   post("/api/plans/upsert", { items });
 export const fillPlan = (body: { date_from: string; date_to: string; metric: string; value: number; skip_weekends: boolean }) =>
   post("/api/plans/fill", body);
+
+// ─── Отчёты: помесячная сводка ───────────────────────────────────────
+
+export interface CallsReportRow { period: string; incoming: number; outgoing: number; missed: number; total: number }
+export interface ApptReportRow  { period: string; total: number; visits: number; noshow: number; cancels: number; new_patients: number; visit_pct: number }
+
+export interface CallsReportResponse { granularity: string; rows: CallsReportRow[] }
+export interface ApptReportResponse  { granularity: string; rows: ApptReportRow[] }
+
+export type ReportGranularity = "day" | "week" | "month";
+
+export const fetchCallsReport = (dateFrom: string, dateTo: string, granularity: ReportGranularity = "month") =>
+  get<CallsReportResponse>("/api/reports/calls", { date_from: dateFrom, date_to: dateTo, granularity });
+export const fetchApptReport = (dateFrom: string, dateTo: string, granularity: ReportGranularity = "month") =>
+  get<ApptReportResponse>("/api/reports/appointments", { date_from: dateFrom, date_to: dateTo, granularity });
 
 // ── Compatibility aliases ─────────────────────────────────────────────
 // Старые компоненты используют эти имена

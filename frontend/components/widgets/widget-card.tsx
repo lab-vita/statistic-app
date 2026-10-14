@@ -120,3 +120,44 @@ export const C = {
   violet: "#8b5cf6",
   slate:  "#94b3c9",
 } as const;
+
+// ─── Форматирование ──────────────────────────────────────────────
+
+export const num = (v: number) => v.toLocaleString("ru-RU");
+
+export const rub = (v: number) =>
+  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(Math.round(v)) + " ₽";
+
+/** «1,2 млн ₽», «845 тыс ₽» — для подписей осей и тесных мест. */
+export const rubShort = (v: number) =>
+  v >= 1_000_000 ? `${(v / 1_000_000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} млн ₽`
+  : v >= 10_000 ? `${Math.round(v / 1000).toLocaleString("ru-RU")} тыс ₽`
+  : rub(v);
+
+/** «5 окт» из ISO-даты. */
+export const dayLabel = (iso: string) =>
+  new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+
+/** «пт, 5 октября» из ISO-даты — для подсказок. */
+export const dayLong = (iso: string) =>
+  new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
+
+/** Карточка подсказки графика в стиле «Пульса». */
+export function ChartTip({ title, rows }: {
+  title: string; rows: { label: string; value: string; color?: string }[];
+}) {
+  return (
+    <div className="space-y-1 rounded-lg border border-border bg-popover px-3 py-2 text-[12px] shadow-pop">
+      <p className="mb-1 font-semibold">{title}</p>
+      {rows.map(r => (
+        <div key={r.label} className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-1.5 text-text-2">
+            {r.color && <span className="h-2 w-2 rounded-full" style={{ background: r.color }} />}
+            {r.label}
+          </span>
+          <span className="font-bold tabular-nums">{r.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}

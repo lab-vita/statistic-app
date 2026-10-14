@@ -1,11 +1,13 @@
 /**
- * Загрузка всех данных для виджетов главной одним вызовом.
- * Каждый запрос независим: если один не удался (например, нет права на раздел),
- * остальные виджеты всё равно работают.
+ * Загрузка данных для виджетов главной одним вызовом.
+ * Каждый виджет объявляет, какие данные ему нужны (`data` в WIDGET_TYPES),
+ * и запрашивается только то, что стоит на экране. Запросы независимы:
+ * если один не удался (например, нет права на раздел), остальные виджеты работают.
  */
 import type {
-  AppointmentStatsResponse, ConversionResponse, DailyResponse,
-  PaymentStatsResponse, PlanRangeResponse, StatsResponse,
+  AppointmentDailyResponse, AppointmentStatsResponse, ApptReportResponse, CallsReportResponse,
+  ConversionResponse, DailyResponse, HeatmapResponse, PaymentDailyResponse, PaymentDoctorResponse,
+  PaymentStatsResponse, PlanRangeResponse, SalesStatsResponse, StatsResponse,
 } from "@/lib/api";
 import { conversionValue, type ConversionValue } from "@/lib/call-metrics";
 
@@ -21,56 +23,103 @@ export interface HomeData {
   conversion:     ConversionValue | null;
   /** конверсия по операторам — для таблицы качества */
   conversionData: ConversionResponse | null;
+  heatmap:        HeatmapResponse | null;
   appointments:   AppointmentStatsResponse | null;
+  apptDaily:      AppointmentDailyResponse | null;
   payments:       PaymentStatsResponse | null;
+  paymentDaily:   PaymentDailyResponse | null;
+  doctors:        PaymentDoctorResponse | null;
+  sales:          SalesStatsResponse | null;
+  /** помесячная сводка за последние полгода — не зависит от выбранного периода */
+  reports:        { calls: CallsReportResponse | null; appts: ApptReportResponse | null; from: string; to: string } | null;
 }
+
+/** Группы данных, которые может запросить виджет. */
+export type DataKey =
+  | "stats" | "daily" | "prevDaily" | "conversion" | "plan" | "heatmap"
+  | "appointments" | "apptDaily" | "payments" | "paymentDaily" | "doctors" | "sales" | "reports";
+
+export type HomeNeeds = Partial<Record<DataKey, boolean>>;
+
+export const ALL_NEEDS: HomeNeeds = {
+  stats: true, daily: true, prevDaily: true, conversion: true, plan: true, heatmap: true,
+  appointments: true, apptDaily: true, payments: true, paymentDaily: true, doctors: true, sales: true, reports: true,
+};
+
+/** Ключ для сравнения наборов: одинаковые потребности → тот же ключ. */
+export const needsKey = (n: HomeNeeds) => (Object.keys(n) as DataKey[]).filter(k => n[k]).sort().join(",");
+
+type Fn<T> = (from: string, to: string) => Promise<T>;
 
 export interface HomeApi {
-  fetchStats:            (from: string, to: string) => Promise<StatsResponse>;
-  fetchDaily:            (from: string, to: string) => Promise<DailyResponse>;
-  fetchConversion:       (from: string, to: string) => Promise<ConversionResponse>;
-  fetchPlanRange:        (from: string, to: string) => Promise<PlanRangeResponse>;
-  fetchAppointmentStats?: (from: string, to: string) => Promise<AppointmentStatsResponse>;
-  fetchPaymentStats?:     (from: string, to: string) => Promise<PaymentStatsResponse>;
-}
-
-/** Какие группы данных нужны виджетам на экране — лишнее не запрашиваем. */
-export interface HomeNeeds {
-  calls:        boolean;
-  appointments: boolean;
-  payments:     boolean;
+  fetchStats:             Fn<StatsResponse>;
+  fetchDaily:             Fn<DailyResponse>;
+  fetchConversion:        Fn<ConversionResponse>;
+  fetchPlanRange:         Fn<PlanRangeResponse>;
+  fetchHeatmap?:          Fn<HeatmapResponse>;
+  fetchAppointmentStats?: Fn<AppointmentStatsResponse>;
+  fetchAppointmentDaily?: Fn<AppointmentDailyResponse>;
+  fetchPaymentStats?:     Fn<PaymentStatsResponse>;
+  fetchPaymentDaily?:     Fn<PaymentDailyResponse>;
+  fetchPaymentByDoctor?:  Fn<PaymentDoctorResponse>;
+  fetchSalesStats?:       Fn<SalesStatsResponse>;
+  fetchCallsReport?:      Fn<CallsReportResponse>;
+  fetchApptReport?:       Fn<ApptReportResponse>;
 }
 
 const ok = <T,>(r: PromiseSettledResult<T>): T | null => (r.status === "fulfilled" ? r.value : null);
 const skip = <T,>(): Promise<T> => Promise.reject(new Error("не нужно"));
+const maybe = <T,>(need: boolean | undefined, fn: Fn<T> | undefined, from: string, to: string): Promise<T> =>
+  need && fn ? fn(from, to) : skip<T>();
 
 export const emptyHomeData = (dateFrom = "", dateTo = ""): HomeData => ({
   dateFrom, dateTo, stats: null, daily: null, prevDaily: null, plan: null,
-  conversion: null, conversionData: null, appointments: null, payments: null,
+  conversion: null, conversionData: null, heatmap: null,
+  appointments: null, apptDaily: null, payments: null, paymentDaily: null,
+  doctors: null, sales: null, reports: null,
 });
+
+/** Последние шесть месяцев, включая текущий, по вчерашний день. */
+export function reportsRange(today: Date = new Date()): { from: string; to: string } {
+  const y = new Date(today); y.setDate(y.getDate() - 1);
+  const from = new Date(y.getFullYear(), y.getMonth() - 5, 1);
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: iso(from), to: iso(y) };
+}
 
 export async function loadHomeData(
   dateFrom: string,
   dateTo: string,
   api: HomeApi,
-  needs: HomeNeeds = { calls: true, appointments: true, payments: true },
+  needs: HomeNeeds = ALL_NEEDS,
 ): Promise<HomeData> {
-  const [s, d, cv, pl, ap, pay] = await Promise.allSettled([
-    needs.calls ? api.fetchStats(dateFrom, dateTo)      : skip<StatsResponse>(),
-    needs.calls ? api.fetchDaily(dateFrom, dateTo)      : skip<DailyResponse>(),
-    needs.calls ? api.fetchConversion(dateFrom, dateTo) : skip<ConversionResponse>(),
-    needs.calls ? api.fetchPlanRange(dateFrom, dateTo)  : skip<PlanRangeResponse>(),
-    needs.appointments && api.fetchAppointmentStats ? api.fetchAppointmentStats(dateFrom, dateTo) : skip<AppointmentStatsResponse>(),
-    needs.payments && api.fetchPaymentStats         ? api.fetchPaymentStats(dateFrom, dateTo)     : skip<PaymentStatsResponse>(),
+  // /stats нужен и сам по себе, и чтобы узнать границы прошлого периода
+  const needStats = needs.stats || needs.prevDaily || needs.conversion;
+  const rr = reportsRange();
+
+  const [s, d, cv, pl, hm, ap, apd, pay, payd, doc, sal, rc, ra] = await Promise.allSettled([
+    maybe(needStats,          api.fetchStats,            dateFrom, dateTo),
+    maybe(needs.daily,        api.fetchDaily,            dateFrom, dateTo),
+    maybe(needs.conversion,   api.fetchConversion,       dateFrom, dateTo),
+    maybe(needs.plan,         api.fetchPlanRange,        dateFrom, dateTo),
+    maybe(needs.heatmap,      api.fetchHeatmap,          dateFrom, dateTo),
+    maybe(needs.appointments, api.fetchAppointmentStats, dateFrom, dateTo),
+    maybe(needs.apptDaily,    api.fetchAppointmentDaily, dateFrom, dateTo),
+    maybe(needs.payments,     api.fetchPaymentStats,     dateFrom, dateTo),
+    maybe(needs.paymentDaily, api.fetchPaymentDaily,     dateFrom, dateTo),
+    maybe(needs.doctors,      api.fetchPaymentByDoctor,  dateFrom, dateTo),
+    maybe(needs.sales,        api.fetchSalesStats,       dateFrom, dateTo),
+    maybe(needs.reports,      api.fetchCallsReport,      rr.from, rr.to),
+    maybe(needs.reports,      api.fetchApptReport,       rr.from, rr.to),
   ]);
-  const stats = ok(s), daily = ok(d), conversionData = ok(cv), plan = ok(pl);
+  const stats = ok(s), conversionData = ok(cv);
 
   // Прошлый период известен из ответа /stats: берём за него дни и конверсию
   let prevDaily: DailyResponse | null = null;
   let prevConversionPct: number | null = null;
-  if (stats) {
+  if (stats && (needs.prevDaily || conversionData)) {
     const [pd, pc] = await Promise.allSettled([
-      api.fetchDaily(stats.prev_from, stats.prev_to),
+      maybe(needs.prevDaily, api.fetchDaily, stats.prev_from, stats.prev_to),
       conversionData ? api.fetchConversion(stats.prev_from, stats.prev_to) : skip<ConversionResponse>(),
     ]);
     prevDaily = ok(pd);
@@ -78,10 +127,18 @@ export async function loadHomeData(
     prevConversionPct = prevConv ? prevConv.total.conversion_pct : null;
   }
 
+  const reportsCalls = ok(rc), reportsAppts = ok(ra);
+
   return {
-    dateFrom, dateTo, stats, daily, prevDaily, plan, conversionData,
+    dateFrom, dateTo, stats, daily: ok(d), prevDaily, plan: ok(pl), conversionData,
     conversion: conversionData ? conversionValue(conversionData.total.conversion_pct, prevConversionPct) : null,
+    heatmap:      ok(hm),
     appointments: ok(ap),
+    apptDaily:    ok(apd),
     payments:     ok(pay),
+    paymentDaily: ok(payd),
+    doctors:      ok(doc),
+    sales:        ok(sal),
+    reports:      needs.reports ? { calls: reportsCalls, appts: reportsAppts, ...rr } : null,
   };
 }
