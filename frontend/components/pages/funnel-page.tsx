@@ -153,7 +153,7 @@ function TrendChart({ points }: { points: DayPoint[] }) {
               yAxisId="cnt"
               dataKey="calls"
               name="Звонки"
-              fill="#3b82f6"
+              fill="#328fcd"
               fillOpacity={0.35}
               radius={[3, 3, 0, 0]}
               maxBarSize={24}
@@ -172,11 +172,11 @@ function TrendChart({ points }: { points: DayPoint[] }) {
               type="monotone"
               dataKey="conversion"
               name="Конверсия"
-              stroke="#10b981"
+              stroke="#1a9e6e"
               strokeWidth={2}
               strokeDasharray="4 2"
               dot={false}
-              activeDot={{ r: 4, fill: "#10b981" }}
+              activeDot={{ r: 4, fill: "#1a9e6e" }}
             />
           </ComposedChart>
         </ResponsiveContainer>

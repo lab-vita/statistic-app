@@ -37,8 +37,8 @@ export function RevenuePeriodChart({ current, prev }: Props) {
       <ComposedChart data={data} margin={{ top: 4, right: 4, left: -4, bottom: 0 }}>
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#16a34a" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+            <stop offset="5%"  stopColor="#1a9e6e" stopOpacity={0.15} />
+            <stop offset="95%" stopColor="#1a9e6e" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
@@ -71,13 +71,13 @@ export function RevenuePeriodChart({ current, prev }: Props) {
             formatter={(name) => name === "current" ? "Текущий период" : "Предыдущий период"}
           />
         )}
-        <Bar dataKey="current" name="current" fill="#16a34a" fillOpacity={0.85} radius={[2, 2, 0, 0]} maxBarSize={24} />
+        <Bar dataKey="current" name="current" fill="#1a9e6e" fillOpacity={0.85} radius={[2, 2, 0, 0]} maxBarSize={24} />
         {hasPrev && (
           <Line
             dataKey="prev"
             name="prev"
             type="monotone"
-            stroke="#9ca3af"
+            stroke="#94b3c9"
             strokeWidth={1.5}
             dot={false}
             strokeDasharray="4 2"
