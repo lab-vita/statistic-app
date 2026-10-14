@@ -204,6 +204,21 @@ Lucide React, 16px в навигации (`strokeWidth 1.6`), 12–14px в ко�
 
 ---
 
+## 9a. Главная: виджеты
+
+Главная собирается пользователем из виджетов на сетке 12 колонок (`components/home-dashboard.tsx`).
+
+- Типы, размеры, группы и права — `lib/grid.ts` (`WIDGET_TYPES`), раскладка по умолчанию — `DEFAULT_LAYOUT`.
+- Строка сетки фиксированной высоты `ROW_H = 76px`, промежуток `GAP = 14px`; уже 720px сетка становится колонкой.
+- Компонент и настройки каждого типа — `components/widgets/registry.tsx`; оболочка — `widgets/widget-card.tsx`
+  (`WidgetCard`, `WidgetHeader`, `DeltaBadge`, `WidgetSkeleton`, `WidgetEmpty`).
+- Виджет занимает всю высоту ячейки (`h-full`), длинный список скроллится внутри; узкие раскладки — через container queries (`@container`, `@[26rem]:…`).
+- Каталог рисует настоящие виджеты на демо-данных (`lib/home-sample.ts`), поэтому превью всегда совпадает с главной.
+- Раскладка хранится в `localStorage` (`grid_layout_v2`) у каждого пользователя; виджеты без права на раздел не показываются.
+- Новый виджет: тип в `WIDGET_TYPES`, компонент в `widgets/`, ветка в `WidgetContent`, при выборе метрики — запись в `WIDGET_OPTIONS`.
+
+---
+
 ## 10. Запрещено
 
 ❌ Ряд табов для выбора периода (только `PeriodPill`)
