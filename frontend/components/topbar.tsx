@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, ChevronDown, CalendarDays } from "lucide-react";
 import { Period, PeriodType, shiftPeriod, formatPeriodLabel } from "@/lib/periods";
 import { toDateStr, Operator, Admin } from "@/lib/api";
-import { type Section } from "@/components/sidebar";
+import { type Section } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const PERIODS: { type: PeriodType; label: string }[] = [
@@ -18,8 +18,8 @@ const PERIODS: { type: PeriodType; label: string }[] = [
 
 const SECTION_LABELS: Record<Section, string> = {
   home: "Главная", calls: "Звонки", appointments: "Записи",
-  revenue: "Выручка", reports: "Отчёты", funnel: "Воронка", plans: "Планы", admin: "Доступ",
-  about: "О приложении",
+  revenue: "Выручка", reports: "Отчёты", funnel: "Воронка", plans: "Планы",
+  doctors: "Врачи", admin: "Доступ", about: "О приложении",
 };
 
 const GROUP_ORDER  = ["callcenter", "admin", "other"] as const;

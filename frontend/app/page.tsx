@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { AuthGate, useAuth } from "@/components/auth-gate";
-import { Sidebar, type Section } from "@/components/sidebar";
+import { Sidebar } from "@/components/sidebar";
+import type { Section } from "@/lib/permissions";
 import { CallsPage }        from "@/components/pages/calls-page";
 import { AppointmentsPage } from "@/components/pages/appointments-page";
 import { RevenuePage }      from "@/components/pages/revenue-page";
