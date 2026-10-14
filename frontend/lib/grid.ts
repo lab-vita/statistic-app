@@ -5,6 +5,8 @@
 // цифры и графики не растягиваются на широких экранах.
 // Раскладка хранится в localStorage как массив PlacedWidget.
 
+import type { DataKey } from "@/lib/home-data";
+
 export const COLS  = 12;
 export const GAP   = 14;  // px между ячейками
 export const ROW_H = 76;  // px, высота одной строки
@@ -19,15 +21,28 @@ export type WidgetTypeId =
   | "calls_plan"        // план и прогноз
   | "calls_operators"   // операторы: качество
   | "calls_conversion"  // конверсия звонок → запись по операторам
+  | "calls_heatmap"     // нагрузка по дням недели и часам
+  | "appt_single"       // одна метрика записей
   | "appt_summary"      // записи за период
+  | "appt_chart"        // записи по дням
   | "appt_sources"      // источники записей
+  | "appt_admins"       // записи по сотрудникам
   | "revenue_single"    // одна метрика выручки
-  | "revenue_methods";  // способы оплаты
+  | "revenue_chart"     // выручка по дням
+  | "revenue_methods"   // способы оплаты
+  | "revenue_services"  // топ услуг
+  | "doctors_top"       // топ врачей по выручке
+  | "funnel_steps"      // звонки → записи → визиты → выручка
+  | "funnel_trend"      // звонки, записи и конверсия по дням
+  | "plans_progress"    // выполнение планов
+  | "reports_months";   // помесячная сводка за полгода
 
-export type WidgetGroup = "Звонки" | "Записи" | "Выручка";
+export type WidgetGroup = "Звонки" | "Записи" | "Выручка" | "Врачи" | "Воронка" | "Планы" | "Отчёты";
 
 /** Право, без которого виджет не показывается (как у разделов в сайдбаре). */
-export type WidgetPermission = "view:calls" | "view:appointments" | "view:revenue";
+export type WidgetPermission =
+  | "view:calls" | "view:appointments" | "view:revenue"
+  | "view:funnel" | "view:plans" | "view:reports";
 
 // ─── Определение типа (метаданные для каталога) ──────────────
 
@@ -37,6 +52,8 @@ export interface WidgetTypeDef {
   name:        string;
   description: string;
   permission:  WidgetPermission;
+  /** какие данные запрашивать, когда виджет стоит на экране */
+  data:        DataKey[];
   /** у виджета есть настройка (выбор метрики) — каталог покажет шаг выбора */
   configurable?: boolean;
   defaultW: number; defaultH: number;
@@ -44,74 +61,148 @@ export interface WidgetTypeDef {
   maxW: number; maxH: number;
 }
 
-export const WIDGET_GROUPS: WidgetGroup[] = ["Звонки", "Записи", "Выручка"];
+export const WIDGET_GROUPS: WidgetGroup[] = ["Звонки", "Записи", "Выручка", "Врачи", "Воронка", "Планы", "Отчёты"];
 
 export const WIDGET_TYPES: WidgetTypeDef[] = [
+  // ── Звонки
   {
     id: "calls_single", group: "Звонки", permission: "view:calls", configurable: true,
+    data: ["stats", "daily", "conversion"],
     name: "Одна метрика",
     description: "Крупная цифра на выбор: принятые, потеряно, время до перезвона, конверсия и другие — с изменением к прошлому периоду и мини-графиком.",
     defaultW: 3, defaultH: 2, minW: 2, minH: 2, maxW: 6, maxH: 3,
   },
   {
-    id: "calls_trio", group: "Звонки", permission: "view:calls",
+    id: "calls_trio", group: "Звонки", permission: "view:calls", data: ["stats"],
     name: "Три показателя",
     description: "Принято · Потеряно · До перезвона в одной строке с изменением к предыдущему периоду.",
     defaultW: 6, defaultH: 2, minW: 6, minH: 2, maxW: 12, maxH: 3,
   },
   {
-    id: "calls_conversion", group: "Звонки", permission: "view:calls",
+    id: "calls_conversion", group: "Звонки", permission: "view:calls", data: ["stats", "conversion"],
     name: "Конверсия по операторам",
     description: "Сколько принятых звонков колл-центра закончились записью — в целом и по каждому оператору.",
     defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 8, maxH: 5,
   },
   {
-    id: "calls_chart", group: "Звонки", permission: "view:calls", configurable: true,
+    id: "calls_chart", group: "Звонки", permission: "view:calls", configurable: true, data: ["stats", "daily", "prevDaily"],
     name: "Динамика",
     description: "Принято, поступило или потеряно по дням: линия этого периода и пунктир прошлого. Сразу виден тренд.",
     defaultW: 8, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 5,
   },
   {
-    id: "calls_funnel", group: "Звонки", permission: "view:calls",
+    id: "calls_heatmap", group: "Звонки", permission: "view:calls", configurable: true, data: ["heatmap"],
+    name: "Нагрузка по часам",
+    description: "Тепловая карта: в какие дни недели и часы больше всего звонков или пропущенных. Помогает планировать смены.",
+    defaultW: 8, defaultH: 4, minW: 6, minH: 3, maxW: 12, maxH: 5,
+  },
+  {
+    id: "calls_funnel", group: "Звонки", permission: "view:calls", data: ["stats"],
     name: "Судьба звонков",
     description: "Сколько поступило и пропущено и что стало с пропущенными. Главная цифра — сколько клиентов потеряно.",
     defaultW: 6, defaultH: 5, minW: 4, minH: 4, maxW: 12, maxH: 6,
   },
   {
-    id: "calls_plan", group: "Звонки", permission: "view:calls",
+    id: "calls_plan", group: "Звонки", permission: "view:calls", data: ["daily", "plan"],
     name: "План и прогноз",
     description: "Сколько плана по звонкам выполнено и чем закончится период при текущем темпе. План задаётся в разделе «Планы».",
     defaultW: 6, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 4,
   },
   {
-    id: "calls_operators", group: "Звонки", permission: "view:calls",
+    id: "calls_operators", group: "Звонки", permission: "view:calls", data: ["stats", "conversion"],
     name: "Операторы: качество",
     description: "Принято, пропущено, потеряно, время до перезвона и конверсия по каждому оператору, с цветной оценкой.",
     defaultW: 12, defaultH: 4, minW: 7, minH: 3, maxW: 12, maxH: 7,
   },
+  // ── Записи
   {
-    id: "appt_summary", group: "Записи", permission: "view:appointments",
+    id: "appt_single", group: "Записи", permission: "view:appointments", configurable: true, data: ["appointments", "apptDaily"],
+    name: "Одна метрика",
+    description: "Всего записей, явки, неявки, новые пациенты или доля явок — крупной цифрой с изменением к прошлому периоду.",
+    defaultW: 3, defaultH: 2, minW: 2, minH: 2, maxW: 6, maxH: 3,
+  },
+  {
+    id: "appt_summary", group: "Записи", permission: "view:appointments", data: ["appointments"],
     name: "Записи за период",
     description: "Явки, неявки, новые пациенты и ожидающие подтверждения — четыре плитки с долями от всех записей.",
     defaultW: 6, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 4,
   },
   {
-    id: "appt_sources", group: "Записи", permission: "view:appointments",
+    id: "appt_chart", group: "Записи", permission: "view:appointments", data: ["apptDaily"],
+    name: "Записи по дням",
+    description: "Сколько записей было на каждый день и сколько из них пришли: столбики явок и неявок.",
+    defaultW: 8, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 5,
+  },
+  {
+    id: "appt_sources", group: "Записи", permission: "view:appointments", data: ["appointments"],
     name: "Источники записей",
     description: "Кто создал записи: колл-центр, администраторы или другие сотрудники.",
     defaultW: 6, defaultH: 2, minW: 4, minH: 2, maxW: 12, maxH: 4,
   },
   {
-    id: "revenue_single", group: "Выручка", permission: "view:revenue", configurable: true,
+    id: "appt_admins", group: "Записи", permission: "view:appointments", data: ["appointments"],
+    name: "Сотрудники",
+    description: "Кто сколько записал, доля явок и неявок, новые пациенты — по каждому администратору и оператору.",
+    defaultW: 6, defaultH: 4, minW: 4, minH: 3, maxW: 12, maxH: 7,
+  },
+  // ── Выручка
+  {
+    id: "revenue_single", group: "Выручка", permission: "view:revenue", configurable: true, data: ["payments"],
     name: "Одна метрика",
     description: "Выручка, число платежей или средний чек за период — с изменением к прошлому периоду.",
     defaultW: 3, defaultH: 2, minW: 2, minH: 2, maxW: 6, maxH: 3,
   },
   {
-    id: "revenue_methods", group: "Выручка", permission: "view:revenue",
+    id: "revenue_chart", group: "Выручка", permission: "view:revenue", data: ["paymentDaily"],
+    name: "Выручка по дням",
+    description: "Сколько оплачено в каждый день периода, с отметкой лучшего дня и средним за день.",
+    defaultW: 8, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 5,
+  },
+  {
+    id: "revenue_methods", group: "Выручка", permission: "view:revenue", data: ["payments"],
     name: "Способы оплаты",
     description: "Доли наличных, карт, безналичных и кредита в выручке за период.",
     defaultW: 4, defaultH: 3, minW: 3, minH: 2, maxW: 12, maxH: 4,
+  },
+  {
+    id: "revenue_services", group: "Выручка", permission: "view:revenue", data: ["sales"],
+    name: "Топ услуг",
+    description: "Услуги, которые принесли больше всего денег: сумма, доля в продажах и изменение к прошлому периоду.",
+    defaultW: 6, defaultH: 4, minW: 4, minH: 3, maxW: 12, maxH: 7,
+  },
+  // ── Врачи
+  {
+    id: "doctors_top", group: "Врачи", permission: "view:revenue", data: ["doctors"],
+    name: "Топ врачей",
+    description: "Врачи с наибольшей выручкой за период: сумма, число оплат и доля в общей выручке.",
+    defaultW: 6, defaultH: 4, minW: 4, minH: 3, maxW: 12, maxH: 7,
+  },
+  // ── Воронка
+  {
+    id: "funnel_steps", group: "Воронка", permission: "view:funnel", data: ["stats", "conversion", "appointments", "payments"],
+    name: "Воронка",
+    description: "Звонки → записи → визиты → выручка: сколько людей дошло до каждого шага и сколько денег приносит визит.",
+    defaultW: 12, defaultH: 2, minW: 6, minH: 2, maxW: 12, maxH: 3,
+  },
+  {
+    id: "funnel_trend", group: "Воронка", permission: "view:funnel", data: ["daily", "apptDaily"],
+    name: "Конверсия по дням",
+    description: "Принятые звонки и записи по дням и линия конверсии — видно, в какие дни звонки хуже превращаются в записи.",
+    defaultW: 8, defaultH: 3, minW: 5, minH: 3, maxW: 12, maxH: 5,
+  },
+  // ── Планы
+  {
+    id: "plans_progress", group: "Планы", permission: "view:plans", data: ["plan", "stats", "appointments"],
+    name: "Выполнение планов",
+    description: "Принятые, исходящие и записи против плана на выбранный период. План задаётся в разделе «Планы».",
+    defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 12, maxH: 4,
+  },
+  // ── Отчёты
+  {
+    id: "reports_months", group: "Отчёты", permission: "view:reports", configurable: true, data: ["reports"],
+    name: "Последние полгода",
+    description: "Звонки или записи по месяцам за шесть месяцев — не зависит от выбранного периода, удобно сравнивать сезонность.",
+    defaultW: 6, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 5,
   },
 ];
 
@@ -167,7 +258,20 @@ export function sanitizeGrid(saved: unknown): PlacedWidget[] {
     const y = Math.max(0, Number(raw.y) || 0);
     out.push({ id: String(raw.id || newId()), type: def.id, x, y, w, h, config: raw.config });
   }
-  return out;
+  return resolveOverlaps(out);
+}
+
+/** Сдвигает вниз виджеты, которые накладываются на уже стоящие (после зажатия размеров). */
+function resolveOverlaps(items: PlacedWidget[]): PlacedWidget[] {
+  const settled: PlacedWidget[] = [];
+  for (const p of [...items].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const q = { ...p };
+    while (settled.some(s => overlaps(s, q))) {
+      q.y = settled.filter(s => overlaps(s, q)).reduce((m, s) => Math.max(m, s.y + s.h), q.y);
+    }
+    settled.push(q);
+  }
+  return items.map(p => settled.find(s => s.id === p.id)!);
 }
 
 /** null — пользователь ещё ничего не настраивал (показываем раскладку по умолчанию). */
