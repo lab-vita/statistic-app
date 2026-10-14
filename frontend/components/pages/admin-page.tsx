@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { fetchMe, type AuthUser } from "@/lib/api";
 import { authFetch } from "@/lib/auth";
-import { PageContent, SectionCard, Skeleton, ErrorBanner } from "@/components/ui/primitives";
+import {
+  PageContent, SectionCard, Skeleton, ErrorBanner, PageHeader,
+} from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
 interface User { id: string; name: string; role: string; last_seen?: string; }
@@ -95,10 +97,9 @@ export function AdminPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-card px-4 lg:px-5">
-        <span className="text-[13px] font-bold">Доступ</span>
-        <span className="text-[12px] text-muted-foreground/60">Кто может открывать «Пульс» и что ему разрешено</span>
-      </header>
+      <PageHeader title="Настройки">
+        <span className="text-[12px] text-text-3">Кто может открывать «Пульс» и что ему разрешено</span>
+      </PageHeader>
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
@@ -169,7 +170,7 @@ export function AdminPage() {
                     { label: "Имя (необязательно)", val: newName, set: setNewName, ph: "Имя Фамилия", w: 180, type: "text" },
                   ].map((f, i) => (
                     <div key={i}>
-                      <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60 mb-1.5">{f.label}</p>
+                      <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1.5">{f.label}</p>
                       <input
                         type={f.type} value={f.val} placeholder={f.ph}
                         onChange={e => f.set(e.target.value)}
@@ -179,7 +180,7 @@ export function AdminPage() {
                     </div>
                   ))}
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/60 mb-1.5">Роль</p>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1.5">Роль</p>
                     <select value={newRole} onChange={e => setNewRole(e.target.value)}
                       className="rounded-md border border-border bg-background px-3 py-1.5 text-[13px]">
                       {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -187,7 +188,7 @@ export function AdminPage() {
                   </div>
                   <button
                     onClick={handleAdd} disabled={!newId.trim() || adding}
-                    className="px-4 py-1.5 rounded-md bg-foreground text-background text-[13px] font-semibold disabled:opacity-50 transition-opacity"
+                    className="px-4 py-1.5 rounded-md bg-brand text-brand-foreground text-[13px] font-semibold hover:bg-brand-strong disabled:opacity-50 transition-opacity"
                   >
                     {adding ? "Добавление…" : "Добавить"}
                   </button>
