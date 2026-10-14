@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
-  Topbar, PageContent, MetricCard, SectionCard, SrcBar,
+  Topbar, MenuItem, MenuDivider, MenuLabel, PageContent, MetricCard, SectionCard, SrcBar,
   StatusPill, Th, Td, SkeletonCards, Skeleton, Empty, ErrorBanner, ProgressBar,
 } from "@/components/ui/primitives";
 import {
@@ -26,10 +26,10 @@ const GROUP_LABELS: Record<string, string> = {
   callcenter:"Колл-центр", admin:"Администраторы", other:"Прочие", unknown:"Не указан"
 };
 const GROUP_COLORS: Record<string, { text: string; bar: string }> = {
-  callcenter: { text: "#1d4ed8", bar: "#2563eb" },
-  admin:      { text: "#15803d", bar: "#16a34a" },
-  other:      { text: "#6d28d9", bar: "#7c3aed" },
-  unknown:    { text: "#9ca3af", bar: "#d1d5db" },
+  callcenter: { text: "#2070a8", bar: "#328fcd" },
+  admin:      { text: "#127352", bar: "#1a9e6e" },
+  other:      { text: "#7c4ddb", bar: "#8b5cf6" },
+  unknown:    { text: "#94b3c9", bar: "#d6e8f5" },
 };
 
 function fmt(n: number) { return n.toLocaleString("ru-RU"); }
@@ -68,9 +68,9 @@ function PlanFactSection({ plan, daily }: PlanFactProps) {
     <>
       {/* Карточка выполнения плана */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-3">Выполнение плана</p>
+        <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-3">Выполнение плана</p>
         <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-[30px] font-black tabular-nums">{fmt(factTotal)}</span>
+          <span className="text-[30px] font-extrabold tabular-nums">{fmt(factTotal)}</span>
           <span className="text-[14px] text-muted-foreground/60">из {fmt(planTotal)} запланированных</span>
           <span className={cn("ml-auto text-[18px] font-black tabular-nums", color)}>{pct}%</span>
         </div>
@@ -110,7 +110,7 @@ function PlanFactSection({ plan, daily }: PlanFactProps) {
                 <Bar
                   dataKey="fact"
                   name="Факт"
-                  fill="#7c3aed"
+                  fill="#8b5cf6"
                   fillOpacity={0.7}
                   radius={[3, 3, 0, 0]}
                   maxBarSize={20}
@@ -119,7 +119,7 @@ function PlanFactSection({ plan, daily }: PlanFactProps) {
                   dataKey="plan"
                   name="План"
                   type="monotone"
-                  stroke="#10b981"
+                  stroke="#1a9e6e"
                   strokeWidth={2}
                   strokeDasharray="4 2"
                   dot={false}
@@ -142,7 +142,6 @@ export function AppointmentsPage() {
   const [periodLabel, setPeriodLabel] = useState("День");
   const [period,      setPeriod]      = useState<Period>(getDefaultPeriod("day"));
   const [adminId,     setAdminId]     = useState<string | null>(null);
-  const [menuOpen,    setMenuOpen]    = useState(false);
   const [admins,      setAdmins]      = useState<Admin[]>([]);
   const [stats,       setStats]       = useState<AppointmentStatsResponse | null>(null);
   const [daily,       setDaily]       = useState<AppointmentDailyResponse | null>(null);
@@ -193,7 +192,26 @@ export function AppointmentsPage() {
       <Topbar
         title="Записи"
         filterLabel={adminName}
-        onFilterClick={() => setMenuOpen(v => !v)}
+        filterMenu={close => (
+          <>
+            <MenuItem active={!adminId} onClick={() => { setAdminId(null); close(); }}>Все сотрудники</MenuItem>
+            <MenuDivider />
+            {GROUP_ORDER.map(g => {
+              const items = adminsByGroup[g];
+              if (!items?.length) return null;
+              return (
+                <div key={g}>
+                  <MenuLabel>{GROUP_LABELS[g]}</MenuLabel>
+                  {items.map(a => (
+                    <MenuItem key={a.surname} active={adminId === a.surname} onClick={() => { setAdminId(a.surname); close(); }}>
+                      {a.surname}
+                    </MenuItem>
+                  ))}
+                </div>
+              );
+            })}
+          </>
+        )}
         periodItems={PERIODS}
         period={periodLabel}
         onPeriod={handlePeriod}
@@ -203,34 +221,6 @@ export function AppointmentsPage() {
         nextDisabled={toDateStr(period.dateTo) >= yesterday}
         onRefresh={load}
       />
-
-      {/* Admin filter dropdown */}
-      {menuOpen && (
-        <div className="absolute top-[100px] left-[216px] z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[190px] max-h-72 overflow-y-auto">
-          <button onClick={() => { setAdminId(null); setMenuOpen(false); }}
-            className={cn("w-full px-3 py-1.5 text-left text-[12px] hover:bg-accent transition-colors", !adminId && "font-semibold")}>
-            Все сотрудники
-          </button>
-          <div className="h-px bg-border mx-2 my-1" />
-          {GROUP_ORDER.map(g => {
-            const items = adminsByGroup[g];
-            if (!items?.length) return null;
-            return (
-              <div key={g}>
-                <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                  {GROUP_LABELS[g]}
-                </div>
-                {items.map(a => (
-                  <button key={a.surname} onClick={() => { setAdminId(a.surname); setMenuOpen(false); }}
-                    className={cn("w-full px-3 py-1.5 text-left text-[12px] hover:bg-accent transition-colors", adminId === a.surname && "font-semibold")}>
-                    {a.surname}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
@@ -267,16 +257,16 @@ export function AppointmentsPage() {
             {/* Новые vs повторные пациенты */}
             {!adminId && s.total > 0 && s.new_patients > 0 && (
               <div className="rounded-lg border border-border bg-card p-5">
-                <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-4">Новые vs повторные пациенты</p>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-4">Новые vs повторные пациенты</p>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <p className="text-[11px] text-muted-foreground/60 mb-1">Новые</p>
-                    <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-violet-600 dark:text-violet-400">{fmt(s.new_patients)}</p>
+                    <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-violet-600 dark:text-violet-400">{fmt(s.new_patients)}</p>
                     <p className="text-[11px] text-muted-foreground/50 mt-1">{fmtPct(s.new_pct)} от записей</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground/60 mb-1">Повторные</p>
-                    <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-foreground">{fmt(s.total - s.new_patients)}</p>
+                    <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-foreground">{fmt(s.total - s.new_patients)}</p>
                     <p className="text-[11px] text-muted-foreground/50 mt-1">{fmtPct(100 - s.new_pct)} от записей</p>
                   </div>
                 </div>
@@ -362,7 +352,7 @@ export function AppointmentsPage() {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <h3 className="text-[13px] font-semibold">Динамика записей по дням</h3>
                   <div className="flex items-center gap-3">
-                    {[{c:"#2563eb",l:"Записей"},{c:"#16a34a",l:"Явки"},{c:"#dc2626",l:"Неявки"},{c:"#7c3aed",l:"Новые",round:true}].map((x,i)=>(
+                    {[{c:"#328fcd",l:"Записей"},{c:"#1a9e6e",l:"Явки"},{c:"#e03a5a",l:"Неявки"},{c:"#8b5cf6",l:"Новые",round:true}].map((x,i)=>(
                       <span key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
                         <span className={cn("h-2 w-2 inline-block", x.round?"rounded-full":"rounded-sm")} style={{background:x.c}}/>
                         {x.l}
@@ -377,10 +367,10 @@ export function AppointmentsPage() {
                       <XAxis dataKey="date" tickFormatter={fmtDate} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval={daily.days.length>14?2:0} />
                       <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
                       <Tooltip {...ct.tooltip} labelFormatter={(v)=>new Date(String(v)).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} />
-                      <Bar dataKey="total"   name="Записей" fill="#2563eb" radius={[3,3,0,0]} maxBarSize={20} />
-                      <Bar dataKey="visits"  name="Явки"    fill="#16a34a" radius={[3,3,0,0]} maxBarSize={20} />
-                      <Bar dataKey="noshow"  name="Неявки"  fill="#dc2626" radius={[3,3,0,0]} maxBarSize={20} />
-                      <Line dataKey="new_patients" name="Новые" type="monotone" stroke="#7c3aed" strokeWidth={2} dot={false} />
+                      <Bar dataKey="total"   name="Записей" fill="#328fcd" radius={[3,3,0,0]} maxBarSize={20} />
+                      <Bar dataKey="visits"  name="Явки"    fill="#1a9e6e" radius={[3,3,0,0]} maxBarSize={20} />
+                      <Bar dataKey="noshow"  name="Неявки"  fill="#e03a5a" radius={[3,3,0,0]} maxBarSize={20} />
+                      <Line dataKey="new_patients" name="Новые" type="monotone" stroke="#8b5cf6" strokeWidth={2} dot={false} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -422,14 +412,14 @@ export function AppointmentsPage() {
                             <tr key={i} className="hover:bg-muted/40 transition-colors">
                               <Td><span className="font-semibold">{a.name}</span></Td>
                               <Td right bold>{a.total}</Td>
-                              <Td right color="#16a34a" bold>{a.visits}</Td>
+                              <Td right color="#1a9e6e" bold>{a.visits}</Td>
                               <Td right>
                                 <StatusPill color={a.visit_pct >= 90 ? "green" : a.visit_pct >= 70 ? "amber" : "red"}>
                                   {fmtPct(a.visit_pct)}
                                 </StatusPill>
                               </Td>
                               <Td right>{a.noshow > 0 ? <span className="text-red-600 dark:text-red-400 font-medium">{a.noshow}</span> : <span className="text-muted-foreground/40">0</span>}</Td>
-                              <Td right color="#7c3aed">{a.new_patients || "—"}</Td>
+                              <Td right color="#8b5cf6">{a.new_patients || "—"}</Td>
                               <Td right muted>{a.cancels || "—"}</Td>
                             </tr>
                           ))
@@ -440,10 +430,10 @@ export function AppointmentsPage() {
                       <tr className="bg-muted/30 border-t border-border">
                         <Td bold>Итого</Td>
                         <Td right bold>{s.total}</Td>
-                        <Td right color="#16a34a" bold>{s.visits}</Td>
+                        <Td right color="#1a9e6e" bold>{s.visits}</Td>
                         <Td right><StatusPill color={s.visit_pct >= 90 ? "green" : s.visit_pct >= 70 ? "amber" : "red"}>{fmtPct(s.visit_pct)}</StatusPill></Td>
-                        <Td right color="#dc2626" bold>{s.noshow}</Td>
-                        <Td right color="#7c3aed">{s.new_patients}</Td>
+                        <Td right color="#e03a5a" bold>{s.noshow}</Td>
+                        <Td right color="#8b5cf6">{s.new_patients}</Td>
                         <Td right muted>{s.cancels}</Td>
                       </tr>
                     </tfoot>
