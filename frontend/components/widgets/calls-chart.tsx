@@ -1,20 +1,20 @@
 "use client";
 
 import { useId, useState } from "react";
-import { TrendingUp, TrendingDown } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { LineChart as LineChartIcon } from "lucide-react";
 import type { DailyItem } from "@/lib/api";
-import { deltaIsGood, relativeDelta } from "@/lib/call-metrics";
-import { Card } from "@/components/ui/card";
-import { useTheme } from "next-themes";
+import { relativeDelta } from "@/lib/call-metrics";
+import { useChartTheme } from "@/components/charts/base-chart";
+import { WidgetCard, WidgetLabel, WidgetSkeleton, WidgetEmpty, DeltaBadge, C } from "./widget-card";
 import { cn } from "@/lib/utils";
 
 export type ChartMetric = "incoming" | "received" | "lost";
 
-export const CHART_METRICS: { key: ChartMetric; label: string; bad: boolean }[] = [
-  { key: "incoming", label: "Принято",   bad: false },
-  { key: "received", label: "Поступило", bad: false },
-  { key: "lost",     label: "Потеряно",  bad: true  },
+export const CHART_METRICS: { key: ChartMetric; label: string; bad: boolean; color: string }[] = [
+  { key: "incoming", label: "Принято",   bad: false, color: C.green },
+  { key: "received", label: "Поступило", bad: false, color: C.blue  },
+  { key: "lost",     label: "Потеряно",  bad: true,  color: C.red   },
 ];
 
 export interface ChartPoint { date: string; label: string; cur: number; prev: number | null }
@@ -37,18 +37,18 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-[12px] shadow-md space-y-1">
-      <p className="font-medium mb-1">
+    <div className="space-y-1 rounded-lg border border-border bg-popover px-3 py-2 text-[12px] shadow-pop">
+      <p className="mb-1 font-semibold">
         {new Date(`${p.date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" })}
       </p>
       <div className="flex justify-between gap-4">
-        <span className="text-muted-foreground">Текущий</span>
-        <span className="font-medium tabular-nums">{p.cur.toLocaleString("ru-RU")}</span>
+        <span className="text-text-2">Текущий</span>
+        <span className="font-bold tabular-nums">{p.cur.toLocaleString("ru-RU")}</span>
       </div>
       {p.prev !== null && (
         <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground/60">Прошлый</span>
-          <span className="tabular-nums text-muted-foreground">{p.prev.toLocaleString("ru-RU")}</span>
+          <span className="text-text-3">Прошлый</span>
+          <span className="tabular-nums text-text-2">{p.prev.toLocaleString("ru-RU")}</span>
         </div>
       )}
     </div>
@@ -58,55 +58,43 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 export function CallsChartWidget({ daily, prevDaily, loading, metric: initial = "incoming" }: {
   daily: DailyItem[]; prevDaily: DailyItem[] | null; loading: boolean; metric?: ChartMetric;
 }) {
-  const gradId = useId();
+  const gradId = useId().replace(/:/g, "");
   const [metric, setMetric] = useState<ChartMetric>(initial);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  const ct = useChartTheme();
 
-  if (loading) return <div className="h-full rounded-lg bg-muted/60 animate-pulse" />;
+  if (loading) return <WidgetSkeleton />;
 
-  const def      = CHART_METRICS.find(m => m.key === metric)!;
-  const data     = buildChartData(daily, prevDaily, metric);
-  const hasPrev  = data.some(p => p.prev !== null);
-  const total    = sum(data.map(p => p.cur));
-  const delta    = hasPrev ? relativeDelta(total, sum(data.map(p => p.prev ?? 0))) : null;
-  const good     = delta ? deltaIsGood(delta.dir, def.bad) : null;
-  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
-  const axisColor = isDark ? "#555" : "#aaa";
-  const strokeColor = "#22c55e";
+  const def     = CHART_METRICS.find(m => m.key === metric) ?? CHART_METRICS[0];
+  const data    = buildChartData(daily, prevDaily, def.key);
+  const hasPrev = data.some(p => p.prev !== null);
+  const total   = sum(data.map(p => p.cur));
+  const delta   = hasPrev ? relativeDelta(total, sum(data.map(p => p.prev ?? 0))) : null;
 
   return (
-    <Card className="h-full flex flex-col p-5">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70 mb-1">
-            {def.label} по дням
-          </p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[26px] font-semibold leading-none tracking-tight tabular-nums">
+    <WidgetCard>
+      <div className="mb-3 flex shrink-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
+          <WidgetLabel>{def.label} по дням</WidgetLabel>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span className="text-[26px] font-extrabold leading-none tracking-[-0.04em] tabular-nums">
               {total.toLocaleString("ru-RU")}
             </span>
-            {delta && delta.pct !== null && delta.dir && delta.dir !== "flat" && (
-              <span className={cn(
-                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
-                good ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                     : "bg-red-500/10 text-red-600 dark:text-red-400"
-              )}>
-                {delta.dir === "up" ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                {delta.dir === "up" ? "+" : "−"}{delta.pct}%
-              </span>
-            )}
+            {delta && <DeltaBadge pct={delta.pct} dir={delta.dir} invert={def.bad} />}
           </div>
         </div>
-        <div className="inline-flex items-center rounded-lg border border-border bg-background p-0.5">
+        <div className="inline-flex items-center gap-1" role="tablist" aria-label="Показатель графика">
           {CHART_METRICS.map(m => (
             <button
               key={m.key}
+              type="button"
+              role="tab"
+              aria-selected={metric === m.key}
               onClick={() => setMetric(m.key)}
               className={cn(
-                "rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-150",
-                metric === m.key ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                "rounded-full border px-2.5 py-[3px] text-[11px] font-semibold transition-colors",
+                metric === m.key
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-card text-text-2 hover:border-brand hover:text-brand",
               )}
             >
               {m.label}
@@ -116,49 +104,45 @@ export function CallsChartWidget({ daily, prevDaily, loading, metric: initial = 
       </div>
 
       {data.length < 2 ? (
-        <div className="flex-1 flex items-center justify-center text-[12px] text-muted-foreground/50">
-          Выберите период от двух дней для отображения графика
-        </div>
+        <WidgetEmpty icon={LineChartIcon} text="Нужен период от двух дней" hint="Выберите неделю, месяц или квартал" />
       ) : (
         <>
-          <div className="flex-1 min-h-0">
+          <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
                 <defs>
                   <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.2} />
-                    <stop offset="95%" stopColor={strokeColor} stopOpacity={0}   />
+                    <stop offset="5%"  stopColor={def.color} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={def.color} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
                 <XAxis dataKey="label" axisLine={false} tickLine={false}
                   interval="preserveStartEnd" minTickGap={28}
-                  tick={{ fill: axisColor, fontSize: 11 }} />
+                  tick={{ fill: ct.axis, fontSize: 11 }} />
                 <YAxis hide domain={[0, "auto"]} />
-                <Tooltip content={<ChartTooltip />}
-                  cursor={{ stroke: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.08)", strokeWidth: 1 }} />
+                <Tooltip content={<ChartTooltip />} cursor={{ stroke: ct.axis, strokeOpacity: 0.3, strokeWidth: 1 }} />
                 {hasPrev && (
-                  <Area type="monotone" dataKey="prev"
-                    stroke={isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)"}
-                    strokeWidth={1.5} strokeDasharray="4 3" fill="none" dot={false} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="prev" stroke={C.slate} strokeWidth={1.5}
+                    strokeDasharray="4 3" fill="none" dot={false} isAnimationActive={false} />
                 )}
-                <Area type="monotone" dataKey="cur"
-                  stroke={strokeColor} strokeWidth={2} fill={`url(#${gradId})`} dot={false} />
+                <Area type="monotone" dataKey="cur" stroke={def.color} strokeWidth={2}
+                  fill={`url(#${gradId})`} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex gap-4 text-[11px] text-muted-foreground/60 mt-3">
+          <div className="mt-2 flex shrink-0 gap-4 text-[11px] text-text-3">
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-0.5 w-4 bg-emerald-500 rounded" />Текущий
+              <span className="inline-block h-0.5 w-4 rounded" style={{ background: def.color }} />Этот период
             </span>
             {hasPrev && (
               <span className="flex items-center gap-1.5">
-                <span className="inline-block w-4 border-t border-dashed border-muted-foreground/40" />Прошлый
+                <span className="inline-block w-4 border-t border-dashed" style={{ borderColor: C.slate }} />Прошлый
               </span>
             )}
           </div>
         </>
       )}
-    </Card>
+    </WidgetCard>
   );
 }

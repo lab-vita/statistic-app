@@ -1,9 +1,11 @@
 /**
  * Загрузка всех данных для виджетов главной одним вызовом.
- * Каждый запрос независим: если один не удался, остальные виджеты всё равно работают.
+ * Каждый запрос независим: если один не удался (например, нет права на раздел),
+ * остальные виджеты всё равно работают.
  */
 import type {
-  ConversionResponse, DailyResponse, PlanRangeResponse, StatsResponse,
+  AppointmentStatsResponse, ConversionResponse, DailyResponse,
+  PaymentStatsResponse, PlanRangeResponse, StatsResponse,
 } from "@/lib/api";
 import { conversionValue, type ConversionValue } from "@/lib/call-metrics";
 
@@ -19,27 +21,47 @@ export interface HomeData {
   conversion:     ConversionValue | null;
   /** конверсия по операторам — для таблицы качества */
   conversionData: ConversionResponse | null;
+  appointments:   AppointmentStatsResponse | null;
+  payments:       PaymentStatsResponse | null;
 }
 
 export interface HomeApi {
-  fetchStats:      (from: string, to: string) => Promise<StatsResponse>;
-  fetchDaily:      (from: string, to: string) => Promise<DailyResponse>;
-  fetchConversion: (from: string, to: string) => Promise<ConversionResponse>;
-  fetchPlanRange:  (from: string, to: string) => Promise<PlanRangeResponse>;
+  fetchStats:            (from: string, to: string) => Promise<StatsResponse>;
+  fetchDaily:            (from: string, to: string) => Promise<DailyResponse>;
+  fetchConversion:       (from: string, to: string) => Promise<ConversionResponse>;
+  fetchPlanRange:        (from: string, to: string) => Promise<PlanRangeResponse>;
+  fetchAppointmentStats?: (from: string, to: string) => Promise<AppointmentStatsResponse>;
+  fetchPaymentStats?:     (from: string, to: string) => Promise<PaymentStatsResponse>;
+}
+
+/** Какие группы данных нужны виджетам на экране — лишнее не запрашиваем. */
+export interface HomeNeeds {
+  calls:        boolean;
+  appointments: boolean;
+  payments:     boolean;
 }
 
 const ok = <T,>(r: PromiseSettledResult<T>): T | null => (r.status === "fulfilled" ? r.value : null);
+const skip = <T,>(): Promise<T> => Promise.reject(new Error("не нужно"));
 
 export const emptyHomeData = (dateFrom = "", dateTo = ""): HomeData => ({
-  dateFrom, dateTo, stats: null, daily: null, prevDaily: null, plan: null, conversion: null, conversionData: null,
+  dateFrom, dateTo, stats: null, daily: null, prevDaily: null, plan: null,
+  conversion: null, conversionData: null, appointments: null, payments: null,
 });
 
-export async function loadHomeData(dateFrom: string, dateTo: string, api: HomeApi): Promise<HomeData> {
-  const [s, d, cv, pl] = await Promise.allSettled([
-    api.fetchStats(dateFrom, dateTo),
-    api.fetchDaily(dateFrom, dateTo),
-    api.fetchConversion(dateFrom, dateTo),
-    api.fetchPlanRange(dateFrom, dateTo),
+export async function loadHomeData(
+  dateFrom: string,
+  dateTo: string,
+  api: HomeApi,
+  needs: HomeNeeds = { calls: true, appointments: true, payments: true },
+): Promise<HomeData> {
+  const [s, d, cv, pl, ap, pay] = await Promise.allSettled([
+    needs.calls ? api.fetchStats(dateFrom, dateTo)      : skip<StatsResponse>(),
+    needs.calls ? api.fetchDaily(dateFrom, dateTo)      : skip<DailyResponse>(),
+    needs.calls ? api.fetchConversion(dateFrom, dateTo) : skip<ConversionResponse>(),
+    needs.calls ? api.fetchPlanRange(dateFrom, dateTo)  : skip<PlanRangeResponse>(),
+    needs.appointments && api.fetchAppointmentStats ? api.fetchAppointmentStats(dateFrom, dateTo) : skip<AppointmentStatsResponse>(),
+    needs.payments && api.fetchPaymentStats         ? api.fetchPaymentStats(dateFrom, dateTo)     : skip<PaymentStatsResponse>(),
   ]);
   const stats = ok(s), daily = ok(d), conversionData = ok(cv), plan = ok(pl);
 
@@ -49,7 +71,7 @@ export async function loadHomeData(dateFrom: string, dateTo: string, api: HomeAp
   if (stats) {
     const [pd, pc] = await Promise.allSettled([
       api.fetchDaily(stats.prev_from, stats.prev_to),
-      conversionData ? api.fetchConversion(stats.prev_from, stats.prev_to) : Promise.reject(new Error("нет конверсии")),
+      conversionData ? api.fetchConversion(stats.prev_from, stats.prev_to) : skip<ConversionResponse>(),
     ]);
     prevDaily = ok(pd);
     const prevConv = ok(pc);
@@ -59,5 +81,7 @@ export async function loadHomeData(dateFrom: string, dateTo: string, api: HomeAp
   return {
     dateFrom, dateTo, stats, daily, prevDaily, plan, conversionData,
     conversion: conversionData ? conversionValue(conversionData.total.conversion_pct, prevConversionPct) : null,
+    appointments: ok(ap),
+    payments:     ok(pay),
   };
 }
