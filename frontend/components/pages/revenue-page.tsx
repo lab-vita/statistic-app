@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   fetchPaymentStats, fetchPaymentDaily, fetchPaymentByDoctor, fetchSalesStats,
+  fetchPaymentByType,
   toDateStr, addDays, fmtRub,
   type PaymentStatsResponse, type PaymentDailyResponse,
   type PaymentDoctorResponse, type SalesStatsResponse,
+  type PaymentByTypeResponse,
 } from "@/lib/api";
 import {
   getDefaultPeriod, shiftPeriod, formatPeriodLabel,
@@ -16,6 +18,7 @@ import {
   Skeleton, Empty, ErrorBanner,
 } from "@/components/ui/primitives";
 import { RevenueChart } from "@/components/charts/revenue-chart";
+import { RevenuePeriodChart } from "@/components/charts/revenue-period-chart";
 import { cn } from "@/lib/utils";
 
 // ─── Константы
@@ -82,6 +85,8 @@ export function RevenuePage() {
 
   const [stats,      setStats]      = useState<PaymentStatsResponse | null>(null);
   const [daily,      setDaily]      = useState<PaymentDailyResponse | null>(null);
+  const [byType,     setByType]     = useState<PaymentByTypeResponse | null>(null);
+  const [prevDaily,  setPrevDaily]  = useState<PaymentDailyResponse | null>(null);
   const [doctors,    setDoctors]    = useState<PaymentDoctorResponse | null>(null);
   const [sales,      setSales]      = useState<SalesStatsResponse | null>(null);
   const [loading,    setLoading]    = useState(true);
@@ -96,13 +101,23 @@ export function RevenuePage() {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
-      const [s, d, doc, sal] = await Promise.all([
+      // Вычисляем предыдущий период той же длины
+      const from = new Date(dateFrom);
+      const to   = new Date(dateTo);
+      const days  = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+      const prevTo   = toDateStr(addDays(from, -1));
+      const prevFrom = toDateStr(addDays(from, -days));
+
+      const [s, d, bt, pd, doc, sal] = await Promise.all([
         fetchPaymentStats(dateFrom, dateTo),
         fetchPaymentDaily(dateFrom, dateTo),
+        fetchPaymentByType(dateFrom, dateTo).catch(() => null),
+        fetchPaymentDaily(prevFrom, prevTo).catch(() => null),
         fetchPaymentByDoctor(dateFrom, dateTo, 20),
         fetchSalesStats(dateFrom, dateTo, 15),
       ]);
-      setStats(s); setDaily(d); setDoctors(doc); setSales(sal);
+      setStats(s); setDaily(d); setByType(bt); setPrevDaily(pd);
+      setDoctors(doc); setSales(sal);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally {
@@ -204,10 +219,10 @@ export function RevenuePage() {
               </div>
             </div>
 
-            {/* Динамика */}
+            {/* Динамика текущий vs предыдущий период */}
             {daily && daily.days.length > 0 && (
               <SectionCard title="Динамика выручки">
-                <RevenueChart data={daily.days} />
+                <RevenuePeriodChart current={daily.days} prev={prevDaily?.days ?? null} />
               </SectionCard>
             )}
 

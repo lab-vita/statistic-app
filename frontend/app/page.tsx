@@ -12,6 +12,7 @@ import { AdminPage }        from "@/components/pages/admin-page";
 import { HomePage }         from "@/components/pages/home-page";
 import { AboutPage }        from "@/components/pages/about-page";
 import { FunnelPage }       from "@/components/pages/funnel-page";
+import { DoctorsPage }      from "@/components/pages/doctors-page";
 
 function App() {
   const { canSee } = useAuth();
@@ -32,6 +33,7 @@ function App() {
         {section === "reports"      && <ReportsPage />}
         {section === "funnel"       && <FunnelPage />}
         {section === "plans"        && <PlansPage />}
+        {section === "doctors"      && <DoctorsPage />}
         {section === "admin"        && <AdminPage />}
         {section === "about"        && <AboutPage />}
       </div>

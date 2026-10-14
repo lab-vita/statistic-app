@@ -1,38 +1,33 @@
-export type Section = "home" | "calls" | "appointments" | "revenue" | "reports" | "funnel" | "plans" | "admin" | "about";
+// Права доступа к разделам
+export type Section =
+  | "home"
+  | "calls"
+  | "appointments"
+  | "revenue"
+  | "reports"
+  | "funnel"
+  | "plans"
+  | "doctors"
+  | "admin"
+  | "about";
 
-export const ROLE_LABELS: Record<string, string> = {
-  owner:   "Владелец",
-  admin:   "Администратор",
-  viewer:  "Наблюдатель",
-};
+export type Permission =
+  | "view:revenue"
+  | "view:calls"
+  | "view:appointments"
+  | "view:reports"
+  | "view:funnel"
+  | "view:plans"
+  | "view:admin";
 
-const SECTION_PERMISSIONS: Record<Section, string> = {
-  home:         "view:calls",
+// Какое право нужно для просмотра раздела
+export const SECTION_PERMISSIONS: Partial<Record<Section, Permission>> = {
   calls:        "view:calls",
   appointments: "view:appointments",
   revenue:      "view:revenue",
   reports:      "view:reports",
-  funnel:       "view:revenue",   // требует доступа к выручке
+  funnel:       "view:funnel",
   plans:        "view:plans",
-  admin:        "users:manage",
-  about:        "view:calls",
+  doctors:      "view:revenue",
+  admin:        "view:admin",
 };
-
-export function canSeeSection(permissions: string[], section: Section): boolean {
-  return permissions.includes(SECTION_PERMISSIONS[section]);
-}
-
-export function hasPerm(permissions: string[], perm: string): boolean {
-  return permissions.includes(perm);
-}
-
-// Алиасы для совместимости с auth-gate.tsx
-export function canWith(permissions: string[], role: string, perm: string): boolean {
-  if (role === "owner") return true;
-  return permissions.includes(perm);
-}
-
-export function sectionAllowed(permissions: string[], role: string, section: Section): boolean {
-  if (role === "owner") return true;
-  return canSeeSection(permissions, section);
-}

@@ -264,6 +264,81 @@ export function AppointmentsPage() {
             {/* Блок план / факт */}
             {!adminId && <PlanFactSection plan={planRange} daily={daily} />}
 
+            {/* Новые vs повторные пациенты */}
+            {!adminId && s.total > 0 && s.new_patients > 0 && (
+              <div className="rounded-lg border border-border bg-card p-5">
+                <p className="text-[11px] font-bold uppercase tracking-[.07em] text-muted-foreground/70 mb-4">Новые vs повторные пациенты</p>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground/60 mb-1">Новые</p>
+                    <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-violet-600 dark:text-violet-400">{fmt(s.new_patients)}</p>
+                    <p className="text-[11px] text-muted-foreground/50 mt-1">{fmtPct(s.new_pct)} от записей</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground/60 mb-1">Повторные</p>
+                    <p className="text-[28px] font-black leading-none tracking-tight tabular-nums text-foreground">{fmt(s.total - s.new_patients)}</p>
+                    <p className="text-[11px] text-muted-foreground/50 mt-1">{fmtPct(100 - s.new_pct)} от записей</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-[11px] text-muted-foreground/60">Новые</span>
+                      <span className="text-[11px] font-bold tabular-nums">{fmtPct(s.new_pct)}</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-border overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500 bg-violet-500" style={{ width: Math.min(s.new_pct, 100) + "%" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-[11px] text-muted-foreground/60">Повторные</span>
+                      <span className="text-[11px] font-bold tabular-nums">{fmtPct(100 - s.new_pct)}</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-border overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500 bg-emerald-500" style={{ width: Math.min(100 - s.new_pct, 100) + "%" }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Конверсия по администраторам (запись → явка) */}
+            {!adminId && stats && Object.keys(stats.by_admin).length > 1 && (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <h3 className="text-[13px] font-semibold">Конверсия запись → явка по администраторам</h3>
+                </div>
+                <div className="p-4 space-y-3">
+                  {Object.values(stats.by_admin)
+                    .filter(a => a.total >= 3)
+                    .sort((a, b) => b.visit_pct - a.visit_pct)
+                    .map((a, i) => (
+                      <div key={i}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-medium">{a.name}</span>
+                            <span className="text-[11px] text-muted-foreground/50 tabular-nums">
+                              {fmt(a.visits)} из {fmt(a.total)}
+                            </span>
+                          </div>
+                          <span className={cn(
+                            "text-[13px] font-bold tabular-nums",
+                            a.visit_pct >= 90 ? "text-emerald-600 dark:text-emerald-400"
+                            : a.visit_pct >= 70 ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400"
+                          )}>
+                            {fmtPct(a.visit_pct)}
+                          </span>
+                        </div>
+                        <ProgressBar pct={Math.min(a.visit_pct, 100)} />
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+
             {/* Sources */}
             {stats?.by_group && Object.keys(stats.by_group).length > 0 && !adminId && (
               <SectionCard title="Источники записей" right={`всего ${fmt(s.total)}`}>
