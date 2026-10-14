@@ -60,8 +60,8 @@ export function RevenuePeriodChart({ current, prev }: Props) {
         <Tooltip
           {...ct.tooltip}
           labelFormatter={fmtDateLong}
-          formatter={(v: number, name: string) => [
-            new Intl.NumberFormat("ru-RU").format(Math.round(v)) + " ₽",
+          formatter={(v, name) => [
+            typeof v === "number" ? new Intl.NumberFormat("ru-RU").format(Math.round(v)) + " ₽" : "—",
             name === "current" ? "Текущий период" : "Предыдущий период",
           ]}
         />
