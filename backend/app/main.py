@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import engine
-from app.api import calls, appointments, plans, revenue, sales, services, staff, payments
+from app.api import calls, appointments, plans, revenue, sales, services, staff, payments, reports
 from app.api import admin as admin_api, auth as auth_api, bitrix_app
 from app.core.auth import current_user, require_any
 from app.services.scheduler import create_scheduler
@@ -53,6 +53,7 @@ app.include_router(sales.router,        prefix="/api/sales",        tags=["sales
 app.include_router(services.router,     prefix="/api/services",     tags=["services"],     dependencies=_guard("view:revenue"))
 app.include_router(staff.router,        prefix="/api/staff",        tags=["staff"],        dependencies=_guard("users:manage"))  # телефоны и почта сотрудников
 app.include_router(payments.router,     prefix="/api/payments",     tags=["payments"],     dependencies=_guard("view:revenue"))
+app.include_router(reports.router,      prefix="/api/reports",      tags=["reports"],      dependencies=_guard("view:reports"))
 app.include_router(admin_api.router,    prefix="/api/admin",        tags=["admin"],        dependencies=_guard("users:manage"))
 
 # Вход и служебное (без защиты токеном: auth/me сам проверяет, handler/install вызывает Битрикс24)
