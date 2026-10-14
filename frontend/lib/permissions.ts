@@ -31,3 +31,26 @@ export const SECTION_PERMISSIONS: Partial<Record<Section, Permission>> = {
   doctors:      "view:revenue",
   admin:        "view:admin",
 };
+
+// Вспомогательные функции для проверки прав
+
+/** Есть ли нужное право в списке или роль admin/owner */
+export function canWith(
+  permissions: string[],
+  role: string,
+  perm: string,
+): boolean {
+  if (role === "admin" || role === "owner") return true;
+  return permissions.includes(perm);
+}
+
+/** Разрешён ли раздел для данного набора прав */
+export function sectionAllowed(
+  permissions: string[],
+  role: string,
+  section: Section,
+): boolean {
+  const required = SECTION_PERMISSIONS[section];
+  if (!required) return true; // home / about — доступны всем
+  return canWith(permissions, role, required);
+}
