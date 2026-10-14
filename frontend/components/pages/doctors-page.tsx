@@ -33,7 +33,7 @@ function DoctorBarChart({ doctors }: { doctors: PaymentDoctor[] }) {
     .sort((a, b) => b.total_paid - a.total_paid)
     .slice(0, 12)
     .map(d => ({
-      name: d.doctor_surname || d.doctor_name.split(" ")[0],
+      name: d.doctor_surname || (d.doctor_name ?? "").split(" ")[0],
       value: d.total_paid,
       count: d.count,
     }));
@@ -208,7 +208,7 @@ export function DoctorsPage() {
                 {doctors[0] && (
                   <>
                     <p className="text-[18px] font-black leading-tight tracking-tight text-foreground">
-                      {doctors[0].doctor_surname || doctors[0].doctor_name.split(" ")[0]}
+                      {doctors[0].doctor_surname || (doctors[0].doctor_name ?? "").split(" ")[0]}
                     </p>
                     <p className="text-[22px] font-black leading-none tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400 mt-1">
                       {fmtRub(doctors[0].total_paid)}
@@ -256,7 +256,7 @@ export function DoctorsPage() {
                           <span className="font-semibold">{d.doctor_surname}</span>
                           {" "}
                           <span className="text-[11px] text-muted-foreground/50">
-                            {d.doctor_name.replace(d.doctor_surname, "").trim()}
+                            {(d.doctor_name ?? "").replace(d.doctor_surname ?? "", "").trim()}
                           </span>
                         </Td>
                         <Td right muted>{fmt(d.count)}</Td>
