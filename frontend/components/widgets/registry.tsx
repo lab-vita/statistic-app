@@ -17,6 +17,17 @@ import { ApptSummaryWidget } from "./appt-summary";
 import { ApptSourcesWidget } from "./appt-sources";
 import { RevenueSingleWidget, REVENUE_METRICS, type RevenueMetric } from "./revenue-single";
 import { RevenueMethodsWidget } from "./revenue-methods";
+import { CallsHeatmapWidget, HEATMAP_METRICS, type HeatmapMetric } from "./calls-heatmap";
+import { ApptSingleWidget, APPT_METRICS, type ApptMetric } from "./appt-single";
+import { ApptChartWidget } from "./appt-chart";
+import { ApptAdminsWidget } from "./appt-admins";
+import { RevenueChartWidget } from "./revenue-chart";
+import { RevenueServicesWidget } from "./revenue-services";
+import { DoctorsTopWidget } from "./doctors-top";
+import { FunnelStepsWidget } from "./funnel-steps";
+import { FunnelTrendWidget } from "./funnel-trend";
+import { PlansProgressWidget } from "./plans-progress";
+import { ReportsMonthsWidget, REPORTS_METRICS, type ReportsMetric } from "./reports-months";
 
 export interface WidgetOption { value: string; label: string; hint?: string }
 
@@ -36,6 +47,21 @@ export const WIDGET_OPTIONS: Partial<Record<WidgetTypeId, { title: string; key: 
     title: "Какую метрику показывать",
     key: "metric",
     options: REVENUE_METRICS.map(m => ({ value: m.key, label: m.label, hint: m.hint })),
+  },
+  calls_heatmap: {
+    title: "Что считать",
+    key: "metric",
+    options: HEATMAP_METRICS.map(m => ({ value: m.key, label: m.label, hint: m.hint })),
+  },
+  appt_single: {
+    title: "Какую метрику показывать",
+    key: "metric",
+    options: APPT_METRICS.map(m => ({ value: m.key, label: m.label, hint: m.hint })),
+  },
+  reports_months: {
+    title: "Что показывать",
+    key: "metric",
+    options: REPORTS_METRICS.map(m => ({ value: m.key, label: m.label, hint: m.hint })),
   },
 };
 
@@ -93,6 +119,33 @@ export function WidgetContent({ pw, data, loading }: {
       return <RevenueSingleWidget data={data.payments} loading={loading} metric={(metric as RevenueMetric) ?? "total_paid"} />;
     case "revenue_methods":
       return <RevenueMethodsWidget data={data.payments} loading={loading} />;
+    case "calls_heatmap":
+      return <CallsHeatmapWidget data={data.heatmap} loading={loading} metric={(metric as HeatmapMetric) ?? "total"} />;
+    case "appt_single":
+      return (
+        <ApptSingleWidget
+          data={data.appointments} daily={data.apptDaily?.days} loading={loading}
+          metric={(metric as ApptMetric) ?? "total"}
+        />
+      );
+    case "appt_chart":
+      return <ApptChartWidget days={data.apptDaily?.days ?? []} loading={loading} />;
+    case "appt_admins":
+      return <ApptAdminsWidget data={data.appointments} loading={loading} />;
+    case "revenue_chart":
+      return <RevenueChartWidget days={data.paymentDaily?.days ?? []} loading={loading} />;
+    case "revenue_services":
+      return <RevenueServicesWidget data={data.sales} loading={loading} />;
+    case "doctors_top":
+      return <DoctorsTopWidget data={data.doctors} loading={loading} />;
+    case "funnel_steps":
+      return <FunnelStepsWidget data={data} loading={loading} />;
+    case "funnel_trend":
+      return <FunnelTrendWidget calls={data.daily?.days ?? []} appts={data.apptDaily?.days ?? []} loading={loading} />;
+    case "plans_progress":
+      return <PlansProgressWidget data={data} loading={loading} />;
+    case "reports_months":
+      return <ReportsMonthsWidget data={data} loading={loading} metric={(metric as ReportsMetric) ?? "calls"} />;
     default:
       return null;
   }

@@ -3,11 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { Settings2 } from "lucide-react";
 import {
-  fetchStats, fetchDaily, fetchConversion, fetchPlanRange, fetchAppointmentStats, fetchPaymentStats,
+  fetchStats, fetchDaily, fetchConversion, fetchPlanRange, fetchHeatmap,
+  fetchAppointmentStats, fetchAppointmentDaily,
+  fetchPaymentStats, fetchPaymentDaily, fetchPaymentByDoctor, fetchSalesStats,
+  fetchCallsReport, fetchApptReport,
   toDateStr, addDays,
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
-import { loadHomeData, emptyHomeData, type HomeData, type HomeNeeds } from "@/lib/home-data";
+import { loadHomeData, emptyHomeData, needsKey, type HomeApi, type HomeData, type HomeNeeds } from "@/lib/home-data";
 import { widgetDef, type PlacedWidget, type WidgetPermission } from "@/lib/grid";
 import {
   PageContent, PageHeader, PeriodPill, DateNav, HeaderDivider, RefreshButton,
@@ -21,13 +24,23 @@ const P_MAP: Record<string, PeriodType> = {
   "День": "day", "Неделя": "week", "Месяц": "month", "Квартал": "quarter", "Год": "year",
 };
 
+const API: HomeApi = {
+  fetchStats, fetchDaily, fetchConversion, fetchPlanRange,
+  fetchHeatmap:          (f, t) => fetchHeatmap(f, t),
+  fetchAppointmentStats: (f, t) => fetchAppointmentStats(f, t),
+  fetchAppointmentDaily: (f, t) => fetchAppointmentDaily(f, t),
+  fetchPaymentStats, fetchPaymentDaily,
+  fetchPaymentByDoctor:  (f, t) => fetchPaymentByDoctor(f, t, 15),
+  fetchSalesStats:       (f, t) => fetchSalesStats(f, t, 15),
+  fetchCallsReport:      (f, t) => fetchCallsReport(f, t, "month"),
+  fetchApptReport:       (f, t) => fetchApptReport(f, t, "month"),
+};
+
+/** Объединение данных, которые нужны виджетам на экране. */
 function needsOf(widgets: PlacedWidget[]): HomeNeeds {
-  const perms = new Set(widgets.map(w => widgetDef(w.type)?.permission));
-  return {
-    calls:        perms.has("view:calls"),
-    appointments: perms.has("view:appointments"),
-    payments:     perms.has("view:revenue"),
-  };
+  const out: HomeNeeds = {};
+  for (const w of widgets) for (const k of widgetDef(w.type)?.data ?? []) out[k] = true;
+  return out;
 }
 
 export function HomePage() {
@@ -49,17 +62,13 @@ export function HomePage() {
 
   const onLayout = useCallback((widgets: PlacedWidget[]) => {
     const next = needsOf(widgets);
-    setNeeds(prev =>
-      prev && prev.calls === next.calls && prev.appointments === next.appointments && prev.payments === next.payments ? prev : next,
-    );
+    setNeeds(prev => (prev && needsKey(prev) === needsKey(next) ? prev : next));
   }, []);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!needs) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const d = await loadHomeData(dateFrom, dateTo, {
-      fetchStats, fetchDaily, fetchConversion, fetchPlanRange, fetchAppointmentStats, fetchPaymentStats,
-    }, needs);
+    const d = await loadHomeData(dateFrom, dateTo, API, needs);
     setData(d);
     setLoading(false);
     setRefreshing(false);
