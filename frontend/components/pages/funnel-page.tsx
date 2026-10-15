@@ -15,10 +15,9 @@ import {
   type Period, type PeriodType,
 } from "@/lib/periods";
 import {
-  fetchStats, fetchConversion, fetchAppointmentStats, fetchPaymentStats,
-  fetchDaily, fetchAppointmentDaily,
+  fetchConversion, fetchAppointmentStats, fetchPaymentStats,
   toDateStr, addDays, fmtRub,
-  type ConversionOperator, type DailyItem, type AppointmentDailyItem,
+  type ConversionOperator,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -209,36 +208,20 @@ export function FunnelPage() {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
-      const requests: Promise<unknown>[] = [
-        fetchStats(dateFrom, dateTo),
+      const [convRes, apptRes, payRes] = await Promise.all([
         fetchConversion(dateFrom, dateTo),
         fetchAppointmentStats(dateFrom, dateTo),
         fetchPaymentStats(dateFrom, dateTo),
-      ];
-      if (!isDay) {
-        requests.push(fetchDaily(dateFrom, dateTo));
-        requests.push(fetchAppointmentDaily(dateFrom, dateTo));
-      }
+      ]);
 
-      const results = await Promise.all(requests);
-      const [statsRes, convRes, apptRes, payRes] = results as [
-        Awaited<ReturnType<typeof fetchStats>>,
-        Awaited<ReturnType<typeof fetchConversion>>,
-        Awaited<ReturnType<typeof fetchAppointmentStats>>,
-        Awaited<ReturnType<typeof fetchPaymentStats>>,
-        ...unknown[]
-      ];
-
-      // Данные воронки
-      const totalCalls = Object.entries(statsRes.operators)
-        .filter(([k]) => k !== "total")
-        .reduce((sum, [, op]) => sum + (op.incoming ?? 0), 0);
-
+      // Данные воронки. Звонки и записи — операторов колл-центра, на одной базе
+      // с разделом «Звонки»: записи по дню создания, пациент считается один раз.
+      const totalCalls = convRes.total.incoming ?? 0;
       const appt    = convRes.total.appointments ?? 0;
       const visits  = apptRes.total.visits ?? 0;
       const revenue = payRes.total_paid ?? 0;
 
-      const callsToAppt     = totalCalls > 0 ? (appt / totalCalls) * 100 : 0;
+      const callsToAppt     = convRes.total.conversion_pct ?? 0;
       const apptToVisit     = appt > 0       ? (visits / appt) * 100    : 0;
       const revenuePerVisit = visits > 0     ? revenue / visits          : 0;
 
@@ -253,19 +236,13 @@ export function FunnelPage() {
       setData({ calls: totalCalls, appointments: appt, visits, revenue, callsToAppt, apptToVisit, revenuePerVisit, operators });
 
       // Динамика по дням
-      if (!isDay && results.length >= 6) {
-        const callsDaily = (results[4] as Awaited<ReturnType<typeof fetchDaily>>).days;
-        const apptDaily  = (results[5] as Awaited<ReturnType<typeof fetchAppointmentDaily>>).days;
-
-        const apptMap: Record<string, AppointmentDailyItem> = {};
-        for (const d of apptDaily) apptMap[d.date] = d;
-
-        const points: DayPoint[] = callsDaily.map((d: DailyItem) => {
-          const a = apptMap[d.date]?.total ?? 0;
-          const conv = d.incoming > 0 ? (a / d.incoming) * 100 : 0;
-          const label = new Date(d.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-          return { date: label, calls: d.incoming, appt: a, conversion: Math.round(conv * 10) / 10 };
-        });
+      if (!isDay && convRes.days?.length) {
+        const points: DayPoint[] = convRes.days.map(d => ({
+          date:       new Date(`${d.date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
+          calls:      d.incoming,
+          appt:       d.appointments,
+          conversion: d.conversion_pct,
+        }));
         setTrend(points);
       } else {
         setTrend([]);
