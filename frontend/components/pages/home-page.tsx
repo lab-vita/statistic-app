@@ -13,7 +13,7 @@ import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type Per
 import { loadHomeData, emptyHomeData, needsKey, type HomeApi, type HomeData, type HomeNeeds } from "@/lib/home-data";
 import { widgetDef, type PlacedWidget, type WidgetPermission } from "@/lib/grid";
 import {
-  PageContent, PageHeader, PeriodPill, DateNav, HeaderDivider, RefreshButton,
+  PageContent, PageHeader, HeaderControls, PeriodPill, DateNav, HeaderDivider, RefreshButton,
 } from "@/components/ui/primitives";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { useAuth } from "@/components/auth-gate";
@@ -79,36 +79,37 @@ export function HomePage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <PageHeader title="Главная">
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => setEditMode(v => !v)}
-          aria-pressed={editMode}
-          className={cn(
-            "inline-flex h-7 items-center gap-1.5 rounded-[7px] border px-2.5 text-[12px] font-semibold transition-colors",
-            editMode
-              ? "border-brand bg-brand-soft text-brand"
-              : "border-border bg-card text-text-2 hover:border-brand/50 hover:text-foreground",
-          )}
-        >
-          <Settings2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-          {editMode ? "Настройка…" : "Настроить"}
-        </button>
-        <HeaderDivider />
-        <PeriodPill
-          items={PERIODS}
-          active={periodLabel}
-          onChange={l => { setPeriodLabel(l); setPeriod(getDefaultPeriod(P_MAP[l] ?? "month")); }}
-        />
-        <HeaderDivider />
-        <DateNav
-          label={formatPeriodLabel(period)}
-          onPrev={() => setPeriod(p => shiftPeriod(p, -1))}
-          onNext={() => setPeriod(p => shiftPeriod(p, 1))}
-          nextDisabled={toDateStr(period.dateTo) >= yesterday}
-        />
-        <HeaderDivider />
-        <RefreshButton onClick={() => load(true)} refreshing={refreshing} />
+        <HeaderControls>
+          <button
+            type="button"
+            onClick={() => setEditMode(v => !v)}
+            aria-pressed={editMode}
+            className={cn(
+              "inline-flex h-7 items-center gap-1.5 rounded-[7px] border px-2.5 text-[12px] font-semibold transition-colors",
+              editMode
+                ? "border-brand bg-brand-soft text-brand"
+                : "border-border bg-card text-text-2 hover:border-brand/50 hover:text-foreground",
+            )}
+          >
+            <Settings2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+            <span className="max-sm:sr-only">{editMode ? "Настройка…" : "Настроить"}</span>
+          </button>
+          <HeaderDivider />
+          <PeriodPill
+            items={PERIODS}
+            active={periodLabel}
+            onChange={l => { setPeriodLabel(l); setPeriod(getDefaultPeriod(P_MAP[l] ?? "month")); }}
+          />
+          <HeaderDivider />
+          <DateNav
+            label={formatPeriodLabel(period)}
+            onPrev={() => setPeriod(p => shiftPeriod(p, -1))}
+            onNext={() => setPeriod(p => shiftPeriod(p, 1))}
+            nextDisabled={toDateStr(period.dateTo) >= yesterday}
+          />
+          <HeaderDivider />
+          <RefreshButton onClick={() => load(true)} refreshing={refreshing} />
+        </HeaderControls>
       </PageHeader>
 
       <PageContent>

@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
-  PageContent, Skeleton, Empty, ErrorBanner, Delta, Th, Td, PageHeader, PeriodPill, DateNav, HeaderDivider, RefreshButton,
+  PageContent, Skeleton, Empty, ErrorBanner, Delta, Th, Td, PageHeader, HeaderControls, PeriodPill, DateNav, HeaderDivider, RefreshButton,
 } from "@/components/ui/primitives";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -41,7 +41,7 @@ function DoctorBarChart({ doctors }: { doctors: PaymentDoctor[] }) {
     <ResponsiveContainer width="100%" height={Math.max(260, data.length * 38)}>
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 60, left: 0, bottom: 4 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} horizontal={false} />
-        <XAxis
+        <XAxis minTickGap={20}
           type="number"
           tickFormatter={v => fmtRub(v as number)}
           tick={{ fontSize: 10, fill: ct.axis }}
@@ -74,7 +74,7 @@ function ServicesTable({ services }: { services: SaleService[] }) {
   const maxSum = Math.max(...services.map(s => s.final_sum));
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
+      <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
         <thead>
           <tr>
             <Th>Услуга</Th>
@@ -88,8 +88,8 @@ function ServicesTable({ services }: { services: SaleService[] }) {
           {services.map((s, i) => (
             <tr key={i} className="hover:bg-muted/40 transition-colors">
               <Td>
-                <div>
-                  <span className="font-medium text-[13px]">{s.service_title}</span>
+                <div className="max-w-[clamp(160px,40vw,420px)]">
+                  <span className="block truncate font-medium text-[13px]" title={s.service_title}>{s.service_title}</span>
                   <div className="mt-1 h-1 w-full max-w-[160px] rounded-full bg-border overflow-hidden">
                     <div
                       className="h-full rounded-full bg-blue-500 transition-all duration-500"
@@ -151,21 +151,22 @@ export function DoctorsPage() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title="Врачи">
-        <div className="flex-1" />
-        <PeriodPill
-          items={PERIODS}
-          active={periodLabel}
-          onChange={l => { setPeriodLabel(l); setPeriod(getDefaultPeriod(P_MAP[l] ?? "month")); }}
-        />
-        <HeaderDivider />
-        <DateNav
-          label={formatPeriodLabel(period)}
-          onPrev={() => setPeriod(p => shiftPeriod(p, -1))}
-          onNext={() => setPeriod(p => shiftPeriod(p, 1))}
-          nextDisabled={toDateStr(period.dateTo) >= yesterday}
-        />
-        <HeaderDivider />
-        <RefreshButton onClick={load} />
+        <HeaderControls>
+          <PeriodPill
+            items={PERIODS}
+            active={periodLabel}
+            onChange={l => { setPeriodLabel(l); setPeriod(getDefaultPeriod(P_MAP[l] ?? "month")); }}
+          />
+          <HeaderDivider />
+          <DateNav
+            label={formatPeriodLabel(period)}
+            onPrev={() => setPeriod(p => shiftPeriod(p, -1))}
+            onNext={() => setPeriod(p => shiftPeriod(p, 1))}
+            nextDisabled={toDateStr(period.dateTo) >= yesterday}
+          />
+          <HeaderDivider />
+          <RefreshButton onClick={load} />
+        </HeaderControls>
       </PageHeader>
 
       <PageContent>
@@ -182,16 +183,16 @@ export function DoctorsPage() {
           <>
             {/* KPI */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="@container min-w-0 rounded-lg border border-border bg-card p-4">
                 <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Выручка по врачам</p>
-                <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-emerald-600 dark:text-emerald-400">
+                <p className="text-[length:min(28px,15cqw)] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-emerald-600 dark:text-emerald-400">
                   {fmtRub(totalByDoctors)}
                 </p>
                 <p className="text-[11px] text-muted-foreground/60 mt-1">{doctors.length} врачей</p>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="@container min-w-0 rounded-lg border border-border bg-card p-4">
                 <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Средний чек</p>
-                <p className="text-[28px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-foreground">
+                <p className="text-[length:min(28px,15cqw)] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-foreground">
                   {fmtRub(doctors.reduce((s, d) => s + d.count, 0) > 0
                     ? totalByDoctors / doctors.reduce((s, d) => s + d.count, 0)
                     : 0)}
@@ -200,7 +201,7 @@ export function DoctorsPage() {
                   {fmt(doctors.reduce((s, d) => s + d.count, 0))} визитов
                 </p>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4 col-span-2 sm:col-span-1">
+              <div className="@container min-w-0 rounded-lg border border-border bg-card p-4 col-span-2 sm:col-span-1">
                 <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 mb-1">Лидер по выручке</p>
                 {doctors[0] && (
                   <>
@@ -234,7 +235,7 @@ export function DoctorsPage() {
                 <h3 className="text-[13px] font-semibold">Детализация по врачам</h3>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                   <thead>
                     <tr>
                       <Th>#</Th>
