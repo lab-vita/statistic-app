@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   fetchPlanMonth, savePlanItems,
   fetchStats, fetchAppointmentStats,
@@ -70,6 +70,15 @@ export function PlansPage() {
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [tab,     setTab]     = useState<MetricKey>("incoming");
+
+  // Ряд месяцев на узком экране прокручивается: держим выбранный месяц на виду.
+  // Двигаем только сам ряд — scrollIntoView внутри Битрикс24 сдвинул бы и страницу портала.
+  const monthsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = monthsRef.current;
+    const el = row?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (row && el) row.scrollLeft = el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2;
+  }, [month]);
 
   const dateFrom = toDateStr(new Date(year, month - 1, 1));
   const dateTo   = toDateStr(new Date(year, month, 0));
@@ -192,7 +201,7 @@ export function PlansPage() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title="Планы">
-        <div className="flex flex-1 flex-wrap items-center gap-0.5" role="tablist" aria-label="Месяц плана">
+        <div ref={monthsRef} className="no-scrollbar relative flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto max-sm:order-last max-sm:-mx-3 max-sm:basis-full max-sm:px-3" role="tablist" aria-label="Месяц плана">
           {MONTHS.map(m => (
             <button
               key={m.value}
@@ -201,7 +210,7 @@ export function PlansPage() {
               aria-selected={month === m.value}
               onClick={() => setMonth(m.value)}
               className={cn(
-                "rounded-[5px] px-2 py-[3px] text-[11px] font-semibold transition-colors",
+                "shrink-0 rounded-[5px] px-2 py-[3px] text-[11px] font-semibold transition-colors max-sm:px-2.5 max-sm:py-1.5",
                 month === m.value
                   ? "bg-brand text-brand-foreground"
                   : "text-text-3 hover:bg-accent hover:text-foreground"
@@ -216,12 +225,14 @@ export function PlansPage() {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="h-7 rounded-[7px] bg-brand px-4 text-[12px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong disabled:opacity-50"
+            className="ml-auto h-7 rounded-[7px] bg-brand px-4 text-[12px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong disabled:opacity-50"
           >
             {saving ? "Сохраняю…" : "Сохранить"}
           </button>
         )}
-        <RefreshButton onClick={load} />
+        <div className={saved ? "ml-auto" : undefined}>
+          <RefreshButton onClick={load} />
+        </div>
       </PageHeader>
 
       <PageContent>
@@ -283,7 +294,7 @@ export function PlansPage() {
                 <span className="text-[11px] text-muted-foreground/60">{metricInfo.label}, {metricInfo.unit}</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
                       <th className="px-4 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3 w-32">День</th>
