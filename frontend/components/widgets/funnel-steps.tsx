@@ -10,16 +10,17 @@ const tone = (pct: number, good: number, bad: number) =>
   : pct >= bad ? "text-amber-600 dark:text-amber-400"
   : "text-red-600 dark:text-red-400";
 
-/** Те же формулы, что в разделе «Воронка». */
+/** Те же формулы, что в разделе «Воронка»: звонки и записи — операторов колл-центра. */
 export function funnelOf(data: HomeData) {
-  const calls   = data.stats?.operators["total"]?.incoming ?? null;
-  const appts   = data.conversionData?.total.appointments ?? null;
+  const conv    = data.conversionData?.total ?? null;
+  const calls   = conv?.incoming ?? null;
+  const appts   = conv?.appointments ?? null;
   const visits  = data.appointments?.total.visits ?? null;
   const revenue = data.payments?.total_paid ?? null;
   const pct = (a: number | null, b: number | null) => (a !== null && b ? (a / b) * 100 : null);
   return {
     calls, appts, visits, revenue,
-    callsToAppt: pct(appts, calls),
+    callsToAppt: conv ? conv.conversion_pct : null,
     apptToVisit: pct(visits, appts),
     perVisit:    revenue !== null && visits ? revenue / visits : null,
   };
@@ -59,7 +60,7 @@ export function FunnelStepsWidget({ data, loading }: { data: HomeData; loading: 
     <WidgetCard className="py-3.5">
       <p className="metric-label mb-2 shrink-0">Воронка: от звонка до оплаты</p>
       <div className="flex min-h-0 flex-1 items-stretch gap-1">
-        <Step label="Принято звонков" value={v(f.calls)} accent="text-foreground" />
+        <Step label="Принято звонков" value={v(f.calls)} sub="колл-центр" accent="text-foreground" />
         <Arrow pct={f.callsToAppt} good={50} bad={30} />
         <Step label="Записались" value={v(f.appts)} sub="через колл-центр" accent="text-blue-600 dark:text-blue-400" />
         <Arrow pct={f.apptToVisit} good={80} bad={60} />
