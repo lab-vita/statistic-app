@@ -141,7 +141,13 @@ export function WidgetContent({ pw, data, loading }: {
     case "funnel_steps":
       return <FunnelStepsWidget data={data} loading={loading} />;
     case "funnel_trend":
-      return <FunnelTrendWidget calls={data.daily?.days ?? []} appts={data.apptDaily?.days ?? []} loading={loading} />;
+      return (
+        <FunnelTrendWidget
+          days={data.conversionData?.days ?? []}
+          total={data.conversionData ? data.conversionData.total.conversion_pct : null}
+          loading={loading}
+        />
+      );
     case "plans_progress":
       return <PlansProgressWidget data={data} loading={loading} />;
     case "reports_months":

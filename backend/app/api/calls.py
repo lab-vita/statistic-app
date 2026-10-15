@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from datetime import date, timedelta
+from sqlalchemy import select, and_, or_
+from datetime import date, datetime, time, timedelta
 from typing import Optional
 
 from app.db.database import get_db
@@ -20,7 +20,7 @@ from app.services.analytics.call_stats import (
     MAX_CALLBACK_HOURS,
 )
 from app.core.config import settings
-from app.core.utils import prev_period, to_local, local_date, local_window_utc, today_local
+from app.core.utils import prev_period, to_local, local_date, local_window_utc, today_local, TZ_LOCAL
 from app.core.constants import DAY_NAMES_RU
 from app.core.auth import require_any
 
@@ -131,6 +131,20 @@ async def get_stats(
     }
 
 
+def _appt_created_day(a: Appointment) -> date:
+    """
+    День, когда запись СОЗДАНА (а не день приёма). Время из МедОС приходит без
+    часового пояса и уже по Кемерово; если пояс есть — переводим в местное.
+    Старые записи без даты создания считаем по дню приёма.
+    """
+    ts = a.created_at_medods
+    if ts is None:
+        return a.appointment_date
+    if ts.tzinfo is not None:
+        return ts.astimezone(TZ_LOCAL).date()
+    return ts.date()
+
+
 @router.get("/conversion")
 async def get_conversion(
     date_from: date = Query(default=None),
@@ -140,6 +154,11 @@ async def get_conversion(
     """
     Конверсия звонок → запись для операторов колл-центра.
     Только для Белобородовой, Пирожковой, Часовских.
+
+    Записи берутся по дню СОЗДАНИЯ: звонок и запись, сделанная в этом разговоре,
+    попадают в один период. Раньше записи брались по дню приёма, и запись,
+    сделанная неделю назад на сегодня, считалась сегодняшней конверсией —
+    отсюда значения больше 100%. Считаются пациенты, а не записи (см. ниже).
     """
     if not date_from:
         date_from = today_local() - timedelta(days=1)
@@ -148,14 +167,34 @@ async def get_conversion(
 
     calls = await _load_calls(db, date_from, date_to)
 
-    appts = list(await db.scalars(
-        select(Appointment).where(
+    # С запасом по дню с каждой стороны (на случай времени с поясом), точный день — ниже
+    start = datetime.combine(date_from - timedelta(days=1), time.min)
+    end   = datetime.combine(date_to + timedelta(days=2), time.min)
+    candidates = list(await db.scalars(
+        select(Appointment).where(or_(
+            and_(Appointment.created_at_medods >= start, Appointment.created_at_medods < end),
             and_(
+                Appointment.created_at_medods.is_(None),
                 Appointment.appointment_date >= date_from,
                 Appointment.appointment_date <= date_to,
-            )
-        )
+            ),
+        ))
     ))
+    in_period = [a for a in candidates if date_from <= _appt_created_day(a) <= date_to]
+
+    # Считаем записанных ПАЦИЕНТОВ, а не записи: за один звонок пациента часто
+    # записывают к двум врачам — это одна успешная продажа, а не две.
+    # Один пациент у одного оператора в один день = одна запись.
+    seen: set[tuple] = set()
+    appts: list[Appointment] = []
+    for a in in_period:
+        patient = a.client_id or a.client_phone or f"appt:{a.medods_id}"
+        key = (a.administrator_surname, _appt_created_day(a), patient)
+        if key in seen:
+            continue
+        seen.add(key)
+        appts.append(a)
+
     appts_by_surname: dict[str, int] = {}
     for a in appts:
         if a.administrator_surname:
@@ -166,6 +205,29 @@ async def get_conversion(
     rows, total_incoming, total_appts = conversion_stats(calls, appts_by_surname)
     total_conversion = round(total_appts / total_incoming * 100, 1) if total_incoming else 0
 
+    # По дням — те же операторы и та же база, для графиков конверсии
+    surnames = {r["surname"] for r in rows}
+    op_ids   = {r["operator_id"] for r in rows}
+    days: dict[str, dict] = {}
+    d = date_from
+    while d <= date_to:
+        days[d.isoformat()] = {"date": d.isoformat(), "incoming": 0, "appointments": 0, "conversion_pct": 0}
+        d += timedelta(days=1)
+    for c in calls:
+        if c.is_incoming and c.portal_user_id in op_ids:
+            key = local_date(c.call_start_date).isoformat()
+            if key in days:
+                days[key]["incoming"] += 1
+    for a in appts:
+        if a.administrator_surname in surnames:
+            key = _appt_created_day(a).isoformat()
+            if key in days:
+                days[key]["appointments"] += 1
+    for day in days.values():
+        day["conversion_pct"] = (
+            round(day["appointments"] / day["incoming"] * 100, 1) if day["incoming"] else 0
+        )
+
     return {
         "date_from": date_from,
         "date_to":   date_to,
@@ -175,6 +237,7 @@ async def get_conversion(
             "appointments":   total_appts,
             "conversion_pct": total_conversion,
         },
+        "days": list(days.values()),
     }
 
 

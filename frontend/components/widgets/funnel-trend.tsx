@@ -2,7 +2,7 @@
 
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { LineChart as LineChartIcon } from "lucide-react";
-import type { AppointmentDailyItem, DailyItem } from "@/lib/api";
+import type { ConversionDay } from "@/lib/api";
 import { useChartTheme } from "@/components/charts/base-chart";
 import { WidgetCard, WidgetLabel, WidgetSkeleton, WidgetEmpty, ChartTip, C, num, dayLabel, dayLong } from "./widget-card";
 
@@ -23,20 +23,18 @@ function Tip({ active, payload }: { active?: boolean; payload?: { payload: Point
   );
 }
 
-export function FunnelTrendWidget({ calls, appts, loading }: {
-  calls: DailyItem[]; appts: AppointmentDailyItem[]; loading: boolean;
+export function FunnelTrendWidget({ days, total, loading }: {
+  days: ConversionDay[]; total: number | null; loading: boolean;
 }) {
   const ct = useChartTheme();
   if (loading) return <WidgetSkeleton />;
 
-  const apptBy = new Map(appts.map(a => [a.date, a.total]));
-  const data: Point[] = calls.map(d => {
-    const a = apptBy.get(d.date) ?? 0;
-    return { date: d.date, label: dayLabel(d.date), calls: d.incoming, appt: a, conv: d.incoming > 0 ? (a / d.incoming) * 100 : null };
-  });
-  const sumCalls = data.reduce((s, p) => s + p.calls, 0);
-  const sumAppt  = data.reduce((s, p) => s + p.appt, 0);
-  const avgConv  = sumCalls > 0 ? (sumAppt / sumCalls) * 100 : null;
+  // Звонки и записи операторов колл-центра; записи — по дню создания (как в разделе «Звонки»)
+  const data: Point[] = days.map(d => ({
+    date: d.date, label: dayLabel(d.date), calls: d.incoming, appt: d.appointments,
+    conv: d.incoming > 0 ? d.conversion_pct : null,
+  }));
+  const avgConv = total;
 
   return (
     <WidgetCard>
