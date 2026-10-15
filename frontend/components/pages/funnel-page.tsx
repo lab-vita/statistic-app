@@ -52,7 +52,7 @@ interface DayPoint {
   date:       string;
   calls:      number;
   appt:       number;
-  conversion: number; // %
+  conversion: number | null; // %, null — в день не было звонков
 }
 
 // ─── Вспомогательные компоненты
@@ -144,7 +144,7 @@ function TrendChart({ points }: { points: DayPoint[] }) {
               {...ct.tooltip}
               formatter={(val, name) =>
                 name === "Конверсия"
-                  ? [`${typeof val === "number" ? val.toFixed(1) : "0"}%`, name]
+                  ? [typeof val === "number" ? `${val.toFixed(1)}%` : "—", name]
                   : [val, name]
               }
             />
@@ -241,7 +241,8 @@ export function FunnelPage() {
           date:       new Date(`${d.date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
           calls:      d.incoming,
           appt:       d.appointments,
-          conversion: d.conversion_pct,
+          // без звонков конверсии нет: линия прерывается, а не падает в 0
+          conversion: d.incoming > 0 ? d.conversion_pct : null,
         }));
         setTrend(points);
       } else {
