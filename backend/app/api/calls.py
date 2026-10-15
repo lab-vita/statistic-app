@@ -145,6 +145,17 @@ def _appt_created_day(a: Appointment) -> date:
     return ts.date()
 
 
+def _patient_outcome(group: list[Appointment]) -> str:
+    """Итог записей одного пациента: visited / waiting / noshow / cancelled."""
+    if any(a.is_visit for a in group):
+        return "visited"
+    if any(not (a.is_noshow or a.is_cancelled) for a in group):
+        return "waiting"  # ожидает, одобрена или статус ещё не проставлен
+    if any(a.is_noshow for a in group):
+        return "noshow"
+    return "cancelled"
+
+
 @router.get("/conversion")
 async def get_conversion(
     date_from: date = Query(default=None),
@@ -185,15 +196,15 @@ async def get_conversion(
     # Считаем записанных ПАЦИЕНТОВ, а не записи: за один звонок пациента часто
     # записывают к двум врачам — это одна успешная продажа, а не две.
     # Один пациент у одного оператора в один день = одна запись.
-    seen: set[tuple] = set()
+    seen: dict[tuple, list[Appointment]] = {}
     appts: list[Appointment] = []
     for a in in_period:
         patient = a.client_id or a.client_phone or f"appt:{a.medods_id}"
         key = (a.administrator_surname, _appt_created_day(a), patient)
-        if key in seen:
-            continue
-        seen.add(key)
-        appts.append(a)
+        if key not in seen:
+            seen[key] = []
+            appts.append(a)
+        seen[key].append(a)
 
     appts_by_surname: dict[str, int] = {}
     for a in appts:
@@ -205,8 +216,24 @@ async def get_conversion(
     rows, total_incoming, total_appts = conversion_stats(calls, appts_by_surname)
     total_conversion = round(total_appts / total_incoming * 100, 1) if total_incoming else 0
 
-    # По дням — те же операторы и та же база, для графиков конверсии
+    # Чем закончились записи этих пациентов (для воронки колл-центра): пришёл,
+    # если хоть одна из его записей того дня состоялась; иначе — ждёт приёма,
+    # не пришёл или отменил. Считаются те же пациенты, что и в конверсии.
     surnames = {r["surname"] for r in rows}
+    outcomes = {"visited": 0, "noshow": 0, "cancelled": 0, "waiting": 0}
+    visits_by_surname: dict[str, int] = {}
+    for (surname, _day, _patient), group in seen.items():
+        if surname not in surnames:
+            continue
+        outcome = _patient_outcome(group)
+        outcomes[outcome] += 1
+        if outcome == "visited":
+            visits_by_surname[surname] = visits_by_surname.get(surname, 0) + 1
+    for r in rows:
+        r["visits"] = visits_by_surname.get(r["surname"], 0)
+    resolved = outcomes["visited"] + outcomes["noshow"] + outcomes["cancelled"]
+
+    # По дням — те же операторы и та же база, для графиков конверсии
     op_ids   = {r["operator_id"] for r in rows}
     days: dict[str, dict] = {}
     d = date_from
@@ -236,6 +263,9 @@ async def get_conversion(
             "incoming":       total_incoming,
             "appointments":   total_appts,
             "conversion_pct": total_conversion,
+            **outcomes,
+            # явка — среди тех, чей приём уже прошёл (ждущих не считаем)
+            "visit_pct": round(outcomes["visited"] / resolved * 100, 1) if resolved else 0,
         },
         "days": list(days.values()),
     }
