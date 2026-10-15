@@ -49,9 +49,9 @@ export function CallsTrioWidget({ stats, loading }: { stats: OperatorStats | nul
     <WidgetCard className="px-0 py-0">
       <div className="grid h-full grid-cols-3">
         {buildItems(stats).map((item, i) => (
-          <div key={item.key} className={cn("flex min-w-0 flex-col px-5 py-[18px]", i > 0 && "border-l border-hairline")}>
-            <WidgetLabel>{item.label}</WidgetLabel>
-            <p className={cn("mt-1.5 truncate text-[26px] font-extrabold leading-none tracking-[-0.04em] tabular-nums", item.accent)}>
+          <div key={item.key} className={cn("flex min-w-0 flex-col px-3 py-3.5 @[30rem]:px-5 @[30rem]:py-[18px]", i > 0 && "border-l border-hairline")}>
+            <WidgetLabel className="whitespace-normal leading-tight">{item.label}</WidgetLabel>
+            <p className={cn("mt-1.5 truncate text-[length:min(26px,7.5cqw)] font-extrabold leading-none tracking-[-0.04em] tabular-nums", item.accent)}>
               {item.value}
             </p>
             {item.sub && <p className="mt-1 truncate text-[11px] text-text-3">{item.sub}</p>}

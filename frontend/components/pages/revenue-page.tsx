@@ -236,7 +236,7 @@ export function RevenuePage() {
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
                         <th className="px-4 py-2.5 text-left w-8"></th>

@@ -60,7 +60,7 @@ export function CallsOperatorsWidget({ operators, conversion, loading }: {
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
             <thead className="sticky top-0 bg-card">
               <tr>
                 <th className={cn(TH, "pl-5 text-left")}>Оператор</th>

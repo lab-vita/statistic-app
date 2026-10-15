@@ -17,8 +17,6 @@ export function RevenueChart({ data }: Props) {
     ? `${(v/1_000_000).toFixed(1)}M`
     : v >= 1_000 ? `${Math.round(v/1_000)}K` : String(v);
 
-  const tick = data.length > 60 ? 6 : data.length > 30 ? 2 : 0;
-
   return (
     <ResponsiveContainer width="100%" height={160}>
       <AreaChart data={data} margin={{ top: 4, right: 4, left: -4, bottom: 0 }}>
@@ -30,7 +28,7 @@ export function RevenueChart({ data }: Props) {
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
         <XAxis dataKey="date" tickFormatter={fmtDate}
-          tick={{ fontSize: 10, fill: ct.axis }} axisLine={false} tickLine={false} interval={tick} />
+          tick={{ fontSize: 10, fill: ct.axis }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
         <YAxis tickFormatter={fmtY}
           tick={{ fontSize: 10, fill: ct.axis }} axisLine={false} tickLine={false} width={42} />
         <Tooltip

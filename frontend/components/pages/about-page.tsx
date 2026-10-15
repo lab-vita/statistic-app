@@ -1,12 +1,13 @@
 "use client";
 
 import { Activity, Smartphone, Server, CheckCircle2, Clock, Sparkles, Wrench, Shield } from "lucide-react";
+import { PageHeader } from "@/components/ui/primitives";
 
 const APP_VERSION_FRONTEND = "0.8.0";
 const APP_VERSION_BACKEND  = "0.10.0";
 const APP_UPDATED          = "13 октября 2026";
 
-// ─── Типы ────────────────────────────────────────────────────────────────────
+// ─── Типы ────────────────────────────────────────────────────────────────────────
 
 type ChangeKind = "new" | "fix" | "improve" | "security";
 
@@ -22,7 +23,7 @@ interface Release {
   changes: Change[];
 }
 
-// ─── Данные ──────────────────────────────────────────────────────────────────
+// ─── Данные ──────────────────────────────────────────────────────────────────────
 
 const FRONTEND_RELEASES: Release[] = [
   {
@@ -218,7 +219,7 @@ const BACKEND_RELEASES: Release[] = [
   },
 ];
 
-// ─── Утилиты ─────────────────────────────────────────────────────────────────
+// ─── Утилиты ───────────────────────────────────────────────────────────────────
 
 const KIND_META: Record<ChangeKind, { label: string; className: string; icon: React.ElementType }> = {
   new:      { label: "Новое",    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", icon: Sparkles      },
@@ -300,25 +301,17 @@ function VersionBlock({
   );
 }
 
-// ─── Главный компонент ────────────────────────────────────────────────────────
+// ─── Главный компонент ────────────────────────────────────────────────────────────────
 
 export function AboutPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Шапка */}
-      <header className="shrink-0 border-b border-border bg-background px-6 h-[52px] flex items-center gap-3">
-        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-foreground">
-          <Activity className="h-3.5 w-3.5 text-background" strokeWidth={2.5} />
-          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-background" />
-        </div>
-        <div>
-          <span className="text-[14px] font-semibold">О приложении</span>
-          <span className="ml-2 text-[12px] text-muted-foreground">Пульс · Аналитика</span>
-        </div>
-      </header>
+      <PageHeader title="О приложении">
+        <span className="text-[12px] text-text-3">Пульс · Аналитика</span>
+      </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+        <div className="max-w-2xl mx-auto px-3 py-4 space-y-6 sm:px-4 sm:py-6 sm:space-y-8">
 
           {/* Карточка версии */}
           <div className="rounded-xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">

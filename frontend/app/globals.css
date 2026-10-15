@@ -206,6 +206,9 @@
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -265,4 +268,10 @@
   .tab-btn-active  { @apply bg-foreground text-background; }
   .tab-btn-idle    { @apply text-text-2 hover:text-brand; }
   .tab-group   { @apply inline-flex items-center gap-1; }
+}
+
+/* Горизонтальная прокрутка без полосы (ряды месяцев, вкладки на телефоне) */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
 }

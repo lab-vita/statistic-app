@@ -10,6 +10,7 @@ import {
   ChevronDown, CalendarDays, RefreshCw, Inbox,
 } from "lucide-react";
 import type { DeltaDir } from "@/lib/api";
+import { MenuButton } from "@/components/mobile-nav";
 
 // ── Delta badge ────────────────────────────────────────────────────────
 interface DeltaProps {
@@ -132,7 +133,7 @@ export function MetricCard({
 }: MetricCardProps) {
   const hasTop = !!icon;
   return (
-    <div className="card-surface flex flex-col px-5 py-[18px]">
+    <div className="card-surface @container flex min-w-0 flex-col px-4 py-4 sm:px-5 sm:py-[18px]">
       {hasTop && (
         <div className="mb-3.5 flex items-start justify-between">
           <span className={cn("flex h-9 w-9 items-center justify-center rounded-[9px] [&_svg]:h-[18px] [&_svg]:w-[18px]", ICON_TONE[iconTone])}>
@@ -143,7 +144,8 @@ export function MetricCard({
       )}
       <p className="metric-label mb-[5px]">{label}</p>
       <p className={cn(
-        "mb-1 text-[30px] font-extrabold leading-none tracking-[-0.04em] tabular-nums",
+        // крупная цифра уменьшается в узкой карточке (две карточки в ряд на телефоне)
+        "mb-1 text-[length:min(30px,15cqw)] font-extrabold leading-none tracking-[-0.04em] tabular-nums",
         valueClass ?? "text-foreground"
       )}>
         {value}
@@ -320,8 +322,8 @@ export function SparkLine({ values, color, width = 64, height = 32 }: { values: 
 // ── Page wrapper ───────────────────────────────────────────────────────
 export function PageContent({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex-1 overflow-y-auto bg-background">
-      <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-5 lg:px-6">
+    <main className="flex-1 overflow-y-auto overscroll-contain bg-background">
+      <div className="mx-auto max-w-[1400px] space-y-3 px-3 py-3 sm:space-y-4 sm:px-4 sm:py-5 lg:px-6 min-[1800px]:max-w-[1640px]">
         {children}
       </div>
     </main>
@@ -351,7 +353,7 @@ function usePopover() {
 export function MenuPanel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn(
-      "absolute left-0 top-[calc(100%+6px)] z-50 min-w-[140px] rounded-lg border border-border bg-popover p-1 shadow-pop",
+      "absolute left-0 top-[calc(100%+6px)] z-50 min-w-[140px] max-w-[calc(100vw-24px)] rounded-lg border border-border bg-popover p-1 shadow-pop",
       className,
     )}>
       {children}
@@ -387,12 +389,28 @@ export function MenuDivider() {
 export function PageHeader({ title, children, className }: { title: string; children?: React.ReactNode; className?: string }) {
   return (
     <header className={cn(
-      "flex min-h-[52px] shrink-0 flex-wrap items-center gap-2.5 border-b border-border bg-card px-4 py-2 lg:px-6",
+      "flex min-h-[52px] shrink-0 flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-border bg-card px-3 py-2 sm:px-4 lg:px-6",
       className,
     )}>
+      <MenuButton />
       <h1 className="whitespace-nowrap text-[14px] font-bold tracking-[-0.02em]">{title}</h1>
       {children}
     </header>
+  );
+}
+
+/**
+ * Правая группа шапки: период, даты, обновление. На телефоне уходит на
+ * отдельную строку во всю ширину, разделители между кнопками прячутся.
+ */
+export function HeaderControls({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn(
+      "ml-auto flex min-w-0 items-center gap-2.5 max-sm:w-full max-sm:justify-between max-sm:gap-2",
+      className,
+    )}>
+      {children}
+    </div>
   );
 }
 
@@ -429,13 +447,13 @@ export function PeriodPill({ items, active, onChange }: { items: string[]; activ
 export function DateNav({ label, onPrev, onNext, nextDisabled }: {
   label: string; onPrev?: () => void; onNext?: () => void; nextDisabled?: boolean;
 }) {
-  const btn = "flex h-6 w-6 items-center justify-center rounded-[5px] text-text-3 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-35";
+  const btn = "flex h-7 w-7 items-center justify-center rounded-[5px] text-text-3 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-35";
   return (
     <div className="flex items-center gap-1.5">
       <button type="button" onClick={onPrev} className={btn} aria-label="Предыдущий период">
         <ChevronLeft className="h-3 w-3" strokeWidth={2.2} />
       </button>
-      <span className="min-w-[120px] text-center text-[12px] font-medium tabular-nums text-text-2 first-letter:uppercase">
+      <span className="min-w-[112px] whitespace-nowrap text-center text-[12px] font-medium tabular-nums text-text-2 first-letter:uppercase">
         {label}
       </span>
       <button type="button" onClick={onNext} disabled={nextDisabled} className={btn} aria-label="Следующий период">
@@ -446,7 +464,7 @@ export function DateNav({ label, onPrev, onNext, nextDisabled }: {
 }
 
 export function HeaderDivider() {
-  return <div className="h-5 w-px shrink-0 bg-border" />;
+  return <div className="h-5 w-px shrink-0 bg-border max-sm:hidden" />;
 }
 
 export function RefreshButton({ onClick, refreshing }: { onClick?: () => void; refreshing?: boolean }) {
@@ -522,27 +540,27 @@ export function Topbar({
         <FilterButton label={filterLabel}>{filterMenu}</FilterButton>
       )}
 
-      <div className="flex-1" />
+      <HeaderControls>
+        {extra}
 
-      {extra}
+        {periodItems && period && onPeriod && (
+          <PeriodPill items={periodItems} active={period} onChange={onPeriod} />
+        )}
 
-      {periodItems && period && onPeriod && (
-        <PeriodPill items={periodItems} active={period} onChange={onPeriod} />
-      )}
+        {periodLabel && (
+          <>
+            <HeaderDivider />
+            <DateNav label={periodLabel} onPrev={onPrev} onNext={onNext} nextDisabled={nextDisabled} />
+          </>
+        )}
 
-      {periodLabel && (
-        <>
-          <HeaderDivider />
-          <DateNav label={periodLabel} onPrev={onPrev} onNext={onNext} nextDisabled={nextDisabled} />
-        </>
-      )}
-
-      {onRefresh && (
-        <>
-          <HeaderDivider />
-          <RefreshButton onClick={onRefresh} refreshing={refreshing} />
-        </>
-      )}
+        {onRefresh && (
+          <>
+            <HeaderDivider />
+            <RefreshButton onClick={onRefresh} refreshing={refreshing} />
+          </>
+        )}
+      </HeaderControls>
     </PageHeader>
   );
 }

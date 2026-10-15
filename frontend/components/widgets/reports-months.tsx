@@ -76,7 +76,7 @@ export function ReportsMonthsWidget({ data, loading, metric = "calls" }: {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={points} margin={{ top: 4, right: 4, left: 4, bottom: 0 }} barGap={3} barCategoryGap="26%">
               <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
-              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: ct.axis, fontSize: 11 }} />
+              <XAxis minTickGap={20} dataKey="label" axisLine={false} tickLine={false} tick={{ fill: ct.axis, fontSize: 11 }} />
               <YAxis hide />
               <Tooltip content={<Tip s={s} />} cursor={{ fill: ct.cursor }} />
               <Bar dataKey="a" fill={s.a.color} radius={[3, 3, 0, 0]} maxBarSize={26} />

@@ -16,8 +16,18 @@ import { WidgetContent, WIDGET_OPTIONS, widgetCaption } from "@/components/widge
 import { WidgetCatalog, WidgetSettingsDialog } from "@/components/widget-catalog";
 import { cn } from "@/lib/utils";
 
-/** Уже этой ширины сетка превращается в колонку виджетов (телефон, узкое окно). */
-const STACK_BELOW = 720;
+/**
+ * Ширина области виджетов → раскладка:
+ *  ≥ 900 px — сетка 12 колонок, как настроил пользователь (можно двигать и тянуть);
+ *  560–900  — две колонки: узкие виджеты попарно, широкие во всю ширину;
+ *  < 560    — одна колонка (телефон, узкое окно Битрикс24); виджеты с одной
+ *             цифрой (ширина 3 и меньше) — по два в ряд.
+ * Порядок в колонках — как на сетке: сверху вниз, слева направо.
+ */
+const GRID_FROM = 900;
+const TWO_COLS_FROM = 560;
+/** на телефоне по два в ряд встают только самые маленькие виджеты (одна цифра) */
+const PAIR_SMALL_FROM = 340;
 
 const px = {
   left:   (x: number, col: number) => x * (col + GAP),
@@ -26,7 +36,7 @@ const px = {
   height: (h: number) => h * ROW_H + (h - 1) * GAP,
 };
 
-// ─── Виджет на сетке ────────────────────────────────────────────────
+// ─── Виджет на сетке ────────────────────────────────────────────────────────────────
 
 function GridItem({ pw, col, editMode, hidden, data, loading, onDelete, onSettings, onResizeStart }: {
   pw: PlacedWidget; col: number; editMode: boolean; hidden: boolean;
@@ -121,7 +131,7 @@ function Ghost({ x, y, w, h, col, label }: { x: number; y: number; w: number; h:
   );
 }
 
-// ─── Дашборд ──────────────────────────────────────────────────────────────
+// ─── Дашборд ──────────────────────────────────────────────────────────────────────
 
 interface Props {
   data:        HomeData;
@@ -159,7 +169,10 @@ export function HomeDashboard({ data, loading, editMode, onEditMode, can, onLayo
     return () => ro.disconnect();
   }, []);
   const col = width ? (width - (COLS - 1) * GAP) / COLS : 0;
-  const stacked = width > 0 && width < STACK_BELOW;
+  const stacked = width > 0 && width < GRID_FROM;
+  const flowCols = width >= PAIR_SMALL_FROM ? 2 : 1;
+  // начиная с какой ширины виджет занимает всю строку в режиме колонок
+  const fullFromW = width >= TWO_COLS_FROM ? COLS / 2 : 4;
 
   useEffect(() => { onLayout?.(widgets); }, [widgets, onLayout]);
 
@@ -308,11 +321,23 @@ export function HomeDashboard({ data, loading, editMode, onEditMode, can, onLayo
             </div>
           </div>
         ) : stacked ? (
-          <div className="flex flex-col gap-3">
+          <div
+            className="grid gap-3 [grid-auto-flow:row_dense]"
+            style={{ gridTemplateColumns: `repeat(${flowCols}, minmax(0, 1fr))` }}
+          >
             {ordered.map(pw => {
               const def = widgetDef(pw.type)!;
+              // широкие виджеты занимают всю строку
+              const wide = flowCols === 1 || pw.w >= fullFromW;
+              const itemW = wide ? width : (width - 12) / 2;
+              // узкому виджету (уже 640 px) может понадобиться больше строк — плитки идут в два ряда
+              const h = Math.max(pw.h, def.minH, itemW < 640 ? def.narrowH ?? 0 : 0);
               return (
-                <div key={pw.id} className="relative" style={{ height: Math.max(px.height(pw.h), def.minH * ROW_H) }}>
+                <div
+                  key={pw.id}
+                  className="relative min-w-0"
+                  style={{ height: px.height(h), gridColumn: wide ? "1 / -1" : undefined }}
+                >
                   <WidgetContent pw={pw} data={data} loading={loading} />
                   {editMode && (
                     <button type="button" onClick={() => commit(compactGrid(widgets.filter(w => w.id !== pw.id)))}

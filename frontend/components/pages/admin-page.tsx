@@ -98,7 +98,7 @@ export function AdminPage() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title="Настройки">
-        <span className="text-[12px] text-text-3">Кто может открывать «Пульс» и что ему разрешено</span>
+        <span className="text-[12px] text-text-3 max-sm:basis-full">Кто может открывать «Пульс» и что ему разрешено</span>
       </PageHeader>
 
       <PageContent>

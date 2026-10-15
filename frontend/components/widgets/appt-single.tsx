@@ -62,10 +62,10 @@ export function ApptSingleWidget({ data, daily, loading, metric = "total" }: {
     <WidgetCard>
       <div className="flex items-start justify-between gap-2">
         <WidgetLabel className="pt-0.5">{def.label}</WidgetLabel>
-        {series && <div className="-mt-1 shrink-0"><SparkLine values={series} color={spark!.color} width={72} height={28} /></div>}
+        {series && <div className="-mt-1 hidden shrink-0 @[13rem]:block"><SparkLine values={series} color={spark!.color} width={72} height={28} /></div>}
       </div>
       <p className={cn(
-        "mt-1.5 truncate text-[30px] font-extrabold leading-none tracking-[-0.04em] tabular-nums",
+        "mt-1.5 truncate text-[length:min(30px,16cqw)] font-extrabold leading-none tracking-[-0.04em] tabular-nums",
         t ? ACCENT[def.key] : "text-text-3",
       )}>
         {value}
