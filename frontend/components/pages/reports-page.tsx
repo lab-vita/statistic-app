@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useChartTheme } from "@/components/charts/base-chart";
-import { fetchOperators, fetchAdmins, type Operator, type Admin } from "@/lib/api";
+import { fetchOperators, fetchAdmins, toDateStr, type Operator, type Admin } from "@/lib/api";
 import { authFetch } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -42,8 +42,8 @@ function defaultDates() {
   const to = new Date(); to.setDate(to.getDate()-1);
   const from = new Date(to); from.setDate(from.getDate()-89);
   return {
-    from: from.toISOString().slice(0,10),
-    to:   to.toISOString().slice(0,10),
+    from: toDateStr(from),
+    to:   toDateStr(to),
   };
 }
 

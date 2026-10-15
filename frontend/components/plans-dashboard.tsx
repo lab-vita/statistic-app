@@ -3,7 +3,7 @@
 import { useAuth } from "@/components/auth-gate";
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchPlanMonth, upsertPlans, fillPlans,
+  fetchPlanMonth, upsertPlans, fillPlans, toDateStr,
   PlanDay, PlanMonthResponse,
 } from "@/lib/api";
 import {
@@ -208,7 +208,7 @@ function MissedPctModal({ value, onClose, onSaved }: {
 
   async function handleSave() {
     setSaving(true);
-    const today = new Date().toISOString().split("T")[0];
+    const today = toDateStr(new Date());
     await upsertPlans([{ date: today, metric: "calls_missed_pct", value: Number(local) }]);
     setSaving(false);
     onSaved(Number(local));
