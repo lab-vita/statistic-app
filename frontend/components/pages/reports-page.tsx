@@ -1,262 +1,349 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  PageContent, MetricCard, SectionCard, StatusPill, Th, Td, TabGroup, Skeleton, Empty, ErrorBanner, PageHeader, FilterButton, MenuItem, MenuDivider, HeaderDivider,
+  Bookmark, Check, ChevronDown, Download, FilePlus2, FileSpreadsheet, FileText, Loader2, Save, SlidersHorizontal, Trash2,
+} from "lucide-react";
+import {
+  PageContent, PageHeader, HeaderControls, HeaderDivider, Skeleton, ErrorBanner,
 } from "@/components/ui/primitives";
+import { BuilderPanel } from "@/components/reports/builder-panel";
+import { CompareNote, ReportChart, ReportTable, TotalsTiles } from "@/components/reports/report-view";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
-import { useChartTheme } from "@/components/charts/base-chart";
-import { fetchOperators, fetchAdmins, toDateStr, type Operator, type Admin } from "@/lib/api";
-import { authFetch } from "@/lib/auth";
+  PRESETS, autoTitle, defaultState, downloadReport, effectiveGranularity, fetchSchema, periodText,
+  resolvePeriod, runReport, sanitizeState, templatesApi, toRequest,
+  type BuilderState, type ReportResult, type ReportTemplate, type SourceInfo,
+} from "@/lib/report-builder";
 import { cn } from "@/lib/utils";
 
-// Internal fetch helper that proxies to the API directly
-async function fetchReport(path: string, params: Record<string, string>) {
-  const url = new URL((process.env.NEXT_PUBLIC_API_URL ?? "") + path, typeof window !== "undefined" ? window.location.origin : "http://localhost");
-  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
-  const res = await authFetch(url.toString());
-  if (!res.ok) throw new Error(`${res.status}`);
-  return res.json();
+/**
+ * Отчёты — конструктор: источник данных, показатели, группировки, фильтры и
+ * период. Отчёт пересчитывается сам при каждом изменении; его можно сохранить
+ * как общий шаблон и выгрузить в Excel или PDF (файлы строит сервер).
+ */
+
+const LS_KEY = "pulse.reports.builder.v1";
+const GRAN_TEXT = { day: "по дням", week: "по неделям", month: "по месяцам" } as const;
+
+function loadLocal(): { state?: Partial<BuilderState>; templateId?: number | null } {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); } catch { return {}; }
+}
+function saveLocal(v: { state: BuilderState; templateId: number | null }) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch { /* хранилище недоступно */ }
 }
 
-const GRAN_ITEMS = ["День","Неделя","Месяц"];
-const GRAN_MAP: Record<string, string> = { "День":"day","Неделя":"week","Месяц":"month" };
-const TAB_ITEMS = ["Звонки","Записи"];
-const GRAN_DATIVE: Record<string, string> = { "День":"дням","Неделя":"неделям","Месяц":"месяцам" };
-
-function fmtPeriod(s: string, gran: string): string {
-  if (gran === "Месяц") {
-    const [y, m] = s.split("-");
-    return new Date(Number(y), Number(m)-1, 1).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+/** Сравнение настроек без учёта порядка ключей (и без подписей фильтров — они справочные). */
+function stable(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
+  if (v && typeof v === "object") {
+    return `{${Object.keys(v).sort().filter(k => k !== "filterLabels")
+      .map(k => `${k}:${stable((v as Record<string, unknown>)[k])}`).join(",")}}`;
   }
-  return s;
+  return JSON.stringify(v ?? null);
 }
-function fmtPct(n: number) { return n.toFixed(1) + "%"; }
-const fmt = (n: number) => n.toLocaleString("ru-RU");
-
-// Default dates: last 90 days
-function defaultDates() {
-  const to = new Date(); to.setDate(to.getDate()-1);
-  const from = new Date(to); from.setDate(from.getDate()-89);
-  return {
-    from: toDateStr(from),
-    to:   toDateStr(to),
-  };
-}
+const same = (a: BuilderState, b: BuilderState) => stable(a) === stable(b);
 
 export function ReportsPage() {
-  const [tab,    setTab]    = useState("Звонки");
-  const [gran,   setGran]   = useState("Месяц");
-  const [opId,   setOpId]   = useState("");
-  const [admin,  setAdmin]  = useState("");
-  const [dates,  setDates]  = useState(defaultDates());
-  const [report, setReport] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
-  const [operators, setOperators] = useState<Operator[]>([]);
-  const [admins,    setAdmins]    = useState<Admin[]>([]);
-  const ct = useChartTheme();
+  const [sources, setSources] = useState<SourceInfo[] | null>(null);
+  const [state, setState] = useState<BuilderState | null>(null);
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [templateId, setTemplateId] = useState<number | null>(null);
+  const [result, setResult] = useState<ReportResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"save" | "xlsx" | "pdf" | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const seq = useRef(0);
 
+  // Схема, шаблоны и последний открытый отчёт
   useEffect(() => {
-    fetchOperators().then(r => setOperators(r.operators)).catch(() => {});
-    fetchAdmins().then(r => setAdmins(r.admins)).catch(() => {});
+    let alive = true;
+    Promise.all([fetchSchema(), templatesApi.list().catch(() => ({ templates: [] as ReportTemplate[] }))])
+      .then(([sch, tpl]) => {
+        if (!alive) return;
+        setSources(sch.sources);
+        setTemplates(tpl.templates);
+        const local = loadLocal();
+        const restored = sanitizeState(local.state, sch.sources);
+        setState(restored ?? (sch.sources[0] ? defaultState(sch.sources[0]) : null));
+        setTemplateId(restored && local.templateId && tpl.templates.some(t => t.id === local.templateId) ? local.templateId : null);
+      })
+      .catch(e => alive && setError(e instanceof Error ? e.message : "Не удалось загрузить конструктор"));
+    return () => { alive = false; };
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
+  useEffect(() => { if (state) saveLocal({ state, templateId }); }, [state, templateId]);
+
+  // Пересчёт при изменении настроек (название на расчёт не влияет)
+  const requestKey = state ? JSON.stringify(toRequest(state)) : "";
+  useEffect(() => {
+    if (!state) return;
+    const my = ++seq.current;
+    const t = setTimeout(() => {
+      setLoading(true);
+      runReport(state)
+        .then(r => { if (my === seq.current) { setResult(r); setError(null); } })
+        .catch(e => { if (my === seq.current) setError(e instanceof Error ? e.message : "Ошибка расчёта"); })
+        .finally(() => { if (my === seq.current) setLoading(false); });
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestKey]);
+
+  const src = sources?.find(s => s.key === state?.source);
+  const title = state ? (state.title.trim() || autoTitle(state, src)) : "Отчёт";
+  const current = templates.find(t => t.id === templateId) ?? null;
+  const currentState = useMemo(
+    () => (current && sources ? sanitizeState(current.config, sources) : null), [current, sources]);
+  const dirty = !!(current && state && currentState && !same(currentState, state));
+
+  const flash = useCallback((msg: string) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(n => (n === msg ? null : n)), 2500);
+  }, []);
+
+  async function save(asNew = false) {
+    if (!state) return;
+    setBusy("save");
     try {
-      const params: Record<string,string> = {
-        date_from: dates.from, date_to: dates.to,
-        granularity: GRAN_MAP[gran] ?? "month",
-      };
-      if (tab === "Звонки" && opId)    params.operator_id    = opId;
-      if (tab === "Записи" && admin)   params.admin_surname  = admin;
-
-      const path = tab === "Звонки" ? "/api/reports/calls" : "/api/reports/appointments";
-      const r = await fetchReport(path, params);
-      setReport(r);
+      const cfg = { ...state, title };
+      const t = current && current.can_edit && !asNew
+        ? await templatesApi.update(current.id, title, cfg)
+        : await templatesApi.create(title, cfg);
+      setTemplates(list => [...list.filter(x => x.id !== t.id), t].sort((a, b) => a.name.localeCompare(b.name, "ru")));
+      setTemplateId(t.id);
+      setState(cfg);
+      flash(asNew || !current ? "Отчёт сохранён — он виден всем в «Шаблонах»" : "Изменения сохранены");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
-    } finally { setLoading(false); }
-  }, [tab, gran, opId, admin, dates]);
+      setError(e instanceof Error ? e.message : "Не удалось сохранить");
+    } finally { setBusy(null); }
+  }
 
-  useEffect(() => { load(); }, [load]);
+  async function remove(t: ReportTemplate) {
+    try {
+      await templatesApi.remove(t.id);
+      setTemplates(list => list.filter(x => x.id !== t.id));
+      if (templateId === t.id) setTemplateId(null);
+      flash(`Шаблон «${t.name}» удалён`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить");
+    }
+  }
 
-  // Ответ сервера: итоги в `summary` (изменение к прошлому периоду — поля `<ключ>_delta_pct/_dir`),
-  // строки по дням/неделям/месяцам — в `rows`.
-  const totals  = report?.summary;
-  const periods = report?.rows ?? [];
-  const delta = (key: string) => ({
-    dir: totals?.[`${key}_delta_dir`] ?? null,
-    pct: totals?.[`${key}_delta_pct`] ?? null,
-  });
-  const missedPct = (r: { incoming: number; missed: number }) =>
-    r.incoming + r.missed > 0 ? (r.missed / (r.incoming + r.missed)) * 100 : 0;
+  function openTemplate(t: ReportTemplate) {
+    const s = sources && sanitizeState(t.config, sources);
+    if (!s) { setError("Этот шаблон собран из данных, к которым у вас нет доступа"); return; }
+    setState(s);
+    setTemplateId(t.id);
+  }
+
+  function newReport() {
+    if (!sources?.[0]) return;
+    setState(defaultState(sources.find(s => s.key === state?.source) ?? sources[0]));
+    setTemplateId(null);
+    setPanelOpen(true);
+  }
+
+  async function exportAs(format: "xlsx" | "pdf") {
+    if (!state) return;
+    setBusy(format);
+    try { await downloadReport(state, format, title); }
+    catch (e) { setError(e instanceof Error ? e.message : "Не удалось выгрузить отчёт"); }
+    finally { setBusy(null); }
+  }
+
+  const summary = state && src ? [
+    src.label,
+    PRESETS.find(p => p.key === state.period.preset)?.label,
+    state.groupBy.length ? `по: ${state.groupBy.map(k => src.dimensions.find(d => d.key === k)?.label.toLowerCase()).join(", ")}` : "итоги",
+    Object.keys(state.filters).length ? `фильтров: ${Object.keys(state.filters).length}` : null,
+  ].filter(Boolean).join(" · ") : "";
+
+  const dates = state ? resolvePeriod(state.period) : null;
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <PageHeader title="Отчёты">
-        <TabGroup items={TAB_ITEMS} active={tab} onChange={t => { setTab(t); setReport(null); }} />
-        <div className="flex-1" />
-        <TabGroup items={GRAN_ITEMS} active={gran} onChange={setGran} small />
-        {tab === "Звонки" ? (
-          <FilterButton label={operators.find(o => o.id === opId)?.name ?? "Все операторы"}>
-            {close => (
-              <>
-                <MenuItem active={!opId} onClick={() => { setOpId(""); close(); }}>Все операторы</MenuItem>
-                <MenuDivider />
-                {operators.map(o => (
-                  <MenuItem key={o.id} active={opId === o.id} onClick={() => { setOpId(o.id); close(); }}>{o.name}</MenuItem>
-                ))}
-              </>
-            )}
-          </FilterButton>
-        ) : (
-          <FilterButton label={admin || "Все сотрудники"}>
-            {close => (
-              <>
-                <MenuItem active={!admin} onClick={() => { setAdmin(""); close(); }}>Все сотрудники</MenuItem>
-                <MenuDivider />
-                {admins.map(a => (
-                  <MenuItem key={a.surname} active={admin === a.surname} onClick={() => { setAdmin(a.surname); close(); }}>{a.surname}</MenuItem>
-                ))}
-              </>
-            )}
-          </FilterButton>
-        )}
-        <HeaderDivider />
-        <div className="flex items-center gap-1.5 max-sm:w-full">
-          <label className="sr-only" htmlFor="rep-from">С даты</label>
-          <input id="rep-from" type="date" value={dates.from}
-            onChange={e => setDates(d => ({ ...d, from: e.target.value }))}
-            className="h-7 min-w-0 flex-1 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand sm:flex-none" />
-          <span className="text-[12px] text-text-3">—</span>
-          <label className="sr-only" htmlFor="rep-to">По дату</label>
-          <input id="rep-to" type="date" value={dates.to}
-            onChange={e => setDates(d => ({ ...d, to: e.target.value }))}
-            className="h-7 min-w-0 flex-1 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand sm:flex-none" />
-        </div>
+        <HeaderControls>
+          <TemplatesMenu templates={templates} current={current} dirty={dirty}
+            onOpen={openTemplate} onNew={newReport} onRemove={remove} onSaveAsNew={() => save(true)} />
+          <button type="button" onClick={() => save(false)} disabled={!state || busy === "save"}
+            className="inline-flex h-7 items-center gap-1.5 rounded-[7px] bg-brand px-2.5 text-[12px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong disabled:opacity-60">
+            {busy === "save" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" strokeWidth={2} />}
+            <span className="max-sm:sr-only">{current && current.can_edit ? (dirty ? "Сохранить изменения" : "Сохранено") : "Сохранить"}</span>
+          </button>
+          <HeaderDivider />
+          <ExportButton label="Excel" icon={FileSpreadsheet} busy={busy === "xlsx"} disabled={!result || !!busy}
+            onClick={() => exportAs("xlsx")} />
+          <ExportButton label="PDF" icon={FileText} busy={busy === "pdf"} disabled={!result || !!busy}
+            onClick={() => exportAs("pdf")} />
+        </HeaderControls>
       </PageHeader>
 
       <PageContent>
         {error && <ErrorBanner message={error} />}
+        {notice && (
+          <div role="status" className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-4 py-2.5 text-[12.5px] font-semibold text-emerald-700 dark:text-emerald-400">
+            <Check className="h-4 w-4" strokeWidth={2.4} /> {notice}
+          </div>
+        )}
 
-        {loading ? (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{Array.from({length:4}).map((_,i)=><Skeleton key={i} className="h-28"/>)}</div>
-            <Skeleton className="h-48" />
-            <Skeleton className="h-64" />
-          </>
-        ) : !totals ? (
-          <Empty />
-        ) : tab === "Звонки" ? (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <MetricCard label="Принято"     value={fmt(totals.incoming)} valueClass="text-emerald-600 dark:text-emerald-400" deltaDir={delta("incoming").dir} deltaPct={delta("incoming").pct} />
-              <MetricCard label="Исходящие"   value={fmt(totals.outgoing)} valueClass="text-blue-600 dark:text-blue-400"       deltaDir={delta("outgoing").dir} deltaPct={delta("outgoing").pct} />
-              <MetricCard label="Пропущенные" value={fmt(totals.missed)}   valueClass="text-red-600 dark:text-red-400"         deltaDir={delta("missed").dir} deltaPct={delta("missed").pct}   invert />
-              <MetricCard label="% пропуска"  value={fmtPct(missedPct(totals))} sub="от поступивших входящих" valueClass="text-red-600 dark:text-red-400" />
+        {!sources || !state || !dates ? (
+          sources && !sources.length ? (
+            <div className="card-surface px-5 py-8 text-center text-[13px] text-text-2">
+              Для отчётов нужен доступ хотя бы к одному разделу: звонкам, записям или выручке.
             </div>
-
-            {periods.length > 1 && (
-              <SectionCard title={`Динамика по ${GRAN_DATIVE[gran] ?? "периодам"}`}>
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={periods} barGap={2} barCategoryGap="35%" margin={{top:0,right:4,left:-20,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
-                    <XAxis dataKey="period" tickFormatter={s => fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
-                    <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
-                    <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
-                    <Bar dataKey="incoming" name="Принятые"    fill="#1a9e6e" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="outgoing" name="Исходящие"   fill="#328fcd" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="missed"   name="Пропущенные" fill="#e03a5a" radius={[3,3,0,0]} maxBarSize={22} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </SectionCard>
-            )}
-
-            <SectionCard title="Сводная таблица" noPad>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-                  <thead><tr>
-                    <Th>Период</Th><Th right>Принято</Th><Th right>Исходящие</Th>
-                    <Th right>Пропущено</Th><Th right>% пропуска</Th><Th right>Всего</Th>
-                  </tr></thead>
-                  <tbody>
-                    {periods.map((r: any, i: number) => (
-                      <tr key={i} className="hover:bg-muted/40 transition-colors">
-                        <Td>{fmtPeriod(r.period, gran)}</Td>
-                        <Td right color="#1a9e6e" bold>{fmt(r.incoming)}</Td>
-                        <Td right color="#328fcd">{fmt(r.outgoing)}</Td>
-                        <Td right>{fmt(r.missed)}</Td>
-                        <Td right>
-                          <StatusPill color={missedPct(r)>10?"red":missedPct(r)>6?"amber":"green"}>
-                            {fmtPct(missedPct(r))}
-                          </StatusPill>
-                        </Td>
-                        <Td right>{fmt(r.total)}</Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </SectionCard>
-          </>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+              <Skeleton className="h-[520px]" />
+              <div className="space-y-4"><Skeleton className="h-24" /><Skeleton className="h-72" /><Skeleton className="h-64" /></div>
+            </div>
+          )
         ) : (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <MetricCard label="Всего записей" value={fmt(totals.total)} deltaDir={delta("total").dir} deltaPct={delta("total").pct} />
-              <MetricCard label="Явки"          value={fmt(totals.visits)} valueClass="text-emerald-600 dark:text-emerald-400" deltaDir={delta("visits").dir} deltaPct={delta("visits").pct} />
-              <MetricCard label="Неявки"        value={fmt(totals.noshow)} valueClass="text-red-600 dark:text-red-400" deltaDir={delta("noshow").dir} deltaPct={delta("noshow").pct} invert />
-              <MetricCard label="Новые пациенты" value={fmt(totals.new_patients)} valueClass="text-violet-600 dark:text-violet-400" deltaDir={delta("new_patients").dir} deltaPct={delta("new_patients").pct} />
+          <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="min-w-0">
+              {/* На телефоне настройки свёрнуты в одну строку */}
+              <button type="button" onClick={() => setPanelOpen(v => !v)} aria-expanded={panelOpen}
+                className="card-surface mb-3 flex w-full items-center gap-3 px-4 py-3 text-left lg:hidden">
+                <SlidersHorizontal className="h-4 w-4 shrink-0 text-brand" strokeWidth={1.8} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12.5px] font-bold">Настроить отчёт</span>
+                  <span className="block truncate text-[11px] text-text-3">{summary}</span>
+                </span>
+                <ChevronDown className={cn("h-4 w-4 text-text-3 transition-transform", panelOpen && "rotate-180")} />
+              </button>
+              <div className={cn(!panelOpen && "max-lg:hidden")}>
+                <BuilderPanel sources={sources} state={state} onChange={s => setState(s)} />
+              </div>
             </div>
 
-            {periods.length > 1 && (
-              <SectionCard title={`Динамика по ${GRAN_DATIVE[gran] ?? "периодам"}`}>
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={periods} barGap={2} barCategoryGap="35%" margin={{top:0,right:4,left:-20,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
-                    <XAxis dataKey="period" tickFormatter={s=>fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
-                    <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
-                    <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
-                    <Bar dataKey="total"  name="Записей" fill="#328fcd" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="visits" name="Явки"    fill="#1a9e6e" radius={[3,3,0,0]} maxBarSize={22} />
-                    <Bar dataKey="noshow" name="Неявки"  fill="#e03a5a" radius={[3,3,0,0]} maxBarSize={22} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </SectionCard>
-            )}
-
-            <SectionCard title="Сводная таблица" noPad>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-                  <thead><tr>
-                    <Th>Период</Th><Th right>Записей</Th><Th right>Явки</Th><Th right>% явки</Th><Th right>Неявки</Th><Th right>Новые</Th>
-                  </tr></thead>
-                  <tbody>
-                    {periods.map((r: any, i: number) => (
-                      <tr key={i} className="hover:bg-muted/40 transition-colors">
-                        <Td>{fmtPeriod(r.period, gran)}</Td>
-                        <Td right bold>{fmt(r.total)}</Td>
-                        <Td right color="#1a9e6e" bold>{fmt(r.visits)}</Td>
-                        <Td right>
-                          <StatusPill color={r.visit_pct>=80?"green":r.visit_pct>=60?"amber":"red"}>
-                            {fmtPct(r.visit_pct ?? 0)}
-                          </StatusPill>
-                        </Td>
-                        <Td right color="#e03a5a">{fmt(r.noshow)}</Td>
-                        <Td right color="#8b5cf6">{fmt(r.new_patients)}</Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className={cn("min-w-0 space-y-4 transition-opacity", loading && result && "opacity-60")}>
+              <div className="px-1">
+                <h2 className="text-[18px] font-extrabold leading-tight tracking-[-0.02em]">{title}</h2>
+                <p className="mt-1 text-[12px] text-text-3">
+                  {src?.label} · {periodText({ date_from: dates.from, date_to: dates.to })}
+                  {state.groupBy.includes("period") && ` · ${GRAN_TEXT[effectiveGranularity(state.granularity, dates.from, dates.to)]}`}
+                  {current && <> · шаблон «{current.name}»{dirty && " (изменён)"}</>}
+                </p>
+                {!!result?.filters.length && (
+                  <p className="mt-1 text-[12px] font-semibold text-brand">
+                    Только: {result.filters.map(f => `${f.label.toLowerCase()} — ${f.values.join(", ")}`).join("; ")}
+                  </p>
+                )}
               </div>
-            </SectionCard>
-          </>
+              {!result ? (
+                <>
+                  <Skeleton className="h-24" />
+                  <Skeleton className="h-72" />
+                </>
+              ) : (
+                <>
+                  <TotalsTiles rep={result} />
+                  {result.dimensions.length > 0 && result.rows.length > 0 &&
+                    <ReportChart key={`${result.metrics.map(m => m.key).join()}|${result.dimensions.map(d => d.key).join()}`} rep={result} />}
+                  {result.dimensions.length > 0 && (result.rows.length > 0
+                    ? <ReportTable rep={result} />
+                    : <div className="card-surface px-5 py-8 text-center text-[13px] text-text-3">Нет данных за выбранный период</div>)}
+                  {!result.dimensions.length && (
+                    <p className="px-1 text-[12px] text-text-3">Выберите группировку слева, чтобы увидеть таблицу и график.</p>
+                  )}
+                  <CompareNote rep={result} />
+                </>
+              )}
+            </div>
+          </div>
         )}
       </PageContent>
+    </div>
+  );
+}
+
+function ExportButton({ label, icon: Icon, busy, disabled, onClick }: {
+  label: string; icon: React.ElementType; busy: boolean; disabled: boolean; onClick: () => void;
+}) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} title={`Скачать ${label}`}
+      className="inline-flex h-7 items-center gap-1.5 rounded-[7px] border border-border bg-card px-2.5 text-[12px] font-semibold text-text-2 transition-colors hover:border-brand/50 hover:text-foreground disabled:opacity-50">
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />}
+      {label}
+      <Download className="h-3 w-3 text-text-3 max-sm:hidden" strokeWidth={2} />
+    </button>
+  );
+}
+
+function TemplatesMenu({ templates, current, dirty, onOpen, onNew, onRemove, onSaveAsNew }: {
+  templates: ReportTemplate[]; current: ReportTemplate | null; dirty: boolean;
+  onOpen: (t: ReportTemplate) => void; onNew: () => void;
+  onRemove: (t: ReportTemplate) => void; onSaveAsNew: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const close = () => { setOpen(false); setConfirm(null); };
+
+  return (
+    <div className="relative max-sm:mr-auto" ref={ref}>
+      <button type="button" onClick={() => setOpen(v => !v)} aria-haspopup="menu" aria-expanded={open}
+        className={cn(
+          "inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-[7px] border px-2.5 text-[12px] font-semibold transition-colors",
+          open ? "border-brand text-brand" : "border-border bg-card text-text-2 hover:border-brand/50 hover:text-foreground",
+        )}>
+        <Bookmark className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+        <span className="truncate">{current ? current.name : "Шаблоны"}</span>
+        {dirty && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="Есть несохранённые изменения" />}
+        <ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", open && "rotate-180")} strokeWidth={2.2} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[300px] max-w-[calc(100vw-24px)] rounded-lg border border-border bg-popover p-1 shadow-pop max-sm:left-0 max-sm:right-auto">
+          <button type="button" onClick={() => { close(); onNew(); }}
+            className="flex w-full items-center gap-2 rounded-[5px] px-2.5 py-[7px] text-left text-[12px] font-semibold text-text-2 hover:bg-accent hover:text-foreground">
+            <FilePlus2 className="h-3.5 w-3.5" strokeWidth={1.8} /> Новый отчёт
+          </button>
+          {current && (
+            <button type="button" onClick={() => { close(); onSaveAsNew(); }}
+              className="flex w-full items-center gap-2 rounded-[5px] px-2.5 py-[7px] text-left text-[12px] font-semibold text-text-2 hover:bg-accent hover:text-foreground">
+              <Save className="h-3.5 w-3.5" strokeWidth={1.8} /> Сохранить как новый шаблон
+            </button>
+          )}
+          <div className="mx-1.5 my-1 h-px bg-hairline" />
+          <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-[.07em] text-text-3">Общие шаблоны</p>
+          <div className="max-h-72 overflow-y-auto">
+            {!templates.length && (
+              <p className="px-2.5 py-2 text-[12px] leading-snug text-text-3">
+                Пока пусто. Соберите отчёт и нажмите «Сохранить» — он появится здесь у всех.
+              </p>
+            )}
+            {templates.map(t => (
+              <div key={t.id} className={cn("group flex items-center gap-1 rounded-[5px] hover:bg-accent", t.id === current?.id && "bg-brand-soft")}>
+                <button type="button" onClick={() => { close(); onOpen(t); }} className="min-w-0 flex-1 px-2.5 py-[6px] text-left">
+                  <span className={cn("block truncate text-[12px] font-semibold", t.id === current?.id ? "text-brand" : "text-foreground")}>{t.name}</span>
+                  {t.created_by && <span className="block truncate text-[10.5px] text-text-3">{t.created_by}</span>}
+                </button>
+                {t.can_edit && (confirm === t.id ? (
+                  <button type="button" onClick={() => { setConfirm(null); onRemove(t); }}
+                    className="mr-1 rounded-[5px] bg-red-500/10 px-2 py-1 text-[11px] font-bold text-red-600 dark:text-red-400">
+                    Удалить?
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setConfirm(t.id)} aria-label={`Удалить шаблон «${t.name}»`}
+                    className="mr-1 flex h-7 w-7 items-center justify-center rounded-[5px] text-text-3 opacity-60 hover:bg-card hover:text-red-600 group-hover:opacity-100">
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

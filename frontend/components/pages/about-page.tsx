@@ -4,8 +4,8 @@ import { Activity, Monitor, Server, CheckCircle2, Sparkles, Wrench, Shield } fro
 import { PageHeader, PageContent } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION_FRONTEND = "0.11.0";
-const APP_VERSION_BACKEND  = "0.12.0";
+const APP_VERSION_FRONTEND = "0.12.0";
+const APP_VERSION_BACKEND  = "0.13.0";
 const APP_UPDATED          = "15 октября 2026";
 
 // ─── Типы ────────────────────────────────────────────────────
@@ -29,6 +29,17 @@ interface Release {
 // исправлено, без технических подробностей.
 
 const FRONTEND_RELEASES: Release[] = [
+  {
+    version: "0.12.0",
+    date: "15 октября 2026",
+    title: "Конструктор отчётов",
+    changes: [
+      { kind: "new",     text: "«Отчёты» — конструктор: звонки, записи и пациенты, выручка или услуги; любые показатели, период и группировка по датам, врачам, операторам, сотрудникам, направлениям, услугам, источникам, дням недели и часам" },
+      { kind: "new",     text: "Фильтры «только…» — например, только колл-центр или один врач; сравнение с прошлым периодом в итогах и строках" },
+      { kind: "new",     text: "Отчёт можно сохранить как общий шаблон и открыть одной кнопкой; период вроде «прошлый месяц» пересчитывается сам" },
+      { kind: "new",     text: "Выгрузка отчёта в Excel и PDF — с итогами, графиком и таблицей" },
+    ],
+  },
   {
     version: "0.11.0",
     date: "15 октября 2026",
@@ -154,6 +165,16 @@ const FRONTEND_RELEASES: Release[] = [
 ];
 
 const BACKEND_RELEASES: Release[] = [
+  {
+    version: "0.13.0",
+    date: "15 октября 2026",
+    title: "Отчёты по любым данным и выгрузка файлов",
+    changes: [
+      { kind: "new",     text: "Расчёт отчётов конструктора: показатели, группировки, фильтры, сравнение с прошлым периодом — с учётом прав на каждый раздел" },
+      { kind: "new",     text: "Общие шаблоны отчётов" },
+      { kind: "new",     text: "Файлы Excel (с графиком на отдельном листе) и PDF (итоги, график, таблица) строятся на сервере" },
+    ],
+  },
   {
     version: "0.12.0",
     date: "15 октября 2026",
