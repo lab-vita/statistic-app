@@ -6,6 +6,7 @@ import {
   fetchStats, fetchDaily, fetchConversion, fetchPlanRange, fetchHeatmap,
   fetchAppointmentStats, fetchAppointmentDaily,
   fetchPaymentStats, fetchPaymentDaily, fetchPaymentByDoctor, fetchSalesStats,
+  fetchNoshows, fetchReturns, fetchSalesByCategory,
   fetchCallsReport, fetchApptReport,
   toDateStr, addDays,
 } from "@/lib/api";
@@ -34,6 +35,8 @@ const API: HomeApi = {
   fetchSalesStats:       (f, t) => fetchSalesStats(f, t, 15),
   fetchCallsReport:      (f, t) => fetchCallsReport(f, t, "month"),
   fetchApptReport:       (f, t) => fetchApptReport(f, t, "month"),
+  fetchNoshows, fetchReturns,
+  fetchSalesByCategory:  (f, t) => fetchSalesByCategory(f, t, 5),
 };
 
 /** Объединение данных, которые нужны виджетам на экране. */

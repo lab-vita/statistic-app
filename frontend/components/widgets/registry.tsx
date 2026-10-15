@@ -28,6 +28,9 @@ import { FunnelStepsWidget } from "./funnel-steps";
 import { FunnelTrendWidget } from "./funnel-trend";
 import { PlansProgressWidget } from "./plans-progress";
 import { ReportsMonthsWidget, REPORTS_METRICS, type ReportsMetric } from "./reports-months";
+import { PatientsNoshowsWidget } from "./patients-noshows";
+import { PatientsReturnsWidget } from "./patients-returns";
+import { RevenueCategoriesWidget } from "./revenue-categories";
 
 export interface WidgetOption { value: string; label: string; hint?: string }
 
@@ -150,6 +153,12 @@ export function WidgetContent({ pw, data, loading }: {
       );
     case "plans_progress":
       return <PlansProgressWidget data={data} loading={loading} />;
+    case "patients_noshows":
+      return <PatientsNoshowsWidget data={data.noshows} loading={loading} />;
+    case "patients_returns":
+      return <PatientsReturnsWidget data={data.returns} loading={loading} />;
+    case "revenue_categories":
+      return <RevenueCategoriesWidget data={data.categories} loading={loading} />;
     case "reports_months":
       return <ReportsMonthsWidget data={data} loading={loading} metric={(metric as ReportsMetric) ?? "calls"} />;
     default:
