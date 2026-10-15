@@ -97,18 +97,28 @@ async def fetch_appointments(
     client: httpx.AsyncClient,
     date_from: date,
     date_to: date,
+    by: str = "created",
 ) -> list[dict]:
-    """Забирает все записи на приём за период."""
+    """
+    Забирает все записи на приём за период.
+
+    by="created" — записи, СОЗДАННЫЕ в эти дни (для конверсии звонок → запись);
+    by="date"    — записи НА эти дни приёма, с актуальными статусами
+                   (пришёл / неявка / отмена проставляются в день приёма).
+    В отчёте МедОДС первое — фильтр createdDate, второе — report.period.
+    """
     all_records, offset, total = [], 0, None
     limit = 100
+    period = f"{date_from:%d.%m.%Y} - {date_to:%d.%m.%Y}" if by == "date" else ""
+    created = [str(date_from), str(date_to)] if by == "created" else ""
 
     while True:
         resp = await client.post(
             f"{settings.MEDODS_URL}/reports/doctor_appointments_report",
             json={
-                "report":               {"period": ""},
+                "report":               {"period": period},
                 "clinicIds":            [settings.MEDODS_CLINIC_ID],
-                "createdDate":          [str(date_from), str(date_to)],
+                "createdDate":          created,
                 "appointmentByDms":     "",
                 "appointmentSourceIds": [],
                 "appointmentStatuses":  [],
