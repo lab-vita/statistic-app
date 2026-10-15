@@ -9,7 +9,7 @@ from app.db.database import engine
 from app.api import calls, appointments, plans, revenue, sales, services, staff, payments, reports
 from app.api import admin as admin_api, auth as auth_api, bitrix_app
 from app.core.auth import current_user, require_any
-from app.services.scheduler import create_scheduler
+from app.services.scheduler import create_scheduler, setup_digest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     scheduler = create_scheduler()
     scheduler.start()
+    await setup_digest()
     logger.info("[main] Планировщик запущен")
     yield
     scheduler.shutdown(wait=False)
