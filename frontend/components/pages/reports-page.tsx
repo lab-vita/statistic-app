@@ -25,6 +25,7 @@ async function fetchReport(path: string, params: Record<string, string>) {
 const GRAN_ITEMS = ["День","Неделя","Месяц"];
 const GRAN_MAP: Record<string, string> = { "День":"day","Неделя":"week","Месяц":"month" };
 const TAB_ITEMS = ["Звонки","Записи"];
+const GRAN_DATIVE: Record<string, string> = { "День":"дням","Неделя":"неделям","Месяц":"месяцам" };
 
 function fmtPeriod(s: string, gran: string): string {
   if (gran === "Месяц") {
@@ -84,8 +85,16 @@ export function ReportsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const totals  = report?.totals;
-  const periods = report?.periods ?? [];
+  // Ответ сервера: итоги в `summary` (изменение к прошлому периоду — поля `<ключ>_delta_pct/_dir`),
+  // строки по дням/неделям/месяцам — в `rows`.
+  const totals  = report?.summary;
+  const periods = report?.rows ?? [];
+  const delta = (key: string) => ({
+    dir: totals?.[`${key}_delta_dir`] ?? null,
+    pct: totals?.[`${key}_delta_pct`] ?? null,
+  });
+  const missedPct = (r: { incoming: number; missed: number }) =>
+    r.incoming + r.missed > 0 ? (r.missed / (r.incoming + r.missed)) * 100 : 0;
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -146,14 +155,14 @@ export function ReportsPage() {
         ) : tab === "Звонки" ? (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <MetricCard label="Принято"     value={fmt(totals.incoming)} valueClass="text-emerald-600 dark:text-emerald-400" deltaDir={report.deltas?.incoming?.dir} deltaPct={report.deltas?.incoming?.pct} />
-              <MetricCard label="Исходящие"   value={fmt(totals.outgoing)} valueClass="text-blue-600 dark:text-blue-400"       deltaDir={report.deltas?.outgoing?.dir} deltaPct={report.deltas?.outgoing?.pct} />
-              <MetricCard label="Пропущенные" value={fmt(totals.missed)}   valueClass="text-red-600 dark:text-red-400"         deltaDir={report.deltas?.missed?.dir}   deltaPct={report.deltas?.missed?.pct}   invert />
-              <MetricCard label="Потеряно"    value={fmt(totals.lost ?? 0)} valueClass="text-red-600 dark:text-red-400" />
+              <MetricCard label="Принято"     value={fmt(totals.incoming)} valueClass="text-emerald-600 dark:text-emerald-400" deltaDir={delta("incoming").dir} deltaPct={delta("incoming").pct} />
+              <MetricCard label="Исходящие"   value={fmt(totals.outgoing)} valueClass="text-blue-600 dark:text-blue-400"       deltaDir={delta("outgoing").dir} deltaPct={delta("outgoing").pct} />
+              <MetricCard label="Пропущенные" value={fmt(totals.missed)}   valueClass="text-red-600 dark:text-red-400"         deltaDir={delta("missed").dir} deltaPct={delta("missed").pct}   invert />
+              <MetricCard label="% пропуска"  value={fmtPct(missedPct(totals))} sub="от поступивших входящих" valueClass="text-red-600 dark:text-red-400" />
             </div>
 
             {periods.length > 1 && (
-              <SectionCard title={`Динамика по ${gran.toLowerCase()}м`}>
+              <SectionCard title={`Динамика по ${GRAN_DATIVE[gran] ?? "периодам"}`}>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={periods} barGap={2} barCategoryGap="35%" margin={{top:0,right:4,left:-20,bottom:0}}>
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
@@ -173,7 +182,7 @@ export function ReportsPage() {
                 <table className="w-full border-collapse">
                   <thead><tr>
                     <Th>Период</Th><Th right>Принято</Th><Th right>Исходящие</Th>
-                    <Th right>Пропущено</Th><Th right>% пропуска</Th><Th right>Потеряно</Th>
+                    <Th right>Пропущено</Th><Th right>% пропуска</Th><Th right>Всего</Th>
                   </tr></thead>
                   <tbody>
                     {periods.map((r: any, i: number) => (
@@ -183,11 +192,11 @@ export function ReportsPage() {
                         <Td right color="#328fcd">{fmt(r.outgoing)}</Td>
                         <Td right>{fmt(r.missed)}</Td>
                         <Td right>
-                          <StatusPill color={r.missed_pct>10?"red":r.missed_pct>6?"amber":"green"}>
-                            {fmtPct(r.missed_pct ?? (r.received>0?r.missed/r.received*100:0))}
+                          <StatusPill color={missedPct(r)>10?"red":missedPct(r)>6?"amber":"green"}>
+                            {fmtPct(missedPct(r))}
                           </StatusPill>
                         </Td>
-                        <Td right color="#e03a5a">{fmt(r.lost ?? 0)}</Td>
+                        <Td right>{fmt(r.total)}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -198,14 +207,14 @@ export function ReportsPage() {
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <MetricCard label="Всего записей" value={fmt(totals.total)} deltaDir={report.deltas?.total?.dir} deltaPct={report.deltas?.total?.pct} />
-              <MetricCard label="Явки"          value={fmt(totals.visits)} valueClass="text-emerald-600 dark:text-emerald-400" deltaDir={report.deltas?.visits?.dir} deltaPct={report.deltas?.visits?.pct} />
-              <MetricCard label="Неявки"        value={fmt(totals.noshow)} valueClass="text-red-600 dark:text-red-400" deltaDir={report.deltas?.noshow?.dir} deltaPct={report.deltas?.noshow?.pct} invert />
-              <MetricCard label="Новые пациенты" value={fmt(totals.new_patients)} valueClass="text-violet-600 dark:text-violet-400" />
+              <MetricCard label="Всего записей" value={fmt(totals.total)} deltaDir={delta("total").dir} deltaPct={delta("total").pct} />
+              <MetricCard label="Явки"          value={fmt(totals.visits)} valueClass="text-emerald-600 dark:text-emerald-400" deltaDir={delta("visits").dir} deltaPct={delta("visits").pct} />
+              <MetricCard label="Неявки"        value={fmt(totals.noshow)} valueClass="text-red-600 dark:text-red-400" deltaDir={delta("noshow").dir} deltaPct={delta("noshow").pct} invert />
+              <MetricCard label="Новые пациенты" value={fmt(totals.new_patients)} valueClass="text-violet-600 dark:text-violet-400" deltaDir={delta("new_patients").dir} deltaPct={delta("new_patients").pct} />
             </div>
 
             {periods.length > 1 && (
-              <SectionCard title={`Динамика по ${gran.toLowerCase()}м`}>
+              <SectionCard title={`Динамика по ${GRAN_DATIVE[gran] ?? "периодам"}`}>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={periods} barGap={2} barCategoryGap="35%" margin={{top:0,right:4,left:-20,bottom:0}}>
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
@@ -234,7 +243,7 @@ export function ReportsPage() {
                         <Td right color="#1a9e6e" bold>{fmt(r.visits)}</Td>
                         <Td right>
                           <StatusPill color={r.visit_pct>=80?"green":r.visit_pct>=60?"amber":"red"}>
-                            {fmtPct(r.visit_pct ?? (r.total>0?r.visits/r.total*100:0))}
+                            {fmtPct(r.visit_pct ?? 0)}
                           </StatusPill>
                         </Td>
                         <Td right color="#e03a5a">{fmt(r.noshow)}</Td>
