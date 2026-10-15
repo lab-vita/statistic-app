@@ -6,11 +6,13 @@ API продаж по номенклатуре.
   POST /api/sales/match     — матчинг с справочником услуг
   GET  /api/sales/stats     — топ услуг за период + дельты
   GET  /api/sales/daily     — разбивка по дням
+  GET  /api/sales/by-category — выручка по направлениям и топ услуг в динамике
   GET  /api/sales/services  — список уникальных услуг в БД
   GET  /api/sales/unmatched — непривязанные названия
 """
 import logging
 import re
+from collections import defaultdict
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -19,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.models.sale import Sale
-from app.models.service import Service
+from app.models.service import Service, ServiceCategory
 from app.services.sales_collector import collect_sales
 from app.core.utils import prev_period, calc_delta
 from app.core.auth import require_any
@@ -244,3 +246,129 @@ async def services(db: AsyncSession = Depends(get_db)):
         }
         for r in rows
     ]}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Направления и услуги в динамике
+# ──────────────────────────────────────────────────────────────────────
+
+ROOT_CATEGORY_ID = 373   # корень дерева услуг «Лабвита» в МедОДС
+NO_CATEGORY = "Без направления"
+
+
+def _bucket(d: date, granularity: str) -> date:
+    if granularity == "month":
+        return d.replace(day=1)
+    if granularity == "week":
+        return d - timedelta(days=d.weekday())
+    return d
+
+
+def _buckets(d_from: date, d_to: date, granularity: str) -> list[date]:
+    out, d = [], _bucket(d_from, granularity)
+    while d <= d_to:
+        out.append(d)
+        d = (d.replace(day=28) + timedelta(days=4)).replace(day=1) if granularity == "month" \
+            else d + timedelta(days=7 if granularity == "week" else 1)
+    return out
+
+
+@router.get("/by-category")
+async def by_category(
+    date_from: date = Query(...),
+    date_to:   date = Query(...),
+    services_limit: int = Query(15, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Выручка по направлениям (верхний уровень категорий услуг МедОДС) и топ услуг —
+    суммы за период, изменение к прошлому такому же периоду и ряд по дням /
+    неделям / месяцам (шаг выбирается по длине периода).
+    """
+    span = (date_to - date_from).days + 1
+    granularity = "day" if span <= 31 else "week" if span <= 120 else "month"
+    prev_from, prev_to = prev_period(date_from, date_to)
+
+    cats = {c.id: c for c in (await db.scalars(select(ServiceCategory))).all()}
+
+    def top_level(cat_id: int | None) -> tuple[int | None, str]:
+        seen = set()
+        while cat_id in cats and cat_id not in seen:
+            seen.add(cat_id)
+            c = cats[cat_id]
+            if c.parent_id in (None, ROOT_CATEGORY_ID) or c.parent_id not in cats:
+                return c.id, c.title
+            cat_id = c.parent_id
+        return None, NO_CATEGORY
+
+    async def load(d_from: date, d_to: date):
+        return (await db.execute(
+            select(Sale.sale_date, Sale.service_title, Sale.final_sum, Service.category_id)
+            .outerjoin(Service, Service.id == Sale.service_id)
+            .where(and_(Sale.sale_date >= d_from, Sale.sale_date <= d_to,
+                        Sale.exclude_from_analytics == False))  # noqa: E712
+        )).all()
+
+    cur_rows, prev_rows = await load(date_from, date_to), await load(prev_from, prev_to)
+    periods = _buckets(date_from, date_to, granularity)
+
+    def aggregate(rows, with_series: bool):
+        cat_tot: dict = defaultdict(float)
+        svc_tot: dict = defaultdict(float)
+        cat_ser: dict = defaultdict(lambda: defaultdict(float))
+        svc_ser: dict = defaultdict(lambda: defaultdict(float))
+        svc_cat: dict = {}
+        for r in rows:
+            cid, title = top_level(r.category_id)
+            key = (cid, title)
+            amount = float(r.final_sum or 0)
+            cat_tot[key] += amount
+            svc_tot[r.service_title] += amount
+            svc_cat[r.service_title] = title
+            if with_series:
+                b = _bucket(r.sale_date, granularity)
+                cat_ser[key][b] += amount
+                svc_ser[r.service_title][b] += amount
+        return cat_tot, svc_tot, cat_ser, svc_ser, svc_cat
+
+    cat_tot, svc_tot, cat_ser, svc_ser, svc_cat = aggregate(cur_rows, True)
+    p_cat, p_svc, *_ = aggregate(prev_rows, False)
+    grand = sum(cat_tot.values())
+    p_grand = sum(p_cat.values())
+    p_cat_by_title = {t: v for (_, t), v in p_cat.items()}
+
+    def series(ser: dict) -> list[float]:
+        return [round(ser.get(b, 0.0)) for b in periods]
+
+    categories = []
+    for (cid, title), total in sorted(cat_tot.items(), key=lambda kv: -kv[1]):
+        d = calc_delta(total, p_cat_by_title.get(title, 0))
+        categories.append({
+            "id": cid, "title": title, "total": round(total),
+            "share": round(total / grand * 100, 1) if grand else 0,
+            "prev_total": round(p_cat_by_title.get(title, 0)),
+            "delta_pct": d["delta_pct"], "delta_dir": d["delta_dir"],
+            "series": series(cat_ser[(cid, title)]),
+        })
+
+    services = []
+    for title, total in sorted(svc_tot.items(), key=lambda kv: -kv[1])[:services_limit]:
+        d = calc_delta(total, p_svc.get(title, 0))
+        services.append({
+            "title": title, "category": svc_cat.get(title, NO_CATEGORY), "total": round(total),
+            "share": round(total / grand * 100, 1) if grand else 0,
+            "delta_pct": d["delta_pct"], "delta_dir": d["delta_dir"],
+            "series": series(svc_ser[title]),
+        })
+
+    d_total = calc_delta(grand, p_grand)
+    return {
+        "date_from": str(date_from), "date_to": str(date_to),
+        "prev_from": str(prev_from), "prev_to": str(prev_to),
+        "granularity": granularity,
+        "periods": [str(b) for b in periods],
+        "total": {"sum": round(grand), "prev_sum": round(p_grand),
+                  "delta_pct": d_total["delta_pct"], "delta_dir": d_total["delta_dir"]},
+        "categories": categories,
+        "services": services,
+    }

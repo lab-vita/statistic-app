@@ -3,6 +3,7 @@ export type Section =
   | "home"
   | "calls"
   | "appointments"
+  | "patients"
   | "revenue"
   | "reports"
   | "funnel"
@@ -24,6 +25,7 @@ export type Permission =
 export const SECTION_PERMISSIONS: Partial<Record<Section, Permission>> = {
   calls:        "view:calls",
   appointments: "view:appointments",
+  patients:     "view:appointments",
   revenue:      "view:revenue",
   reports:      "view:reports",
   funnel:       "view:funnel",
