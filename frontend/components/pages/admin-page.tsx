@@ -7,6 +7,7 @@ import {
   PageContent, SectionCard, Skeleton, ErrorBanner, PageHeader,
 } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
+import { DigestSettingsCard } from "@/components/digest-settings";
 
 interface User { id: string; name: string; role: string; last_seen?: string; }
 
@@ -98,7 +99,7 @@ export function AdminPage() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <PageHeader title="Настройки">
-        <span className="text-[12px] text-text-3 max-sm:basis-full">Кто может открывать «Пульс» и что ему разрешено</span>
+        <span className="text-[12px] text-text-3 max-sm:basis-full">Утренняя сводка и доступ к «Пульсу»</span>
       </PageHeader>
 
       <PageContent>
@@ -108,6 +109,8 @@ export function AdminPage() {
           <Skeleton className="h-40" />
         ) : (
           <>
+            <DigestSettingsCard meId={me?.id} />
+
             {/* Users list */}
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">

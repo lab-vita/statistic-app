@@ -52,3 +52,32 @@ export const adminApi = {
   approve:  (id: string, role: string)          => call<AdminUser>("POST", `/requests/${encodeURIComponent(id)}/approve`, { role }),
   dismiss:  (id: string)                        => call<void>("DELETE", `/requests/${encodeURIComponent(id)}`),
 };
+
+// ─── Утренняя сводка ────────────────────────────────────────
+
+export interface DigestResult {
+  at: string;
+  for_day: string;
+  sent: { id: string; name: string; via: "bot" | "notify" }[];
+  failed: { id: string; name: string; error: string }[];
+  skipped: string | null;
+}
+
+export interface DigestSettings {
+  enabled: boolean;
+  time: string;              // «ЧЧ:ММ» по Кемерово
+  recipients: string[];      // ID сотрудников в Битрикс24
+  app_url: string;
+  bot_ready: boolean;
+  bot_error: string | null;
+  last_sent_for: string | null;
+  last_result: DigestResult | null;
+}
+
+export const digestApi = {
+  get:     () => call<DigestSettings>("GET", "/digest"),
+  save:    (b: Partial<Pick<DigestSettings, "enabled" | "time" | "recipients" | "app_url">>) =>
+             call<DigestSettings>("PUT", "/digest", b),
+  preview: () => call<{ for_day: string; empty: boolean; text: string }>("GET", "/digest/preview"),
+  test:    () => call<DigestResult & { digest: DigestSettings }>("POST", "/digest/test"),
+};
