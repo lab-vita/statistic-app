@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import engine
-from app.api import calls, appointments, plans, revenue, sales, services, staff, payments, reports
+from app.api import calls, appointments, plans, revenue, sales, services, staff, payments, reports, patients
 from app.api import admin as admin_api, auth as auth_api, bitrix_app
 from app.core.auth import current_user, require_any
 from app.services.scheduler import create_scheduler, setup_digest
@@ -48,6 +48,7 @@ def _guard(*perms: str):
 
 app.include_router(calls.router,        prefix="/api/calls",        tags=["calls"],        dependencies=_guard("view:calls", "view:reports"))
 app.include_router(appointments.router, prefix="/api/appointments", tags=["appointments"], dependencies=_guard("view:appointments", "view:reports"))
+app.include_router(patients.router,     prefix="/api/patients",     tags=["patients"],     dependencies=_guard("view:appointments", "view:reports"))
 app.include_router(plans.router,        prefix="/api/plans",        tags=["plans"],        dependencies=[Depends(current_user)])
 app.include_router(revenue.router,      prefix="/api/revenue",      tags=["revenue"],      dependencies=_guard("view:revenue"))
 app.include_router(sales.router,        prefix="/api/sales",        tags=["sales"],        dependencies=_guard("view:revenue"))
