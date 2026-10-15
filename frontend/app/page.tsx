@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AuthGate, useAuth } from "@/components/auth-gate";
 import { Sidebar } from "@/components/sidebar";
+import { MobileNavContext } from "@/components/mobile-nav";
+import { useBitrixFrameFit } from "@/lib/bitrix-frame";
 import type { Section } from "@/lib/permissions";
 import { CallsPage }        from "@/components/pages/calls-page";
 import { AppointmentsPage } from "@/components/pages/appointments-page";
@@ -18,27 +20,35 @@ import { DoctorsPage }      from "@/components/pages/doctors-page";
 function App() {
   const { canSee } = useAuth();
   const [section, setSection] = useState<Section>("home");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const nav = useMemo(() => ({ open: () => setMenuOpen(true) }), []);
+
+  // Внутри Битрикс24 — подогнать высоту окна под видимую часть экрана
+  useBitrixFrameFit();
 
   function handleNav(s: Section) {
     if (s === "about" || canSee(s)) setSection(s);
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar section={section} onSelectSection={handleNav} />
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {section === "home"         && <HomePage />}
-        {section === "calls"        && <CallsPage />}
-        {section === "appointments" && <AppointmentsPage />}
-        {section === "revenue"      && <RevenuePage />}
-        {section === "reports"      && <ReportsPage />}
-        {section === "funnel"       && <FunnelPage />}
-        {section === "plans"        && <PlansPage />}
-        {section === "doctors"      && <DoctorsPage />}
-        {section === "admin"        && <AdminPage />}
-        {section === "about"        && <AboutPage />}
+    <MobileNavContext.Provider value={nav}>
+      <div className="flex h-dvh overflow-hidden bg-background">
+        <Sidebar section={section} onSelectSection={handleNav} mobileOpen={menuOpen} onMobileClose={closeMenu} />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {section === "home"         && <HomePage />}
+          {section === "calls"        && <CallsPage />}
+          {section === "appointments" && <AppointmentsPage />}
+          {section === "revenue"      && <RevenuePage />}
+          {section === "reports"      && <ReportsPage />}
+          {section === "funnel"       && <FunnelPage />}
+          {section === "plans"        && <PlansPage />}
+          {section === "doctors"      && <DoctorsPage />}
+          {section === "admin"        && <AdminPage />}
+          {section === "about"        && <AboutPage />}
+        </div>
       </div>
-    </div>
+    </MobileNavContext.Provider>
   );
 }
 
