@@ -234,6 +234,18 @@ export interface ConversionOperator {
   conversion_pct: number;
 }
 
+export interface ConversionDay {
+  date:           string;
+  incoming:       number;
+  appointments:   number;
+  conversion_pct: number;
+}
+
+/**
+ * Конверсия операторов колл-центра. Записи — по дню СОЗДАНИЯ, пациент у оператора
+ * в один день считается один раз. `days` — то же по дням (сервер до этой правки
+ * его не отдавал, поэтому поле необязательное).
+ */
 export interface ConversionResponse {
   operators: ConversionOperator[];
   total: {
@@ -241,6 +253,7 @@ export interface ConversionResponse {
     appointments:   number;
     conversion_pct: number;
   };
+  days?: ConversionDay[];
 }
 
 export const fetchConversion = (dateFrom: string, dateTo: string) =>
@@ -317,7 +330,7 @@ export interface AppointmentDailyResponse {
 export const fetchAppointmentDaily = (dateFrom: string, dateTo: string, adminSurname?: string) =>
   get<AppointmentDailyResponse>("/api/appointments/daily", { date_from: dateFrom, date_to: dateTo, admin_surname: adminSurname });
 
-// ─── Платежи ────────────────────────────────────────────────────────────
+// ─── Платежи ──────────────────────────────────────────────────────────────
 
 export interface PaymentStatsResponse {
   count:        number;
@@ -405,7 +418,7 @@ export interface SalesStatsResponse {
 export const fetchSalesStats = (dateFrom: string, dateTo: string, limit = 15) =>
   get<SalesStatsResponse>("/api/sales/stats", { date_from: dateFrom, date_to: dateTo, limit });
 
-// ─── Планы ──────────────────────────────────────────────────────────────
+// ─── Планы ────────────────────────────────────────────────────────────────
 
 export interface PlanDay {
   date:           string;
