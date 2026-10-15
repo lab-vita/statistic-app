@@ -88,6 +88,11 @@ export function sampleHomeData(): HomeData {
         { operator_id: "3", name: "Сидорова Мария", surname: "Сидорова", incoming: 174, appointments: 93,  conversion_pct: 53.4 },
       ],
       total: { incoming: 625, appointments: 355, conversion_pct: 56.8 },
+      days: daily.map((d, i) => {
+        const incoming = Math.round(d.incoming * 0.75);
+        const appointments = Math.round(incoming * (0.5 + Math.sin(i / 1.7) * 0.12));
+        return { date: d.date, incoming, appointments, conversion_pct: incoming ? Math.round(appointments / incoming * 1000) / 10 : 0 };
+      }),
     },
     appointments: {
       date_from: "", date_to: "",

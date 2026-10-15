@@ -179,15 +179,15 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   },
   // ── Воронка
   {
-    id: "funnel_steps", group: "Воронка", permission: "view:funnel", data: ["stats", "conversion", "appointments", "payments"],
+    id: "funnel_steps", group: "Воронка", permission: "view:funnel", data: ["conversion", "appointments", "payments"],
     name: "Воронка",
     description: "Звонки → записи → визиты → выручка: сколько людей дошло до каждого шага и сколько денег приносит визит.",
     defaultW: 12, defaultH: 2, minW: 6, minH: 2, maxW: 12, maxH: 3,
   },
   {
-    id: "funnel_trend", group: "Воронка", permission: "view:funnel", data: ["daily", "apptDaily"],
+    id: "funnel_trend", group: "Воронка", permission: "view:funnel", data: ["conversion"],
     name: "Конверсия по дням",
-    description: "Принятые звонки и записи по дням и линия конверсии — видно, в какие дни звонки хуже превращаются в записи.",
+    description: "Принятые звонки и записи колл-центра по дням и линия конверсии — видно, в какие дни звонки хуже превращаются в записи.",
     defaultW: 8, defaultH: 3, minW: 5, minH: 3, maxW: 12, maxH: 5,
   },
   // ── Планы
