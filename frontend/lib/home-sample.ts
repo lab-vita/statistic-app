@@ -83,11 +83,14 @@ export function sampleHomeData(): HomeData {
     conversion: { value: 56.8, deltaPct: 3, deltaDir: "up" },
     conversionData: {
       operators: [
-        { operator_id: "1", name: "Иванова Анна",   surname: "Иванова",  incoming: 238, appointments: 143, conversion_pct: 60.1 },
-        { operator_id: "2", name: "Петрова Ольга",  surname: "Петрова",  incoming: 213, appointments: 119, conversion_pct: 55.9 },
-        { operator_id: "3", name: "Сидорова Мария", surname: "Сидорова", incoming: 174, appointments: 93,  conversion_pct: 53.4 },
+        { operator_id: "1", name: "Иванова Анна",   surname: "Иванова",  incoming: 238, appointments: 143, conversion_pct: 60.1, visits: 98 },
+        { operator_id: "2", name: "Петрова Ольга",  surname: "Петрова",  incoming: 213, appointments: 119, conversion_pct: 55.9, visits: 80 },
+        { operator_id: "3", name: "Сидорова Мария", surname: "Сидорова", incoming: 174, appointments: 93,  conversion_pct: 53.4, visits: 63 },
       ],
-      total: { incoming: 625, appointments: 355, conversion_pct: 56.8 },
+      total: {
+        incoming: 625, appointments: 355, conversion_pct: 56.8,
+        visited: 241, waiting: 52, noshow: 46, cancelled: 16, visit_pct: 79.5,
+      },
       days: daily.map((d, i) => {
         const incoming = Math.round(d.incoming * 0.75);
         const appointments = Math.round(incoming * (0.5 + Math.sin(i / 1.7) * 0.12));

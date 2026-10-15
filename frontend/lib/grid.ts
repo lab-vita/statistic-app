@@ -181,7 +181,7 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   {
     id: "funnel_steps", group: "Воронка", permission: "view:funnel", data: ["conversion", "appointments", "payments"],
     name: "Воронка",
-    description: "Звонки → записи → визиты → выручка: сколько людей дошло до каждого шага и сколько денег приносит визит.",
+    description: "Колл-центр: звонки → записи → сколько пришли. Рядом — явки и выручка всей клиники, включая записи администраторов.",
     defaultW: 12, defaultH: 2, minW: 6, minH: 2, maxW: 12, maxH: 3,
   },
   {

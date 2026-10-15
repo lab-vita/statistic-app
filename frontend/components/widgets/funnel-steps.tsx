@@ -10,19 +10,27 @@ const tone = (pct: number, good: number, bad: number) =>
   : pct >= bad ? "text-amber-600 dark:text-amber-400"
   : "text-red-600 dark:text-red-400";
 
-/** Те же формулы, что в разделе «Воронка»: звонки и записи — операторов колл-центра. */
+/**
+ * Те же формулы, что в разделе «Воронка». Колл-центр: звонки операторов →
+ * записанные ими пациенты → сколько из них пришли. Клиника: все записи на приём
+ * в периоде (кто бы их ни сделал) → явки → выручка.
+ */
 export function funnelOf(data: HomeData) {
   const conv    = data.conversionData?.total ?? null;
-  const calls   = conv?.incoming ?? null;
-  const appts   = conv?.appointments ?? null;
-  const visits  = data.appointments?.total.visits ?? null;
+  const t       = data.appointments?.total ?? null;
   const revenue = data.payments?.total_paid ?? null;
-  const pct = (a: number | null, b: number | null) => (a !== null && b ? (a / b) * 100 : null);
+  const resolved = t ? t.visits + t.noshow + t.cancels : 0;
   return {
-    calls, appts, visits, revenue,
+    calls:       conv?.incoming ?? null,
+    appts:       conv?.appointments ?? null,
     callsToAppt: conv ? conv.conversion_pct : null,
-    apptToVisit: pct(visits, appts),
-    perVisit:    revenue !== null && visits ? revenue / visits : null,
+    ccVisits:    conv?.visited ?? null,
+    ccVisitPct:  conv?.visited !== undefined ? (conv.visit_pct ?? null) : null,
+    clinicTotal:  t?.total ?? null,
+    clinicVisits: t?.visits ?? null,
+    clinicVisitPct: t && resolved ? (t.visits / resolved) * 100 : null,
+    revenue,
+    perVisit: revenue !== null && t?.visits ? revenue / t.visits : null,
   };
 }
 
@@ -62,9 +70,16 @@ export function FunnelStepsWidget({ data, loading }: { data: HomeData; loading: 
       <div className="flex min-h-0 flex-1 items-stretch gap-1">
         <Step label="Принято звонков" value={v(f.calls)} sub="колл-центр" accent="text-foreground" />
         <Arrow pct={f.callsToAppt} good={50} bad={30} />
-        <Step label="Записались" value={v(f.appts)} sub="через колл-центр" accent="text-blue-600 dark:text-blue-400" />
-        <Arrow pct={f.apptToVisit} good={80} bad={60} />
-        <Step label="Пришли" value={v(f.visits)} sub="явки по всем записям" accent="text-emerald-600 dark:text-emerald-400" />
+        <Step label="Записались" value={v(f.appts)} sub="пациентов колл-центра" accent="text-blue-600 dark:text-blue-400" />
+        <Arrow pct={f.ccVisitPct} good={80} bad={60} />
+        <Step label="Пришли" value={v(f.ccVisits)} sub="из записанных колл-центром" accent="text-emerald-600 dark:text-emerald-400" />
+        <div aria-hidden="true" className="mx-1.5 w-px shrink-0 self-stretch bg-hairline" />
+        <Step
+          label="Явки клиники"
+          value={v(f.clinicVisits)}
+          sub={f.clinicTotal !== null ? `из ${num(f.clinicTotal)} записей` : undefined}
+          accent="text-emerald-600 dark:text-emerald-400"
+        />
         <Arrow />
         <Step
           label="Выручка"

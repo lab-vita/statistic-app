@@ -232,6 +232,8 @@ export interface ConversionOperator {
   incoming:       number;
   appointments:   number;
   conversion_pct: number;
+  /** сколько из записанных пациентов пришли (нет у старой версии сервера) */
+  visits?:        number;
 }
 
 export interface ConversionDay {
@@ -252,6 +254,13 @@ export interface ConversionResponse {
     incoming:       number;
     appointments:   number;
     conversion_pct: number;
+    /** чем закончились записи этих пациентов; нет у старой версии сервера */
+    visited?:       number;
+    waiting?:       number;
+    noshow?:        number;
+    cancelled?:     number;
+    /** пришли ÷ (пришли + не пришли + отменили), ждущих не считаем */
+    visit_pct?:     number;
   };
   days?: ConversionDay[];
 }
