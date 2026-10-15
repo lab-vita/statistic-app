@@ -1,13 +1,14 @@
 "use client";
 
-import { Activity, Smartphone, Server, CheckCircle2, Clock, Sparkles, Wrench, Shield } from "lucide-react";
-import { PageHeader } from "@/components/ui/primitives";
+import { Activity, Monitor, Server, CheckCircle2, Sparkles, Wrench, Shield } from "lucide-react";
+import { PageHeader, PageContent } from "@/components/ui/primitives";
+import { cn } from "@/lib/utils";
 
-const APP_VERSION_FRONTEND = "0.8.0";
-const APP_VERSION_BACKEND  = "0.10.0";
-const APP_UPDATED          = "13 октября 2026";
+const APP_VERSION_FRONTEND = "0.10.0";
+const APP_VERSION_BACKEND  = "0.11.0";
+const APP_UPDATED          = "15 октября 2026";
 
-// ─── Типы ────────────────────────────────────────────────────────────────────────
+// ─── Типы ────────────────────────────────────────────────────
 
 type ChangeKind = "new" | "fix" | "improve" | "security";
 
@@ -23,9 +24,36 @@ interface Release {
   changes: Change[];
 }
 
-// ─── Данные ──────────────────────────────────────────────────────────────────────
+// ─── История изменений ───────────────────────────────────────
+// Новые версии — сверху. Пишем для пользователя: что стало можно и что
+// исправлено, без технических подробностей.
 
 const FRONTEND_RELEASES: Release[] = [
+  {
+    version: "0.10.0",
+    date: "15 октября 2026",
+    title: "Адаптив, воронка и утренняя сводка",
+    changes: [
+      { kind: "new",     text: "Удобно на любом экране: на телефоне меню открывается кнопкой, шапка и таблицы не вылезают за край, на больших мониторах контент не растягивается" },
+      { kind: "new",     text: "Настройки утренней сводки: время, получатели, пример сообщения и кнопка «Отправить мне сейчас»" },
+      { kind: "new",     text: "Воронка разделена на «Колл-центр» и «Всю клинику» — записи администраторов больше не теряются" },
+      { kind: "improve", text: "Внутри Битрикс24 окно приложения подстраивается под экран — без двойной прокрутки" },
+      { kind: "fix",     text: "Конверсия больше не бывает выше 100%, а в дни без звонков линия на графике прерывается, а не падает в ноль" },
+      { kind: "fix",     text: "Раздел «Отчёты» снова показывает итоги и таблицы" },
+    ],
+  },
+  {
+    version: "0.9.0",
+    date: "14 октября 2026",
+    title: "Новый дизайн и главная из виджетов",
+    changes: [
+      { kind: "new",     text: "Новый дизайн «Пульс» по макету Labvita: светлые карточки, крупные цифры, единый фирменный цвет" },
+      { kind: "new",     text: "Главная собирается из виджетов: перетаскивание, изменение размера, каталог с превью" },
+      { kind: "new",     text: "Виджеты для всех разделов — звонки, записи, выручка, врачи, воронка, планы и отчёты" },
+      { kind: "improve", text: "Готовая раскладка главной по умолчанию — сразу видно всё важное" },
+      { kind: "fix",     text: "Раздел «Врачи» больше не падает, если у оплаты не указан врач" },
+    ],
+  },
   {
     version: "0.8.0",
     date: "11–13 октября 2026",
@@ -113,6 +141,19 @@ const FRONTEND_RELEASES: Release[] = [
 ];
 
 const BACKEND_RELEASES: Release[] = [
+  {
+    version: "0.11.0",
+    date: "15 октября 2026",
+    title: "Утренняя сводка и честная конверсия",
+    changes: [
+      { kind: "new",     text: "Утренняя сводка: бот «Пульс» каждое утро присылает в Битрикс24 итоги вчерашнего дня — каждому только по его разделам" },
+      { kind: "new",     text: "Перед сводкой вчерашний день дособирается целиком, вечерние звонки и записи не теряются" },
+      { kind: "new",     text: "Для записей колл-центра считается, кто пришёл, не пришёл или ещё ждёт приёма" },
+      { kind: "improve", text: "Настройки, которые меняются из интерфейса, хранятся на сервере" },
+      { kind: "fix",     text: "Конверсия считает записи по дню создания и пациента один раз — без значений больше 100%" },
+      { kind: "fix",     text: "Отчёты отдают итоги и строки в формате, который ждёт интерфейс" },
+    ],
+  },
   {
     version: "0.10.0",
     date: "11–13 октября 2026",
@@ -219,61 +260,51 @@ const BACKEND_RELEASES: Release[] = [
   },
 ];
 
-// ─── Утилиты ───────────────────────────────────────────────────────────────────
+// ─── Оформление ──────────────────────────────────────────────
 
 const KIND_META: Record<ChangeKind, { label: string; className: string; icon: React.ElementType }> = {
-  new:      { label: "Новое",    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", icon: Sparkles      },
-  improve:  { label: "Улучшение",className: "bg-blue-500/10   text-blue-600   dark:text-blue-400",   icon: Wrench        },
-  fix:      { label: "Исправление", className: "bg-amber-500/10 text-amber-600  dark:text-amber-400",  icon: CheckCircle2  },
-  security: { label: "Безопасность",className: "bg-violet-500/10 text-violet-600 dark:text-violet-400",icon: Shield        },
+  new:      { label: "Новое",        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", icon: Sparkles     },
+  improve:  { label: "Улучшение",    className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",          icon: Wrench       },
+  fix:      { label: "Исправление",  className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",       icon: CheckCircle2 },
+  security: { label: "Безопасность", className: "bg-violet-500/10 text-violet-600 dark:text-violet-400",    icon: Shield       },
 };
 
 function Badge({ kind }: { kind: ChangeKind }) {
   const { label, className, icon: Icon } = KIND_META[kind];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${className}`}>
-      <Icon className="h-2.5 w-2.5" strokeWidth={2.5} />
+    <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-bold", className)}>
+      <Icon className="h-3 w-3" strokeWidth={2.4} />
       {label}
     </span>
   );
 }
 
-function ReleaseCard({ release, isLatest }: { release: Release; isLatest: boolean }) {
+function ReleaseCard({ release, current }: { release: Release; current: boolean }) {
   return (
-    <div className={`rounded-xl border ${
-      isLatest ? "border-foreground/20 bg-accent/40" : "border-border bg-card"
-    } p-4 space-y-3`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-bold font-mono">v{release.version}</span>
-            {isLatest && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                Текущая
-              </span>
-            )}
-          </div>
-          <p className="text-[13px] font-semibold mt-0.5">{release.title}</p>
-        </div>
-        <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-          <Clock className="h-3 w-3" />
-          <span className="text-[11px]">{release.date}</span>
-        </div>
-      </div>
-      <ul className="space-y-2">
+    <article className={cn("card-surface px-4 py-4 sm:px-5", current && "ring-1 ring-brand/30")}>
+      <header className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <span className="font-mono text-[13px] font-extrabold tabular-nums">v{release.version}</span>
+        {current && (
+          <span className="rounded-[5px] bg-brand px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[.06em] text-brand-foreground">
+            текущая
+          </span>
+        )}
+        <span className="ml-auto text-[11px] text-text-3">{release.date}</span>
+      </header>
+      <h3 className="mt-1 text-[13.5px] font-bold leading-snug">{release.title}</h3>
+      <ul className="mt-3 space-y-2">
         {release.changes.map((c, i) => (
-          <li key={i} className="flex items-start gap-2">
-            <Badge kind={c.kind} />
-            <span className="text-[12px] text-muted-foreground leading-snug pt-0.5">{c.text}</span>
+          <li key={i} className="flex flex-col items-start gap-1 sm:flex-row sm:gap-2.5">
+            <span className="sm:w-[104px] sm:shrink-0"><Badge kind={c.kind} /></span>
+            <span className="text-[12.5px] leading-snug text-text-2">{c.text}</span>
           </li>
         ))}
       </ul>
-    </div>
+    </article>
   );
 }
 
-function VersionBlock({
+function ReleaseColumn({
   icon: Icon, title, version, releases,
 }: {
   icon: React.ElementType;
@@ -282,90 +313,76 @@ function VersionBlock({
   releases: Release[];
 }) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2.5">
-        <div className="h-7 w-7 rounded-lg bg-foreground/10 flex items-center justify-center">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div>
-          <p className="text-[13px] font-semibold">{title}</p>
-          <p className="text-[11px] text-muted-foreground">Текущая версия: <span className="font-mono font-bold">{version}</span></p>
+    <section className="min-w-0 space-y-3">
+      <div className="flex items-center gap-3 px-1">
+        <span className="flex h-9 w-9 items-center justify-center rounded-[9px] bg-brand-soft text-brand">
+          <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[14px] font-bold tracking-[-0.01em]">{title}</h2>
+          <p className="text-[11px] text-text-3">
+            версия <span className="font-mono font-bold text-text-2">{version}</span> · {releases.length} выпусков
+          </p>
         </div>
       </div>
-      <div className="space-y-2.5">
-        {releases.map((r, i) => (
-          <ReleaseCard key={r.version} release={r} isLatest={i === 0} />
-        ))}
+      <div className="space-y-3">
+        {releases.map((r, i) => <ReleaseCard key={r.version} release={r} current={i === 0} />)}
       </div>
     </section>
   );
 }
 
-// ─── Главный компонент ────────────────────────────────────────────────────────────────
+// ─── Страница ────────────────────────────────────────────────
 
 export function AboutPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PageHeader title="О приложении">
-        <span className="text-[12px] text-text-3">Пульс · Аналитика</span>
+      <PageHeader title="О системе">
+        <span className="text-[12px] text-text-3 max-sm:basis-full">Версии и история изменений</span>
       </PageHeader>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-3 py-4 space-y-6 sm:px-4 sm:py-6 sm:space-y-8">
-
-          {/* Карточка версии */}
-          <div className="rounded-xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-foreground">
-              <Activity className="h-7 w-7 text-background" strokeWidth={2} />
-              <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-emerald-500 ring-2 ring-card" />
-            </div>
-            <div className="flex-1 space-y-1">
-              <p className="text-[15px] font-bold">Пульс — Аналитика</p>
-              <p className="text-[12px] text-muted-foreground">
-                Единый центр статистики клиники: звонки, записи, выручка, планы и отчёты в одном месте.
-              </p>
-              <p className="text-[11px] text-muted-foreground/60">
-                Обновлено {APP_UPDATED}
+      <PageContent>
+        {/* О приложении */}
+        <div className="card-surface flex flex-col gap-5 px-5 py-5 md:flex-row md:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-brand text-brand-foreground">
+              <Activity className="h-6 w-6" strokeWidth={2} />
+              <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-card" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[16px] font-extrabold tracking-[-0.02em]">Пульс — аналитика Labvita</p>
+              <p className="mt-0.5 text-[12.5px] leading-snug text-text-2">
+                Звонки, записи, выручка, планы и отчёты клиники в одном месте. Данные обновляются в 9, 12, 15 и 18 часов,
+                а утром бот присылает сводку за вчера.
               </p>
             </div>
-            <div className="flex sm:flex-col gap-3 sm:gap-1 sm:text-right shrink-0">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50">Интерфейс</p>
-                <p className="text-[13px] font-mono font-bold">v{APP_VERSION_FRONTEND}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50">Сервер</p>
-                <p className="text-[13px] font-mono font-bold">v{APP_VERSION_BACKEND}</p>
-              </div>
-            </div>
           </div>
-
-          {/* Легенда значков */}
-          <div className="rounded-xl border border-border bg-card/60 px-4 py-3">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Обозначения</p>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(KIND_META) as ChangeKind[]).map(k => <Badge key={k} kind={k} />)}
-            </div>
-          </div>
-
-          {/* История изменений интерфейса */}
-          <VersionBlock
-            icon={Smartphone}
-            title="История изменений интерфейса"
-            version={APP_VERSION_FRONTEND}
-            releases={FRONTEND_RELEASES}
-          />
-
-          {/* История изменений сервера */}
-          <VersionBlock
-            icon={Server}
-            title="История изменений сервера"
-            version={APP_VERSION_BACKEND}
-            releases={BACKEND_RELEASES}
-          />
-
+          <dl className="grid shrink-0 grid-cols-3 gap-px overflow-hidden rounded-[10px] bg-hairline text-center md:w-[360px]">
+            {[
+              { label: "Интерфейс", value: `v${APP_VERSION_FRONTEND}` },
+              { label: "Сервер",    value: `v${APP_VERSION_BACKEND}` },
+              { label: "Обновлено", value: APP_UPDATED.replace(/ \d{4}$/, "") },
+            ].map(x => (
+              <div key={x.label} className="bg-card px-2 py-2.5">
+                <dt className="text-[10px] font-semibold uppercase tracking-[.07em] text-text-3">{x.label}</dt>
+                <dd className="mt-0.5 font-mono text-[13px] font-bold tabular-nums">{x.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
-      </div>
+
+        {/* Обозначения */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-1">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-text-3">Обозначения</span>
+          {(Object.keys(KIND_META) as ChangeKind[]).map(k => <Badge key={k} kind={k} />)}
+        </div>
+
+        {/* История: интерфейс слева, сервер справа */}
+        <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-5">
+          <ReleaseColumn icon={Monitor} title="Интерфейс" version={APP_VERSION_FRONTEND} releases={FRONTEND_RELEASES} />
+          <ReleaseColumn icon={Server}  title="Сервер"    version={APP_VERSION_BACKEND}  releases={BACKEND_RELEASES} />
+        </div>
+      </PageContent>
     </div>
   );
 }
