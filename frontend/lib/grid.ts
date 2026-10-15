@@ -59,6 +59,8 @@ export interface WidgetTypeDef {
   defaultW: number; defaultH: number;
   minW: number; minH: number;
   maxW: number; maxH: number;
+  /** высота в строках на узком экране (виджеты идут колонкой), если нужна больше обычной */
+  narrowH?: number;
 }
 
 export const WIDGET_GROUPS: WidgetGroup[] = ["Звонки", "Записи", "Выручка", "Врачи", "Воронка", "Планы", "Отчёты"];
@@ -182,7 +184,7 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     id: "funnel_steps", group: "Воронка", permission: "view:funnel", data: ["conversion", "appointments", "payments"],
     name: "Воронка",
     description: "Колл-центр: звонки → записи → сколько пришли. Рядом — явки и выручка всей клиники, включая записи администраторов.",
-    defaultW: 12, defaultH: 2, minW: 6, minH: 2, maxW: 12, maxH: 3,
+    defaultW: 12, defaultH: 2, minW: 6, minH: 2, maxW: 12, maxH: 3, narrowH: 3,
   },
   {
     id: "funnel_trend", group: "Воронка", permission: "view:funnel", data: ["conversion"],

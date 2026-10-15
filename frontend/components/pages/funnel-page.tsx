@@ -88,7 +88,10 @@ function FunnelBlock({ title, note, children }: { title: string; note: string; c
         <p className="text-[14px] font-semibold">{title}</p>
         <p className="text-[12px] text-muted-foreground mt-0.5">{note}</p>
       </div>
-      <div className="flex items-stretch gap-2 overflow-x-auto pb-1">{children}</div>
+      {/* узко — шаги друг под другом, стрелки вниз; шире 44rem — в ряд */}
+      <div className="@container">
+        <div className="flex flex-col items-stretch gap-1.5 @[44rem]:flex-row @[44rem]:gap-2">{children}</div>
+      </div>
     </section>
   );
 }
@@ -98,7 +101,7 @@ function FunnelCard({ label, value, sub, accentBg, accentText }: {
   accentBg: string; accentText: string;
 }) {
   return (
-    <div className={cn("flex-1 min-w-0 rounded-xl border border-border p-5", accentBg)}>
+    <div className={cn("flex-1 min-w-0 rounded-xl border border-border p-4 @[44rem]:p-5", accentBg)}>
       <p className="text-[12px] font-medium text-muted-foreground mb-2">{label}</p>
       <p className={cn("text-2xl font-bold tabular-nums tracking-tight", accentText)}>{value}</p>
       {sub && <p className="mt-1 text-[12px] text-muted-foreground">{sub}</p>}
@@ -108,11 +111,11 @@ function FunnelCard({ label, value, sub, accentBg, accentText }: {
 
 function Arrow({ pct, good, bad }: { pct: number | null; good: number; bad: number }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1 shrink-0 px-1">
+    <div className="flex shrink-0 items-center justify-center gap-1.5 px-1 @[44rem]:flex-col @[44rem]:gap-1">
+      <ArrowRight className="order-first h-4 w-4 rotate-90 text-muted-foreground/40 @[44rem]:order-last @[44rem]:h-5 @[44rem]:w-5 @[44rem]:rotate-0 @[44rem]:text-muted-foreground/30" />
       {pct === null
         ? <span className="text-[12px] font-semibold text-muted-foreground">—</span>
         : <ConvPct value={pct} good={good} bad={bad} />}
-      <ArrowRight className="h-5 w-5 text-muted-foreground/30" />
     </div>
   );
 }
@@ -125,9 +128,9 @@ function TrendChart({ points }: { points: DayPoint[] }) {
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-border px-4 py-3 sm:px-5 sm:py-4">
         <p className="text-[14px] font-semibold">Динамика воронки по дням</p>
-        <div className="flex items-center gap-4 text-[11px] text-muted-foreground/60">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/60">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-0.5 bg-blue-500 inline-block rounded" />Звонки
           </span>
@@ -147,7 +150,8 @@ function TrendChart({ points }: { points: DayPoint[] }) {
               dataKey="date"
               tick={{ fontSize: 10, fill: ct.axis }}
               axisLine={false} tickLine={false}
-              interval={Math.max(0, Math.floor(points.length / 10) - 1)}
+              interval="preserveStartEnd"
+              minTickGap={24}
             />
             {/* Левая ось — количество */}
             <YAxis
@@ -400,7 +404,7 @@ export function FunnelPage() {
                 accentText="text-emerald-700 dark:text-emerald-300"
               />
               <div className="flex items-center justify-center px-1 shrink-0">
-                <ArrowRight className="h-5 w-5 text-muted-foreground/30" />
+                <ArrowRight className="h-4 w-4 rotate-90 text-muted-foreground/40 @[44rem]:h-5 @[44rem]:w-5 @[44rem]:rotate-0 @[44rem]:text-muted-foreground/30" />
               </div>
               <FunnelCard
                 label="Выручка"
@@ -443,7 +447,7 @@ export function FunnelPage() {
                   <p className="text-[14px] font-semibold">Разбивка по операторам</p>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[13px]">
+                  <table className="w-full text-[13px] [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
                         <th className="px-5 py-3 text-left font-medium text-muted-foreground">Оператор</th>
