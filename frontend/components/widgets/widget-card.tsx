@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 export function WidgetCard({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("@container card-surface flex h-full min-h-0 flex-col overflow-hidden px-5 py-[18px]", className)}>
+    <div className={cn("@container card-surface flex h-full min-h-0 flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-[18px]", className)}>
       {children}
     </div>
   );
@@ -121,7 +121,7 @@ export const C = {
   slate:  "#94b3c9",
 } as const;
 
-// ─── Форматирование ──────────────────────────────────────────────
+// ─── Форматирование ───────────────────────────────────────────────
 
 export const num = (v: number) => v.toLocaleString("ru-RU");
 
