@@ -6,7 +6,9 @@
 
 # --- Статусы записей МедОДС ---
 
+# Коды сверены со списком статусов в отчётах МедОДС (15.10.2026).
 MEDODS_STATUS_NAMES: dict[int, str] = {
+    1: "Подтверждён",
     2: "Не подтверждён",
     3: "Счёт выставлен",
     4: "Отменён пациентом",
@@ -15,19 +17,20 @@ MEDODS_STATUS_NAMES: dict[int, str] = {
     7: "Приём завершён",
     8: "Счёт оплачен",
     9: "Одобрен",
+    10: "Отменён клиникой",
 }
 
-# Посещение состоялось (пришёл / завершён / оплачен)
-MEDODS_VISIT_STATUSES: frozenset[int] = frozenset({6, 7, 8})
+# Посещение состоялось (пришёл / завершён / счёт выставлен / оплачен)
+MEDODS_VISIT_STATUSES: frozenset[int] = frozenset({3, 6, 7, 8})
 
 # Неявка
 MEDODS_NOSHOW_STATUSES: frozenset[int] = frozenset({5})
 
-# Отмена пациентом
-MEDODS_CANCEL_STATUSES: frozenset[int] = frozenset({4})
+# Отмена пациентом или клиникой
+MEDODS_CANCEL_STATUSES: frozenset[int] = frozenset({4, 10})
 
-# Ожидает подтверждения / одобрен
-MEDODS_PENDING_STATUSES: frozenset[int] = frozenset({2, 9})
+# Приём ещё впереди: не подтверждён / подтверждён / одобрен
+MEDODS_PENDING_STATUSES: frozenset[int] = frozenset({1, 2, 9})
 
 # --- Типы звонков Bitrix ---
 

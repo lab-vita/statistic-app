@@ -20,7 +20,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.db.database import async_session_factory
 from app.services.collector import collect_calls
-from app.services.medods_collector import collect_appointments
+from app.services.medods_collector import collect_appointments, refresh_appointments_by_date
 from app.services.revenue_collector import collect_revenue
 from app.services.payment_detail_collector import collect_payment_details
 from app.services.sales_collector import collect_sales
@@ -31,10 +31,21 @@ logger = logging.getLogger(__name__)
 
 TZ_KEMEROVO = ZoneInfo("Asia/Krasnoyarsk")  # UTC+7
 
+async def _collect_appointments(db, day: date, to: date):
+    """
+    Записи за день, затем статусы записей на 3 дня назад и 2 недели вперёд:
+    явки, неявки, отмены и переносы проставляются уже после создания записи.
+    Последовательно, а не параллельно — обе части пишут в одну таблицу.
+    """
+    new = await collect_appointments(db, day, to)
+    await refresh_appointments_by_date(db, day - timedelta(days=3), to + timedelta(days=14))
+    return new
+
+
 # Список коллекторов: (имя, функция(db, date_from, date_to))
 _COLLECTORS: list[tuple[str, Callable]] = [
     ("звонки",           collect_calls),
-    ("записи",           collect_appointments),
+    ("записи",           _collect_appointments),
     ("revenue",          collect_revenue),
     ("payment_details",  collect_payment_details),
     ("sales",            collect_sales),
@@ -119,8 +130,60 @@ async def setup_digest() -> None:
         async with async_session_factory() as db:
             cfg = await digest.get_config(db)
         schedule_digest(cfg["time"])
+        schedule_resync()
     except Exception as exc:
         logger.error("[scheduler] не удалось настроить сводку: %s", exc, exc_info=True)
+
+
+RESYNC_KEY = "appt_resync_v1"
+RESYNC_FROM = date(2026, 1, 1)
+
+
+async def _resync_appointments_history() -> None:
+    """
+    Один раз после обновления: перечитать записи по дню приёма с 1 января,
+    чтобы исправить статусы, застрявшие в «ожидает» (раньше записи собирались
+    только по дню создания). Идёт по месяцам; итог пишется в app_settings.
+    """
+    from app.models.app_setting import AppSetting
+    async with async_session_factory() as db:
+        if await db.get(AppSetting, RESYNC_KEY):
+            return
+    end = today_local() + timedelta(days=14)
+    start, total, errors = RESYNC_FROM, 0, []
+    logger.info("[scheduler] пересбор статусов записей: %s — %s", start, end)
+    while start <= end:
+        month_end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        chunk_end = min(month_end, end)
+        async with async_session_factory() as db:
+            try:
+                total += await refresh_appointments_by_date(db, start, chunk_end)
+                logger.info("[scheduler] пересбор: %s — %s готово", start, chunk_end)
+            except Exception as exc:
+                errors.append(f"{start}: {exc}")
+                logger.error("[scheduler] пересбор %s — %s: %s", start, chunk_end, exc, exc_info=True)
+        start = chunk_end + timedelta(days=1)
+    async with async_session_factory() as db:
+        if not errors:
+            db.add(AppSetting(key=RESYNC_KEY, value={"done": today_local().isoformat(), "new": total}))
+            await db.commit()
+    logger.info("[scheduler] пересбор статусов записей завершён: новых %s, ошибок %s", total, len(errors))
+
+
+def schedule_resync() -> None:
+    """Запустить разовый пересбор через минуту после старта (если ещё не делали)."""
+    if _scheduler is None:
+        return
+    from datetime import datetime
+    _scheduler.add_job(
+        _resync_appointments_history,
+        trigger="date",
+        run_date=datetime.now(TZ_KEMEROVO) + timedelta(minutes=1),
+        id="appt_resync",
+        name="Пересбор статусов записей",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
 
 
 def create_scheduler() -> AsyncIOScheduler:

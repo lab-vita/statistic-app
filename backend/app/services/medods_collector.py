@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import and_, delete, select
 from app.services.medods import login, fetch_appointments
 from app.models.appointment import Appointment
 from app.core.config import settings
@@ -63,20 +63,49 @@ async def collect_appointments(
     date_from: date,
     date_to: date,
 ) -> int:
-    """Авторизуется, собирает записи из МедОДС и сохраняет в БД."""
+    """
+    Собирает записи за период дважды: созданные в эти дни (новые записи для конверсии)
+    и записи НА эти дни приёма (актуальные статусы: пришёл, неявка, отмена).
+
+    Раньше собирались только созданные — и статус записи, сделанной заранее,
+    навсегда оставался «ожидает»: в день приёма её уже никто не перечитывал.
+    """
     client = await login()
     try:
-        raw_records = await fetch_appointments(client, date_from, date_to)
+        created = await fetch_appointments(client, date_from, date_to, by="created")
+        on_date = await fetch_appointments(client, date_from, date_to, by="date")
     finally:
         await client.aclose()
 
+    new_count = await _save(db, created + on_date)
+    await _drop_vanished(db, date_from, date_to, on_date)
+    await db.commit()
+    return new_count
+
+
+async def refresh_appointments_by_date(db: AsyncSession, date_from: date, date_to: date) -> int:
+    """Перечитать только записи на дни приёма date_from..date_to (статусы и переносы)."""
+    client = await login()
+    try:
+        on_date = await fetch_appointments(client, date_from, date_to, by="date")
+    finally:
+        await client.aclose()
+    new_count = await _save(db, on_date)
+    await _drop_vanished(db, date_from, date_to, on_date)
+    await db.commit()
+    return new_count
+
+
+async def _save(db: AsyncSession, raw_records: list[dict]) -> int:
+    """Добавить новые записи и обновить существующие (по medods_id)."""
     new_count = 0
+    seen: set[int] = set()
     for raw in raw_records:
         parsed    = _parse_appointment(raw)
         medods_id = parsed.get("medods_id")
-
-        if not medods_id:
+        if not medods_id or medods_id in seen:
             continue
+        seen.add(medods_id)
 
         existing = await db.scalar(
             select(Appointment).where(Appointment.medods_id == medods_id)
@@ -89,6 +118,21 @@ async def collect_appointments(
 
         db.add(Appointment(**parsed))
         new_count += 1
-
-    await db.commit()
+    await db.flush()
     return new_count
+
+
+async def _drop_vanished(db: AsyncSession, date_from: date, date_to: date, on_date: list[dict]) -> None:
+    """
+    Записи, которые у нас стоят на эти дни, а МедОДС на эти дни их уже не отдаёт,
+    удалены в МедОДС (перенесённые придут с новой датой и обновятся сами).
+    Если МедОДС не вернул ничего — ничего и не трогаем: это может быть сбой.
+    """
+    if not on_date:
+        return
+    ids = {_parse_appointment(r).get("medods_id") for r in on_date}
+    await db.execute(delete(Appointment).where(and_(
+        Appointment.appointment_date >= date_from,
+        Appointment.appointment_date <= date_to,
+        Appointment.medods_id.notin_(ids),
+    )))
