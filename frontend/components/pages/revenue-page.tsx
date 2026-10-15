@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  fetchPaymentStats, fetchPaymentDaily, fetchPaymentByDoctor, fetchSalesStats,
+  fetchPaymentStats, fetchPaymentDaily, fetchPaymentByDoctor, fetchSalesByCategory,
   fetchPaymentByType,
   toDateStr, addDays, fmtRub,
   type PaymentStatsResponse, type PaymentDailyResponse,
-  type PaymentDoctorResponse, type SalesStatsResponse,
+  type PaymentDoctorResponse, type SalesByCategoryResponse,
   type PaymentByTypeResponse,
 } from "@/lib/api";
 import {
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/primitives";
 import { RevenueChart } from "@/components/charts/revenue-chart";
 import { RevenuePeriodChart } from "@/components/charts/revenue-period-chart";
-import { cn } from "@/lib/utils";
+import { CategoryTrendCard, ServicesTrendCard } from "@/components/revenue-categories";
 
 // ─── Константы
 
@@ -88,7 +88,7 @@ export function RevenuePage() {
   const [byType,     setByType]     = useState<PaymentByTypeResponse | null>(null);
   const [prevDaily,  setPrevDaily]  = useState<PaymentDailyResponse | null>(null);
   const [doctors,    setDoctors]    = useState<PaymentDoctorResponse | null>(null);
-  const [sales,      setSales]      = useState<SalesStatsResponse | null>(null);
+  const [sales,      setSales]      = useState<SalesByCategoryResponse | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
@@ -114,7 +114,7 @@ export function RevenuePage() {
         fetchPaymentByType(dateFrom, dateTo).catch(() => null),
         fetchPaymentDaily(prevFrom, prevTo).catch(() => null),
         fetchPaymentByDoctor(dateFrom, dateTo, 20),
-        fetchSalesStats(dateFrom, dateTo, 15),
+        fetchSalesByCategory(dateFrom, dateTo, 15).catch(() => null),
       ]);
       setStats(s); setDaily(d); setByType(bt); setPrevDaily(pd);
       setDoctors(doc); setSales(sal);
@@ -281,46 +281,9 @@ export function RevenuePage() {
               </div>
             )}
 
-            {/* Топ услуг */}
-            {sales && sales.services.length > 0 && (
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <h3 className="text-[13px] font-semibold">Топ услуг по выручке</h3>
-                  <span className="text-[11px] text-muted-foreground/60">
-                    {sales.services.length} услуг
-                  </span>
-                </div>
-                <div className="divide-y divide-border">
-                  {sales.services.map((s, i) => (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
-                      <span className="text-[11px] text-muted-foreground/50 w-4 text-right tabular-nums shrink-0">{i + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-medium truncate" title={s.service_title}>
-                          {s.service_title}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground/60">{s.amount} шт.</div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-[13px] font-bold tabular-nums">{fmt(Math.round(s.final_sum))} ₽</div>
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span className="text-[11px] text-muted-foreground/60 tabular-nums">{s.pct_of_total}%</span>
-                          {s.delta_pct != null && s.delta_dir && s.delta_dir !== "flat" && (
-                            <span className={cn(
-                              "text-[10px] font-bold",
-                              s.delta_dir === "up"
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-red-600 dark:text-red-400"
-                            )}>
-                              {s.delta_dir === "up" ? "+" : "−"}{s.delta_pct}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Направления и услуги в динамике */}
+            {sales && sales.categories.length > 0 && <CategoryTrendCard data={sales} />}
+            {sales && sales.services.length > 0 && <ServicesTrendCard data={sales} />}
           </>
         )}
       </PageContent>

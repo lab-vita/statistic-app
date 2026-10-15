@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
-  PageContent, Skeleton, Empty, ErrorBanner, Delta, Th, Td, PageHeader, HeaderControls, PeriodPill, DateNav, HeaderDivider, RefreshButton,
+  PageContent, Skeleton, Empty, ErrorBanner, Delta, Th, Td, PageHeader, HeaderControls, PeriodPill, DateNav, HeaderDivider, RefreshButton, TabGroup,
 } from "@/components/ui/primitives";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -26,16 +26,21 @@ function fmtPct(n: number) { return n.toFixed(1) + "%"; }
 
 const COLORS = ["#1a9e6e","#328fcd","#e09020","#8b5cf6","#e03a5a","#06b6d4","#1a9e6e","#8b5cf6","#e09020","#0284c7","#4f46e5","#db2777","#1a9e6e","#8b5cf6","#b8730e"];
 
-function DoctorBarChart({ doctors }: { doctors: PaymentDoctor[] }) {
+const avgCheck = (d: PaymentDoctor) => d.avg_check ?? (d.count > 0 ? d.total_paid / d.count : 0);
+
+const CHART_MODES = ["Выручка", "Средний чек"];
+
+function DoctorBarChart({ doctors, mode }: { doctors: PaymentDoctor[]; mode: string }) {
   const ct = useChartTheme();
+  const byCheck = mode === "Средний чек";
   const data = [...doctors]
-    .sort((a, b) => b.total_paid - a.total_paid)
-    .slice(0, 12)
     .map(d => ({
       name: d.doctor_surname || (d.doctor_name ?? "").split(" ")[0],
-      value: d.total_paid,
+      value: byCheck ? avgCheck(d) : d.total_paid,
       count: d.count,
-    }));
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 12);
 
   return (
     <ResponsiveContainer width="100%" height={Math.max(260, data.length * 38)}>
@@ -57,7 +62,7 @@ function DoctorBarChart({ doctors }: { doctors: PaymentDoctor[] }) {
           tickLine={false}
         />
         <Tooltip
-          formatter={(v) => [typeof v === "number" ? fmtRub(v) : "—", "Выручка"]}
+          formatter={(v) => [typeof v === "number" ? fmtRub(v) : "—", byCheck ? "Средний чек" : "Выручка"]}
           {...ct.tooltip}
         />
         <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={20}>
@@ -124,6 +129,7 @@ export function DoctorsPage() {
   const [totalRev,    setTotalRev]    = useState<number>(0);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
+  const [chartMode,   setChartMode]   = useState(CHART_MODES[0]);
 
   const dateFrom  = toDateStr(period.dateFrom);
   const dateTo    = toDateStr(period.dateTo);
@@ -221,11 +227,14 @@ export function DoctorsPage() {
 
             {/* Bar chart */}
             <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <div className="px-4 py-3 border-b border-border">
-                <h3 className="text-[13px] font-semibold">Рейтинг врачей по выручке</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border">
+                <h3 className="text-[13px] font-semibold">
+                  {chartMode === "Средний чек" ? "Средний чек по врачам" : "Рейтинг врачей по выручке"}
+                </h3>
+                <TabGroup items={CHART_MODES} active={chartMode} onChange={setChartMode} small />
               </div>
               <div className="p-4">
-                <DoctorBarChart doctors={doctors} />
+                <DoctorBarChart doctors={doctors} mode={chartMode} />
               </div>
             </div>
 
@@ -243,6 +252,7 @@ export function DoctorsPage() {
                       <Th right>Визитов</Th>
                       <Th right>Выручка</Th>
                       <Th right>Средний чек</Th>
+                      <Th right>Чек к прошлому</Th>
                       <Th right>% от общей</Th>
                     </tr>
                   </thead>
@@ -259,7 +269,12 @@ export function DoctorsPage() {
                         </Td>
                         <Td right muted>{fmt(d.count)}</Td>
                         <Td right bold>{fmtRub(d.total_paid)}</Td>
-                        <Td right muted>{fmtRub(d.count > 0 ? d.total_paid / d.count : 0)}</Td>
+                        <Td right>{fmtRub(avgCheck(d))}</Td>
+                        <Td right>
+                          {d.prev_avg_check
+                            ? <Delta dir={d.avg_check_delta_dir ?? null} pct={d.avg_check_delta_pct ?? null} />
+                            : <span className="text-[11px] text-text-3">нет данных</span>}
+                        </Td>
                         <Td right>
                           <div className="flex items-center gap-2 justify-end">
                             <div className="w-16 h-1.5 rounded-full bg-border overflow-hidden">
