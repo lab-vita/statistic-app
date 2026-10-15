@@ -38,7 +38,10 @@ async function post<T>(path: string, body?: unknown, params?: Record<string, str
 }
 
 export function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Локальная дата, а не UTC: toISOString() у полуночи по Кемерово (UTC+7)
+  // давал предыдущий день — периоды съезжали на день назад.
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function addDays(d: Date, n: number): Date {
@@ -391,6 +394,11 @@ export interface PaymentDoctor {
   count:          number;
   total_paid:     number;
   pct:            number;
+  /** средний чек = выручка / число оплат; изменение — к прошлому такому же периоду */
+  avg_check?:           number;
+  prev_avg_check?:      number;
+  avg_check_delta_pct?: number | null;
+  avg_check_delta_dir?: DeltaDir;
 }
 
 export interface PaymentDoctorResponse {
@@ -497,3 +505,89 @@ export const fillPlans = (dateFrom: string, dateTo: string, metric: string, valu
   fillPlan({ date_from: dateFrom, date_to: dateTo, metric, value, skip_weekends: skipWeekends });
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+
+// ─── Выручка по направлениям ─────────────────────────────────────────
+
+export interface CategoryRow {
+  id: number | null;
+  title: string;
+  total: number;
+  share: number;
+  prev_total: number;
+  delta_pct: number | null;
+  delta_dir: DeltaDir;
+  series: number[];
+}
+
+export interface ServiceTrendRow {
+  title: string;
+  category: string;
+  total: number;
+  share: number;
+  delta_pct: number | null;
+  delta_dir: DeltaDir;
+  series: number[];
+}
+
+export interface SalesByCategoryResponse {
+  granularity: "day" | "week" | "month";
+  periods: string[];
+  total: { sum: number; prev_sum: number; delta_pct: number | null; delta_dir: DeltaDir };
+  categories: CategoryRow[];
+  services: ServiceTrendRow[];
+}
+
+export const fetchSalesByCategory = (dateFrom: string, dateTo: string, servicesLimit = 15) =>
+  get<SalesByCategoryResponse>("/api/sales/by-category", { date_from: dateFrom, date_to: dateTo, services_limit: servicesLimit });
+
+// ─── Пациенты: неявки и повторные визиты ─────────────────────────────
+
+export interface NoshowCounts {
+  visits: number;
+  noshow: number;
+  cancels: number;
+  appointments: number;
+  noshow_pct: number;
+  cancel_pct: number;
+}
+
+export interface NoshowsResponse {
+  date_from: string;
+  date_to: string;
+  total: NoshowCounts & {
+    pending: number;
+    prev_noshow_pct: number;
+    noshow_pct_delta_dir: DeltaDir;
+    noshow_pct_delta_pct: number | null;
+  };
+  by_weekday: (NoshowCounts & { weekday: number; label: string })[];
+  by_hour: (NoshowCounts & { hour: number })[];
+  by_patient: { new: NoshowCounts; repeat: NoshowCounts };
+  by_doctor: (NoshowCounts & { doctor_id: number; doctor_name: string })[];
+  min_doctor_appts: number;
+}
+
+export interface ReturnsResponse {
+  date_from: string;
+  date_to: string;
+  data_since: string | null;
+  patients: number;
+  new: number;
+  returning: number;
+  returning_pct: number;
+  came_back: { days: number; count: number; eligible: number; pct: number }[];
+  median_gap_days: number | null;
+  gap_buckets: { label: string; count: number }[];
+  monthly: { month: string; new: number; returning: number; reliable: boolean }[];
+  by_doctor: {
+    doctor_id: number; doctor_name: string; patients: number;
+    came_back: number; same_doctor: number; came_back_pct: number; same_doctor_pct: number;
+  }[];
+  min_doctor_patients: number;
+}
+
+export const fetchNoshows = (dateFrom: string, dateTo: string) =>
+  get<NoshowsResponse>("/api/patients/noshows", { date_from: dateFrom, date_to: dateTo });
+export const fetchReturns = (dateFrom: string, dateTo: string) =>
+  get<ReturnsResponse>("/api/patients/returns", { date_from: dateFrom, date_to: dateTo });

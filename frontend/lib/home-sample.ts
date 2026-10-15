@@ -191,5 +191,52 @@ export function sampleHomeData(): HomeData {
       count_delta_pct: 8, count_delta_dir: "up", total_paid_delta_pct: 14, total_paid_delta_dir: "up",
       by_cash_delta_pct: null, by_cash_delta_dir: null, by_card_delta_pct: null, by_card_delta_dir: null,
     },
+    noshows: {
+      date_from: "", date_to: "",
+      total: {
+        visits: 812, noshow: 79, cancels: 41, appointments: 932, noshow_pct: 8.9, cancel_pct: 4.4,
+        pending: 0, prev_noshow_pct: 10.2, noshow_pct_delta_dir: "down", noshow_pct_delta_pct: 13,
+      },
+      by_weekday: [
+        [15.6, 160], [7.8, 150], [6.2, 148], [8.6, 152], [7.5, 155], [7.3, 89], [0, 0],
+      ].map(([p, n], i) => ({
+        weekday: i, label: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][i],
+        visits: Math.round(n * (1 - p / 100)), noshow: Math.round(n * p / 100), cancels: 6,
+        appointments: n + 6, noshow_pct: p, cancel_pct: 4,
+      })),
+      by_hour: [],
+      by_patient: {
+        new:    { visits: 160, noshow: 21, cancels: 9,  appointments: 190, noshow_pct: 11.6, cancel_pct: 4.7 },
+        repeat: { visits: 652, noshow: 58, cancels: 32, appointments: 742, noshow_pct: 8.2,  cancel_pct: 4.3 },
+      },
+      by_doctor: [],
+      min_doctor_appts: 10,
+    },
+    returns: {
+      date_from: "", date_to: "", data_since: "2026-01-01",
+      patients: 1290, new: 349, returning: 941, returning_pct: 72.9,
+      came_back: [
+        { days: 30, count: 412, eligible: 1100, pct: 37.5 },
+        { days: 90, count: 590, eligible: 980, pct: 60.2 },
+      ],
+      median_gap_days: 21,
+      gap_buckets: [
+        { label: "до недели", count: 180 }, { label: "до месяца", count: 420 }, { label: "1–3 месяца", count: 260 },
+        { label: "3–6 месяцев", count: 90 }, { label: "больше полугода", count: 12 },
+      ],
+      monthly: [], by_doctor: [], min_doctor_patients: 10,
+    },
+    categories: {
+      granularity: "day", periods: [],
+      total: { sum: 2390640, prev_sum: 2246550, delta_pct: 6, delta_dir: "up" },
+      categories: [
+        ["УЗИ", 1182740, 49.5, "up", 8], ["Приёмы врачей", 628400, 26.3, "up", 4],
+        ["Анализы", 342300, 14.3, "down", 3], ["Гинекология", 224200, 9.4, "up", 12],
+      ].map(([title, total, share, dir, pct], i) => ({
+        id: i, title: title as string, total: total as number, share: share as number, prev_total: 1,
+        delta_dir: dir as "up" | "down", delta_pct: pct as number, series: [],
+      })),
+      services: [],
+    },
   };
 }

@@ -196,39 +196,57 @@ async def by_doctor(
     limit:     int        = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """Выручка по врачам за период."""
-    rows = (await db.execute(
-        select(
-            PaymentDetail.doctor_id,
-            PaymentDetail.doctor_name,
-            PaymentDetail.doctor_surname,
-            func.count(PaymentDetail.id).label("count"),
-            func.sum(PaymentDetail.total_paid).label("total_paid"),
+    """Выручка и средний чек по врачам за период (с изменением чека к прошлому периоду)."""
+    prev_from, prev_to = prev_period(date_from, date_to)
+
+    def query(d_from: date, d_to: date):
+        return (
+            select(
+                PaymentDetail.doctor_id,
+                PaymentDetail.doctor_name,
+                PaymentDetail.doctor_surname,
+                func.count(PaymentDetail.id).label("count"),
+                func.sum(PaymentDetail.total_paid).label("total_paid"),
+            )
+            .where(_base_filter(d_from, d_to, kind))
+            .where(PaymentDetail.doctor_id.isnot(None))
+            .group_by(PaymentDetail.doctor_id, PaymentDetail.doctor_name, PaymentDetail.doctor_surname)
         )
-        .where(_base_filter(date_from, date_to, kind))
-        .where(PaymentDetail.doctor_id.isnot(None))
-        .group_by(PaymentDetail.doctor_id, PaymentDetail.doctor_name, PaymentDetail.doctor_surname)
-        .order_by(func.sum(PaymentDetail.total_paid).desc())
-        .limit(limit)
+
+    rows = (await db.execute(
+        query(date_from, date_to).order_by(func.sum(PaymentDetail.total_paid).desc()).limit(limit)
     )).all()
+    prev = {r.doctor_id: r for r in (await db.execute(query(prev_from, prev_to))).all()}
 
     grand_total = sum(r.total_paid or 0 for r in rows)
+
+    def avg(r) -> int:
+        return round((r.total_paid or 0) / r.count) if r and r.count else 0
+
+    doctors = []
+    for r in rows:
+        p = prev.get(r.doctor_id)
+        d = calc_delta(avg(r), avg(p))
+        doctors.append({
+            "doctor_id":      r.doctor_id,
+            "doctor_name":    r.doctor_name,
+            "doctor_surname": r.doctor_surname,
+            "count":          int(r.count or 0),
+            "total_paid":     int(r.total_paid or 0),
+            "pct":            round(int(r.total_paid or 0) / grand_total * 100, 1) if grand_total else 0,
+            "avg_check":      avg(r),
+            "prev_avg_check": avg(p),
+            "avg_check_delta_pct": d["delta_pct"],
+            "avg_check_delta_dir": d["delta_dir"],
+        })
 
     return {
         "date_from": date_from,
         "date_to":   date_to,
+        "prev_from": prev_from,
+        "prev_to":   prev_to,
         "kind":      kind,
-        "doctors": [
-            {
-                "doctor_id":      r.doctor_id,
-                "doctor_name":    r.doctor_name,
-                "doctor_surname": r.doctor_surname,
-                "count":          int(r.count or 0),
-                "total_paid":     int(r.total_paid or 0),
-                "pct":            round(int(r.total_paid or 0) / grand_total * 100, 1) if grand_total else 0,
-            }
-            for r in rows
-        ],
+        "doctors":   doctors,
     }
 
 

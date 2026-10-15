@@ -8,6 +8,7 @@ import { useBitrixFrameFit } from "@/lib/bitrix-frame";
 import type { Section } from "@/lib/permissions";
 import { CallsPage }        from "@/components/pages/calls-page";
 import { AppointmentsPage } from "@/components/pages/appointments-page";
+import { PatientsPage }     from "@/components/pages/patients-page";
 import { RevenuePage }      from "@/components/pages/revenue-page";
 import { PlansPage }        from "@/components/pages/plans-page";
 import { ReportsPage }      from "@/components/pages/reports-page";
@@ -39,6 +40,7 @@ function App() {
           {section === "home"         && <HomePage />}
           {section === "calls"        && <CallsPage />}
           {section === "appointments" && <AppointmentsPage />}
+          {section === "patients"     && <PatientsPage />}
           {section === "revenue"      && <RevenuePage />}
           {section === "reports"      && <ReportsPage />}
           {section === "funnel"       && <FunnelPage />}

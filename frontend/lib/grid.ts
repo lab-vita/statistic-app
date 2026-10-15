@@ -27,6 +27,9 @@ export type WidgetTypeId =
   | "appt_chart"        // записи по дням
   | "appt_sources"      // источники записей
   | "appt_admins"       // записи по сотрудникам
+  | "patients_noshows"  // неявки по дням недели
+  | "patients_returns"  // повторные визиты
+  | "revenue_categories" // выручка по направлениям
   | "revenue_single"    // одна метрика выручки
   | "revenue_chart"     // выручка по дням
   | "revenue_methods"   // способы оплаты
@@ -37,7 +40,7 @@ export type WidgetTypeId =
   | "plans_progress"    // выполнение планов
   | "reports_months";   // помесячная сводка за полгода
 
-export type WidgetGroup = "Звонки" | "Записи" | "Выручка" | "Врачи" | "Воронка" | "Планы" | "Отчёты";
+export type WidgetGroup = "Звонки" | "Записи" | "Пациенты" | "Выручка" | "Врачи" | "Воронка" | "Планы" | "Отчёты";
 
 /** Право, без которого виджет не показывается (как у разделов в сайдбаре). */
 export type WidgetPermission =
@@ -63,7 +66,7 @@ export interface WidgetTypeDef {
   narrowH?: number;
 }
 
-export const WIDGET_GROUPS: WidgetGroup[] = ["Звонки", "Записи", "Выручка", "Врачи", "Воронка", "Планы", "Отчёты"];
+export const WIDGET_GROUPS: WidgetGroup[] = ["Звонки", "Записи", "Пациенты", "Выручка", "Врачи", "Воронка", "Планы", "Отчёты"];
 
 export const WIDGET_TYPES: WidgetTypeDef[] = [
   // ── Звонки
@@ -147,6 +150,19 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     description: "Кто сколько записал, доля явок и неявок, новые пациенты — по каждому администратору и оператору.",
     defaultW: 6, defaultH: 4, minW: 4, minH: 3, maxW: 12, maxH: 7,
   },
+  // ── Пациенты
+  {
+    id: "patients_noshows", group: "Пациенты", permission: "view:appointments", data: ["noshows"],
+    name: "Неявки по дням недели",
+    description: "Доля неявок за период и в какие дни недели пациенты не приходят чаще всего.",
+    defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 8, maxH: 5,
+  },
+  {
+    id: "patients_returns", group: "Пациенты", permission: "view:appointments", data: ["returns"],
+    name: "Повторные визиты",
+    description: "Сколько пациентов уже бывали в клинике, сколько вернулись за 30 дней и через сколько дней обычно приходят снова.",
+    defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 8, maxH: 4,
+  },
   // ── Выручка
   {
     id: "revenue_single", group: "Выручка", permission: "view:revenue", configurable: true, data: ["payments"],
@@ -171,6 +187,12 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
     name: "Топ услуг",
     description: "Услуги, которые принесли больше всего денег: сумма, доля в продажах и изменение к прошлому периоду.",
     defaultW: 6, defaultH: 4, minW: 4, minH: 3, maxW: 12, maxH: 7,
+  },
+  {
+    id: "revenue_categories", group: "Выручка", permission: "view:revenue", data: ["categories"],
+    name: "Направления",
+    description: "Выручка по направлениям — УЗИ, анализы, приёмы врачей и другим: доля и изменение к прошлому периоду.",
+    defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 12, maxH: 5,
   },
   // ── Врачи
   {
@@ -257,6 +279,10 @@ export const DEFAULT_LAYOUT: PlacedWidget[] = [
   { id: "d-months-calls", type: "reports_months",   x: 0, y: 29, w: 6,  h: 3, config: { metric: "calls" } },
   { id: "d-months-appts", type: "reports_months",   x: 6, y: 29, w: 6,  h: 3, config: { metric: "appts" } },
   { id: "d-operators",    type: "calls_operators",  x: 0, y: 32, w: 12, h: 4 },
+  // пациенты и направления
+  { id: "d-noshows",      type: "patients_noshows",   x: 0, y: 36, w: 4,  h: 3 },
+  { id: "d-returns",      type: "patients_returns",   x: 4, y: 36, w: 4,  h: 3 },
+  { id: "d-categories",   type: "revenue_categories", x: 8, y: 36, w: 4,  h: 3 },
 ];
 
 // ─── localStorage ──────────────────────────────────────────────

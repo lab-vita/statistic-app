@@ -48,11 +48,27 @@ export function getDefaultPeriod(type: PeriodType): Period {
   }
 }
 
+/**
+ * Соседний период. Месяц, квартал и год листаются по календарю: из «октября
+ * (1–14)» назад — весь сентябрь, а не 14 дней до 1 октября. Текущий период
+ * заканчивается вчерашним днём, как в getDefaultPeriod.
+ */
 export function shiftPeriod(p: Period, dir: 1 | -1): Period {
   if (p.type === "custom") return p;
-  const len = Math.round((p.dateTo.getTime() - p.dateFrom.getTime()) / 86400000) + 1;
-  const step = dir * len;
-  return { ...p, dateFrom: addDays(p.dateFrom, step), dateTo: addDays(p.dateTo, step) };
+  const yesterday = addDays(today(), -1);
+  const clamp = (start: Date, end: Date): Period =>
+    ({ ...p, dateFrom: start, dateTo: end > yesterday && start <= yesterday ? yesterday : end });
+
+  const months = p.type === "month" ? 1 : p.type === "quarter" ? 3 : p.type === "year" ? 12 : 0;
+  if (months) {
+    const start = new Date(p.dateFrom.getFullYear(), p.dateFrom.getMonth() + dir * months, 1);
+    const end = new Date(start.getFullYear(), start.getMonth() + months, 0);
+    return clamp(start, end);
+  }
+  const len = p.type === "week" ? 7 : p.type === "day" ? 1
+    : Math.round((p.dateTo.getTime() - p.dateFrom.getTime()) / 86400000) + 1;
+  const start = addDays(p.dateFrom, dir * len);
+  return clamp(start, addDays(start, len - 1));
 }
 
 export function formatPeriodLabel(p: Period): string {
@@ -70,5 +86,8 @@ export function formatPeriodLabel(p: Period): string {
 }
 
 export function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Локальная дата, а не UTC: toISOString() у полуночи по Кемерово (UTC+7)
+  // давал предыдущий день — периоды съезжали на день назад.
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }

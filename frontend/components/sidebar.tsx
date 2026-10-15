@@ -7,13 +7,14 @@ import type { Section } from "@/lib/permissions";
 import { useAuth } from "@/components/auth-gate";
 import {
   Home, Phone, Calendar, TrendingUp, FileText, Filter, Clock,
-  Users, Settings, Info, Activity, ChevronLeft, Moon, Sun, X,
+  Users, Settings, Info, Activity, ChevronLeft, Moon, Sun, X, HeartPulse,
 } from "lucide-react";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "home",         label: "Главная",    icon: Home },
   { id: "calls",        label: "Звонки",     icon: Phone },
   { id: "appointments", label: "Записи",     icon: Calendar },
+  { id: "patients",     label: "Пациенты",   icon: HeartPulse },
   { id: "revenue",      label: "Выручка",    icon: TrendingUp },
   { id: "doctors",      label: "Врачи",      icon: Users },
   { id: "funnel",       label: "Воронка",    icon: Filter },
