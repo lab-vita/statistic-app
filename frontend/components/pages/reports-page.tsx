@@ -128,16 +128,16 @@ export function ReportsPage() {
           </FilterButton>
         )}
         <HeaderDivider />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 max-sm:w-full">
           <label className="sr-only" htmlFor="rep-from">С даты</label>
           <input id="rep-from" type="date" value={dates.from}
             onChange={e => setDates(d => ({ ...d, from: e.target.value }))}
-            className="h-7 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand" />
+            className="h-7 min-w-0 flex-1 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand sm:flex-none" />
           <span className="text-[12px] text-text-3">—</span>
           <label className="sr-only" htmlFor="rep-to">По дату</label>
           <input id="rep-to" type="date" value={dates.to}
             onChange={e => setDates(d => ({ ...d, to: e.target.value }))}
-            className="h-7 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand" />
+            className="h-7 min-w-0 flex-1 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-text-2 outline-none focus:border-brand sm:flex-none" />
         </div>
       </PageHeader>
 
@@ -166,7 +166,7 @@ export function ReportsPage() {
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={periods} barGap={2} barCategoryGap="35%" margin={{top:0,right:4,left:-20,bottom:0}}>
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
-                    <XAxis dataKey="period" tickFormatter={s => fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <XAxis dataKey="period" tickFormatter={s => fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
                     <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
                     <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
                     <Bar dataKey="incoming" name="Принятые"    fill="#1a9e6e" radius={[3,3,0,0]} maxBarSize={22} />
@@ -179,7 +179,7 @@ export function ReportsPage() {
 
             <SectionCard title="Сводная таблица" noPad>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                   <thead><tr>
                     <Th>Период</Th><Th right>Принято</Th><Th right>Исходящие</Th>
                     <Th right>Пропущено</Th><Th right>% пропуска</Th><Th right>Всего</Th>
@@ -218,7 +218,7 @@ export function ReportsPage() {
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={periods} barGap={2} barCategoryGap="35%" margin={{top:0,right:4,left:-20,bottom:0}}>
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
-                    <XAxis dataKey="period" tickFormatter={s=>fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <XAxis dataKey="period" tickFormatter={s=>fmtPeriod(s,gran)} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
                     <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
                     <Tooltip {...ct.tooltip} labelFormatter={(s)=>fmtPeriod(String(s),gran)} />
                     <Bar dataKey="total"  name="Записей" fill="#328fcd" radius={[3,3,0,0]} maxBarSize={22} />
@@ -231,7 +231,7 @@ export function ReportsPage() {
 
             <SectionCard title="Сводная таблица" noPad>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                   <thead><tr>
                     <Th>Период</Th><Th right>Записей</Th><Th right>Явки</Th><Th right>% явки</Th><Th right>Неявки</Th><Th right>Новые</Th>
                   </tr></thead>
