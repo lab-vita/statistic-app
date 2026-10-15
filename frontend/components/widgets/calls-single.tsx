@@ -21,7 +21,7 @@ export const CALLS_SINGLE_METRICS: {
   hint?:  string;
   format: Format;
 }[] = [
-  { key: "incoming",       label: "Принятые",           hint: "отвеченные входящие",               format: "number"   },
+  { key: "incoming",       label: "Принятые",           hint: "отвеченные входящие, все операторы", format: "number"   },
   { key: "received",       label: "Поступило",          hint: "принятые + пропущенные",            format: "number"   },
   { key: "outgoing",       label: "Исходящие",          hint: "совершённые звонки",                format: "number"   },
   { key: "missed",         label: "Пропущенные",        hint: "без ответа",                        format: "number"   },
