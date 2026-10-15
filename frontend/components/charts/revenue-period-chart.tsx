@@ -29,7 +29,6 @@ export function RevenuePeriodChart({ current, prev }: Props) {
     prev:    prev?.[i]?.total_paid ?? null,
   }));
 
-  const tick = data.length > 60 ? 6 : data.length > 30 ? 2 : 0;
   const hasPrev = prev && prev.length > 0;
 
   return (
@@ -48,7 +47,7 @@ export function RevenuePeriodChart({ current, prev }: Props) {
           tick={{ fontSize: 10, fill: ct.axis }}
           axisLine={false}
           tickLine={false}
-          interval={tick}
+          interval="preserveStartEnd" minTickGap={20}
         />
         <YAxis
           tickFormatter={fmtY}

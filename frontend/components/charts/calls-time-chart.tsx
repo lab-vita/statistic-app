@@ -33,11 +33,6 @@ export function CallsTimeChart({ hourly, daily, isDay, interval, onInterval }: P
         missed:   d.missed,
       }));
 
-  const tickInterval = data.length > 48 ? 11
-    : data.length > 24 ? 5
-    : data.length > 14 ? 2
-    : 0;
-
   const legend = [
     { color: CHART_COLORS.incoming, label: "Принятые" },
     { color: CHART_COLORS.outgoing, label: "Исходящие" },
@@ -83,7 +78,7 @@ export function CallsTimeChart({ hourly, daily, isDay, interval, onInterval }: P
                 dataKey="time"
                 tick={{ fontSize: 10, fill: ct.axis }}
                 axisLine={false} tickLine={false}
-                interval={tickInterval}
+                interval="preserveStartEnd" minTickGap={20}
               />
               <YAxis tick={{ fontSize: 10, fill: ct.axis }} axisLine={false} tickLine={false} />
               <Tooltip
