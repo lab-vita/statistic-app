@@ -34,6 +34,8 @@ export function funnelOf(data: HomeData) {
   };
 }
 
+const pctSub = (pct: number | null, what: string) => (pct === null ? undefined : `${pct.toFixed(0)}% ${what}`);
+
 function Step({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col justify-center rounded-lg bg-background px-3 py-2">
@@ -67,7 +69,8 @@ export function FunnelStepsWidget({ data, loading }: { data: HomeData; loading: 
   return (
     <WidgetCard className="py-3.5">
       <p className="metric-label mb-2 shrink-0">Воронка: от звонка до оплаты</p>
-      <div className="flex min-h-0 flex-1 items-stretch gap-1">
+      {/* широко — один ряд шагов */}
+      <div className="hidden min-h-0 flex-1 items-stretch gap-1 @[40rem]:flex">
         <Step label="Принято звонков" value={v(f.calls)} sub="колл-центр" accent="text-foreground" />
         <Arrow pct={f.callsToAppt} good={50} bad={30} />
         <Step label="Записались" value={v(f.appts)} sub="пациентов колл-центра" accent="text-blue-600 dark:text-blue-400" />
@@ -87,6 +90,28 @@ export function FunnelStepsWidget({ data, loading }: { data: HomeData; loading: 
           sub={f.perVisit !== null ? `${rub(f.perVisit)} на визит` : undefined}
           accent="text-emerald-600 dark:text-emerald-400"
         />
+      </div>
+      {/* узко — две группы плиток: колл-центр и вся клиника */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 @[40rem]:hidden">
+        <div className="grid flex-1 grid-cols-3 gap-1.5">
+          <Step label="Звонки" value={v(f.calls)} sub="колл-центр" accent="text-foreground" />
+          <Step label="Записались" value={v(f.appts)} sub={pctSub(f.callsToAppt, "от звонков")} accent="text-blue-600 dark:text-blue-400" />
+          <Step label="Пришли" value={v(f.ccVisits)} sub={pctSub(f.ccVisitPct, "явка")} accent="text-emerald-600 dark:text-emerald-400" />
+        </div>
+        <div className="grid flex-1 grid-cols-2 gap-1.5">
+          <Step
+            label="Явки клиники"
+            value={v(f.clinicVisits)}
+            sub={f.clinicTotal !== null ? `из ${num(f.clinicTotal)} записей` : undefined}
+            accent="text-emerald-600 dark:text-emerald-400"
+          />
+          <Step
+            label="Выручка"
+            value={f.revenue === null ? "—" : rubShort(f.revenue)}
+            sub={f.perVisit !== null ? `${rub(f.perVisit)} на визит` : undefined}
+            accent="text-emerald-600 dark:text-emerald-400"
+          />
+        </div>
       </div>
     </WidgetCard>
   );

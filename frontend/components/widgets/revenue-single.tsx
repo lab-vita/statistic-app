@@ -38,7 +38,7 @@ export function RevenueSingleWidget({ data, loading, metric = "total_paid" }: {
     <WidgetCard>
       <WidgetLabel>{def.label}</WidgetLabel>
       <p className={cn(
-        "mt-1.5 truncate text-[30px] font-extrabold leading-none tracking-[-0.04em] tabular-nums",
+        "mt-1.5 truncate text-[length:min(30px,16cqw)] font-extrabold leading-none tracking-[-0.04em] tabular-nums",
         !data ? "text-text-3" : def.key === "total_paid" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground",
       )} title={value}>
         {value}
