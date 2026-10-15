@@ -17,7 +17,7 @@ const PERIODS: { type: PeriodType; label: string }[] = [
 ];
 
 const SECTION_LABELS: Record<Section, string> = {
-  home: "Главная", calls: "Звонки", appointments: "Записи",
+  home: "Главная", calls: "Звонки", appointments: "Записи", patients: "Пациенты",
   revenue: "Выручка", reports: "Отчёты", funnel: "Воронка", plans: "Планы",
   doctors: "Врачи", admin: "Доступ", about: "О приложении",
 };

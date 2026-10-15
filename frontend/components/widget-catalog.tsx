@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Plus, Phone, Calendar, TrendingUp, ArrowLeft, Check, Users, Filter, Clock, FileText } from "lucide-react";
+import { X, Plus, Phone, Calendar, TrendingUp, ArrowLeft, Check, Users, Filter, Clock, FileText, HeartPulse } from "lucide-react";
 import {
   WIDGET_TYPES, WIDGET_GROUPS, COLS, GAP, ROW_H,
   type WidgetGroup, type WidgetTypeDef, type WidgetTypeId, type WidgetPermission,
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 const GROUP_ICON: Record<WidgetGroup, React.ElementType> = {
   "Звонки":  Phone,
   "Записи":  Calendar,
+  "Пациенты": HeartPulse,
   "Выручка": TrendingUp,
   "Врачи":   Users,
   "Воронка": Filter,
@@ -101,7 +102,7 @@ export function WidgetOptionsPicker({ type, value, onChange }: {
   );
 }
 
-// ─── Диалог ────────────────────────────────────────────────────────────────
+// ─── Диалог ────────────────────────────────────────────────────────────────────────────
 
 function Dialog({ title, subtitle, onClose, children, back }: {
   title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; back?: () => void;
@@ -146,7 +147,7 @@ function Dialog({ title, subtitle, onClose, children, back }: {
   );
 }
 
-// ─── Каталог виджетов ──────────────────────────────────────────────────────
+// ─── Каталог виджетов ──────────────────────────────────────────────────────────────────────
 
 interface WidgetCatalogProps {
   can:     (perm: WidgetPermission) => boolean;

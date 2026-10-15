@@ -8,6 +8,7 @@ import type {
   AppointmentDailyResponse, AppointmentStatsResponse, ApptReportResponse, CallsReportResponse,
   ConversionResponse, DailyResponse, HeatmapResponse, PaymentDailyResponse, PaymentDoctorResponse,
   PaymentStatsResponse, PlanRangeResponse, SalesStatsResponse, StatsResponse,
+  NoshowsResponse, ReturnsResponse, SalesByCategoryResponse,
 } from "@/lib/api";
 import { conversionValue, type ConversionValue } from "@/lib/call-metrics";
 
@@ -30,6 +31,12 @@ export interface HomeData {
   paymentDaily:   PaymentDailyResponse | null;
   doctors:        PaymentDoctorResponse | null;
   sales:          SalesStatsResponse | null;
+  /** неявки по дням недели и врачам */
+  noshows:        NoshowsResponse | null;
+  /** повторные визиты */
+  returns:        ReturnsResponse | null;
+  /** выручка по направлениям */
+  categories:     SalesByCategoryResponse | null;
   /** помесячная сводка за последние полгода — не зависит от выбранного периода */
   reports:        { calls: CallsReportResponse | null; appts: ApptReportResponse | null; from: string; to: string } | null;
 }
@@ -37,13 +44,15 @@ export interface HomeData {
 /** Группы данных, которые может запросить виджет. */
 export type DataKey =
   | "stats" | "daily" | "prevDaily" | "conversion" | "plan" | "heatmap"
-  | "appointments" | "apptDaily" | "payments" | "paymentDaily" | "doctors" | "sales" | "reports";
+  | "appointments" | "apptDaily" | "payments" | "paymentDaily" | "doctors" | "sales" | "reports"
+  | "noshows" | "returns" | "categories";
 
 export type HomeNeeds = Partial<Record<DataKey, boolean>>;
 
 export const ALL_NEEDS: HomeNeeds = {
   stats: true, daily: true, prevDaily: true, conversion: true, plan: true, heatmap: true,
   appointments: true, apptDaily: true, payments: true, paymentDaily: true, doctors: true, sales: true, reports: true,
+  noshows: true, returns: true, categories: true,
 };
 
 /** Ключ для сравнения наборов: одинаковые потребности → тот же ключ. */
@@ -65,6 +74,9 @@ export interface HomeApi {
   fetchSalesStats?:       Fn<SalesStatsResponse>;
   fetchCallsReport?:      Fn<CallsReportResponse>;
   fetchApptReport?:       Fn<ApptReportResponse>;
+  fetchNoshows?:          Fn<NoshowsResponse>;
+  fetchReturns?:          Fn<ReturnsResponse>;
+  fetchSalesByCategory?:  Fn<SalesByCategoryResponse>;
 }
 
 const ok = <T,>(r: PromiseSettledResult<T>): T | null => (r.status === "fulfilled" ? r.value : null);
@@ -76,7 +88,7 @@ export const emptyHomeData = (dateFrom = "", dateTo = ""): HomeData => ({
   dateFrom, dateTo, stats: null, daily: null, prevDaily: null, plan: null,
   conversion: null, conversionData: null, heatmap: null,
   appointments: null, apptDaily: null, payments: null, paymentDaily: null,
-  doctors: null, sales: null, reports: null,
+  doctors: null, sales: null, reports: null, noshows: null, returns: null, categories: null,
 });
 
 /** Последние шесть месяцев, включая текущий, по вчерашний день. */
@@ -97,7 +109,7 @@ export async function loadHomeData(
   const needStats = needs.stats || needs.prevDaily || needs.conversion;
   const rr = reportsRange();
 
-  const [s, d, cv, pl, hm, ap, apd, pay, payd, doc, sal, rc, ra] = await Promise.allSettled([
+  const [s, d, cv, pl, hm, ap, apd, pay, payd, doc, sal, rc, ra, ns, rt, cat] = await Promise.allSettled([
     maybe(needStats,          api.fetchStats,            dateFrom, dateTo),
     maybe(needs.daily,        api.fetchDaily,            dateFrom, dateTo),
     maybe(needs.conversion,   api.fetchConversion,       dateFrom, dateTo),
@@ -111,6 +123,9 @@ export async function loadHomeData(
     maybe(needs.sales,        api.fetchSalesStats,       dateFrom, dateTo),
     maybe(needs.reports,      api.fetchCallsReport,      rr.from, rr.to),
     maybe(needs.reports,      api.fetchApptReport,       rr.from, rr.to),
+    maybe(needs.noshows,      api.fetchNoshows,          dateFrom, dateTo),
+    maybe(needs.returns,      api.fetchReturns,          dateFrom, dateTo),
+    maybe(needs.categories,   api.fetchSalesByCategory,  dateFrom, dateTo),
   ]);
   const stats = ok(s), conversionData = ok(cv);
 
@@ -139,6 +154,9 @@ export async function loadHomeData(
     paymentDaily: ok(payd),
     doctors:      ok(doc),
     sales:        ok(sal),
+    noshows:      ok(ns),
+    returns:      ok(rt),
+    categories:   ok(cat),
     reports:      needs.reports ? { calls: reportsCalls, appts: reportsAppts, ...rr } : null,
   };
 }
