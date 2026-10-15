@@ -61,7 +61,7 @@ function OperatorComparisonChart({ data, metric }: { data: ComparisonResponse; m
           tick={{ fontSize: 11, fill: ct.axis }}
           axisLine={false}
           tickLine={false}
-          interval="preserveStartEnd"
+          interval="preserveStartEnd" minTickGap={20}
         />
         <YAxis
           tick={{ fontSize: 11, fill: ct.axis }}
@@ -444,7 +444,7 @@ export function CallsPage() {
                   <h3 className="text-[13px] font-semibold">По операторам</h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                     <thead>
                       <tr>
                         <Th>Оператор</Th>

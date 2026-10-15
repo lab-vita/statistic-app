@@ -100,7 +100,7 @@ function PlanFactSection({ plan, daily }: PlanFactProps) {
                   tickFormatter={fmtDate}
                   tick={{ fontSize: 10, fill: ct.axis }}
                   axisLine={false} tickLine={false}
-                  interval={chartData.length > 14 ? 2 : 0}
+                  interval="preserveStartEnd" minTickGap={20}
                 />
                 <YAxis tick={{ fontSize: 10, fill: ct.axis }} axisLine={false} tickLine={false} />
                 <Tooltip
@@ -364,7 +364,7 @@ export function AppointmentsPage() {
                   <ResponsiveContainer width="100%" height={180}>
                     <ComposedChart data={daily.days} margin={{top:0,right:4,left:-20,bottom:0}}>
                       <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
-                      <XAxis dataKey="date" tickFormatter={fmtDate} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval={daily.days.length>14?2:0} />
+                      <XAxis dataKey="date" tickFormatter={fmtDate} tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
                       <YAxis tick={{fontSize:10,fill:ct.axis}} axisLine={false} tickLine={false} />
                       <Tooltip {...ct.tooltip} labelFormatter={(v)=>new Date(String(v)).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} />
                       <Bar dataKey="total"   name="Записей" fill="#328fcd" radius={[3,3,0,0]} maxBarSize={20} />
@@ -384,7 +384,7 @@ export function AppointmentsPage() {
                   <h3 className="text-[13px] font-semibold">По сотрудникам</h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="w-full border-collapse [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                     <thead>
                       <tr>
                         <Th>Сотрудник</Th>
