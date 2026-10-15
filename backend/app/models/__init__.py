@@ -10,3 +10,4 @@ from app.models.service import Service               # noqa
 from app.models.payment_detail import PaymentDetail  # noqa
 from app.models.plan import Plan                     # noqa
 from app.models.app_user import AppUser, AccessRequest              # noqa
+from app.models.app_setting import AppSetting                       # noqa

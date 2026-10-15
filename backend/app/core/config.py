@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     OWNER_BITRIX_USER_ID: str = ""      # ID владельца в Битрикс24 — первый вход создаёт его запись
     AUTH_DISABLED: bool = False         # ТОЛЬКО для локальной разработки!
 
+    # Утренняя сводка (настройки — в админке, здесь только техническое)
+    PUBLIC_URL: str = ""                # адрес сервера для событий бота, напр. https://docs.lab-vita.ru;
+                                        # пусто → первый https-адрес из ALLOWED_ORIGINS
+    DIGEST_BOT_CLIENT_ID: str = "labvita_pulse_digest"  # метка бота для вызовов через вебхук
+
     # CORS — через запятую, например: http://localhost:3000,https://stats.labvita.ru
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 

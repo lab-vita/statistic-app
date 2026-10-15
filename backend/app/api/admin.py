@@ -29,6 +29,8 @@ from app.core.permissions import (
 )
 from app.db.database import get_db
 from app.models.app_user import AccessRequest, AppUser
+from app.services import digest
+from app.services.scheduler import schedule_digest
 
 router = APIRouter()
 
@@ -219,3 +221,79 @@ async def dismiss_request(user_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, "Запрос не найден")
     await db.delete(req)
     await db.commit()
+
+
+# ─── Утренняя сводка ────────────────────────────────────────
+
+class DigestPatch(BaseModel):
+    enabled:    bool | None = None
+    time:       str | None = Field(default=None, max_length=5)
+    recipients: list[str] | None = None
+    app_url:    str | None = Field(default=None, max_length=500)
+
+
+def _digest_out(cfg: dict) -> dict:
+    return {
+        "enabled":    cfg["enabled"],
+        "time":       cfg["time"],
+        "recipients": [str(r) for r in cfg.get("recipients", [])],
+        "app_url":    cfg.get("app_url", ""),
+        "bot_ready":  bool(cfg.get("bot_id")),
+        "bot_error":  cfg.get("bot_error"),
+        "last_sent_for": cfg.get("last_sent_for"),
+        "last_result":   cfg.get("last_result"),
+    }
+
+
+@router.get("/digest")
+async def get_digest(db: AsyncSession = Depends(get_db)):
+    return _digest_out(await digest.get_config(db))
+
+
+@router.put("/digest")
+async def put_digest(body: DigestPatch, db: AsyncSession = Depends(get_db)):
+    cfg = await digest.get_config(db)
+    if body.time is not None:
+        try:
+            h, m = digest.parse_time(body.time)
+        except ValueError:
+            raise HTTPException(422, "Время в формате ЧЧ:ММ, например 08:30")
+        cfg["time"] = f"{h:02d}:{m:02d}"
+    if body.recipients is not None:
+        ids = sorted({r.strip() for r in body.recipients if r.strip()})
+        bad = [r for r in ids if not _ID_RE.match(r)]
+        if bad:
+            raise HTTPException(422, f"Неверный ID: {', '.join(bad)}")
+        known = set((await db.execute(
+            select(AppUser.bitrix_user_id).where(AppUser.bitrix_user_id.in_(ids))
+        )).scalars().all()) if ids else set()
+        missing = [r for r in ids if r not in known]
+        if missing:
+            raise HTTPException(422, f"Нет в списке сотрудников: {', '.join(missing)}")
+        cfg["recipients"] = ids
+    if body.app_url is not None:
+        url = body.app_url.strip()
+        if url and not url.startswith("https://"):
+            raise HTTPException(422, "Ссылка должна начинаться с https://")
+        cfg["app_url"] = url
+    if body.enabled is not None:
+        cfg["enabled"] = body.enabled
+
+    cfg = await digest.save_config(db, cfg)
+    schedule_digest(cfg["time"])
+    return _digest_out(cfg)
+
+
+@router.get("/digest/preview")
+async def digest_preview(actor: CurrentUser = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """Как сводка за вчера выглядит для текущего пользователя."""
+    perms = ALL_PERMISSIONS if actor.is_owner else actor.permissions
+    return await digest.preview(db, frozenset(perms))
+
+
+@router.post("/digest/test")
+async def digest_test(actor: CurrentUser = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """Отправить сводку за вчера себе — проверить, что бот работает и как выглядит сообщение."""
+    result = await digest.send_digest(db, only_user=actor.id)
+    cfg = await digest.get_config(db)
+    return {**result, "digest": _digest_out(cfg)}
