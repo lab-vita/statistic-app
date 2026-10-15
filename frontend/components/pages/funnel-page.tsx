@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { TrendingUp, TrendingDown, Minus, ArrowRight, Users } from "lucide-react";
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid,
@@ -32,18 +32,28 @@ const P_MAP: Record<string, PeriodType> = {
 // ─── Типы
 
 interface FunnelData {
-  calls:           number;
-  appointments:    number;
-  visits:          number;
+  // Колл-центр: звонки операторов → записанные ими пациенты → сколько из них пришли
+  calls:        number;
+  appointments: number;
+  callsToAppt:  number;
+  ccVisited:    number | null;  // null — сервер ещё старой версии
+  ccWaiting:    number;
+  ccMissed:     number;         // не пришли или отменили
+  ccVisitPct:   number | null;
+  // Вся клиника: все записи на приём в периоде, кто бы их ни сделал
+  clinicTotal:     number;
+  clinicVisits:    number;
+  clinicAhead:     number;      // приём ещё впереди или статус не проставлен
+  clinicVisitPct:  number | null;
+  sources:         { label: string; count: number }[];
   revenue:         number;
-  callsToAppt:     number;
-  apptToVisit:     number;
   revenuePerVisit: number;
   operators: {
     id:           string;
     name:         string;
     calls:        number;
     appointments: number;
+    visits:       number | null;
     conversion:   number;
   }[];
 }
@@ -71,6 +81,18 @@ function ConvPct({ value, good, bad }: { value: number; good: number; bad: numbe
   );
 }
 
+function FunnelBlock({ title, note, children }: { title: string; note: string; children: ReactNode }) {
+  return (
+    <section className="space-y-2.5">
+      <div>
+        <p className="text-[14px] font-semibold">{title}</p>
+        <p className="text-[12px] text-muted-foreground mt-0.5">{note}</p>
+      </div>
+      <div className="flex items-stretch gap-2 overflow-x-auto pb-1">{children}</div>
+    </section>
+  );
+}
+
 function FunnelCard({ label, value, sub, accentBg, accentText }: {
   label: string; value: string; sub?: string;
   accentBg: string; accentText: string;
@@ -84,10 +106,12 @@ function FunnelCard({ label, value, sub, accentBg, accentText }: {
   );
 }
 
-function Arrow({ pct, good, bad }: { pct: number; good: number; bad: number }) {
+function Arrow({ pct, good, bad }: { pct: number | null; good: number; bad: number }) {
   return (
     <div className="flex flex-col items-center justify-center gap-1 shrink-0 px-1">
-      <ConvPct value={pct} good={good} bad={bad} />
+      {pct === null
+        ? <span className="text-[12px] font-semibold text-muted-foreground">—</span>
+        : <ConvPct value={pct} good={good} bad={bad} />}
       <ArrowRight className="h-5 w-5 text-muted-foreground/30" />
     </div>
   );
@@ -214,26 +238,48 @@ export function FunnelPage() {
         fetchPaymentStats(dateFrom, dateTo),
       ]);
 
-      // Данные воронки. Звонки и записи — операторов колл-центра, на одной базе
-      // с разделом «Звонки»: записи по дню создания, пациент считается один раз.
-      const totalCalls = convRes.total.incoming ?? 0;
-      const appt    = convRes.total.appointments ?? 0;
-      const visits  = apptRes.total.visits ?? 0;
-      const revenue = payRes.total_paid ?? 0;
+      // Колл-центр — на одной базе с разделом «Звонки»: записи по дню создания,
+      // пациент считается один раз; «пришли» — из этих же пациентов.
+      const cc = convRes.total;
+      const ccVisited = cc.visited ?? null;
+      const ccMissed  = (cc.noshow ?? 0) + (cc.cancelled ?? 0);
 
-      const callsToAppt     = convRes.total.conversion_pct ?? 0;
-      const apptToVisit     = appt > 0       ? (visits / appt) * 100    : 0;
-      const revenuePerVisit = visits > 0     ? revenue / visits          : 0;
+      // Вся клиника — все записи на приём в периоде, включая сделанные
+      // администраторами и другими сотрудниками.
+      const t = apptRes.total;
+      const clinicResolved = t.visits + t.noshow + t.cancels;
+      const revenue = payRes.total_paid ?? 0;
+      const sources = Object.values(apptRes.by_group ?? {})
+        .filter(g => g.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .map(g => ({ label: g.label, count: g.count }));
 
       const operators = convRes.operators.map((op: ConversionOperator) => ({
         id:           op.operator_id,
         name:         op.name || op.surname,
         calls:        op.incoming,
         appointments: op.appointments,
+        visits:       op.visits ?? null,
         conversion:   op.conversion_pct,
       }));
 
-      setData({ calls: totalCalls, appointments: appt, visits, revenue, callsToAppt, apptToVisit, revenuePerVisit, operators });
+      setData({
+        calls:        cc.incoming ?? 0,
+        appointments: cc.appointments ?? 0,
+        callsToAppt:  cc.conversion_pct ?? 0,
+        ccVisited,
+        ccWaiting:    cc.waiting ?? 0,
+        ccMissed,
+        ccVisitPct:   ccVisited === null ? null : (cc.visit_pct ?? null),
+        clinicTotal:     t.total,
+        clinicVisits:    t.visits,
+        clinicAhead:     Math.max(0, t.total - clinicResolved),
+        clinicVisitPct:  clinicResolved > 0 ? (t.visits / clinicResolved) * 100 : null,
+        sources,
+        revenue,
+        revenuePerVisit: t.visits > 0 ? revenue / t.visits : 0,
+        operators,
+      });
 
       // Динамика по дням
       if (!isDay && convRes.days?.length) {
@@ -291,38 +337,65 @@ export function FunnelPage() {
             <Skeleton className="h-40" />
             <Skeleton className="h-48" />
           </>
-        ) : !data || data.calls === 0 ? (
+        ) : !data || (data.calls === 0 && data.clinicTotal === 0) ? (
           <Empty />
         ) : (
           <>
             {/* Заголовок */}
             <div>
               <h1 className="text-[17px] font-semibold">Воронка продаж</h1>
-              <p className="text-[13px] text-muted-foreground mt-0.5">Путь клиента: от звонка в колл-центр до оплаты</p>
+              <p className="text-[13px] text-muted-foreground mt-0.5">Путь клиента от звонка до приёма и оплаты</p>
             </div>
 
-            {/* Главная воронка */}
-            <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
+            {/* Колл-центр */}
+            <FunnelBlock
+              title="Колл-центр"
+              note="Пациенты, которых записали операторы: записи по дню создания, пациент считается один раз"
+            >
               <FunnelCard
                 label="Звонков принято"
                 value={data.calls.toLocaleString("ru-RU")}
-                sub="входящие в колл-центр"
+                sub="входящие операторам"
                 accentBg="bg-blue-50 dark:bg-blue-950/30"
                 accentText="text-blue-700 dark:text-blue-300"
               />
               <Arrow pct={data.callsToAppt} good={30} bad={15} />
               <FunnelCard
-                label="Записей создано"
+                label="Записались"
                 value={data.appointments.toLocaleString("ru-RU")}
-                sub={`${data.callsToAppt.toFixed(1)}% от звонков`}
+                sub={`пациентов, ${data.callsToAppt.toFixed(1)}% от звонков`}
                 accentBg="bg-violet-50 dark:bg-violet-950/30"
                 accentText="text-violet-700 dark:text-violet-300"
               />
-              <Arrow pct={data.apptToVisit} good={80} bad={60} />
+              <Arrow pct={data.ccVisitPct} good={80} bad={60} />
               <FunnelCard
                 label="Пришли на приём"
-                value={data.visits.toLocaleString("ru-RU")}
-                sub={`${data.apptToVisit.toFixed(1)}% явка`}
+                value={data.ccVisited === null ? "—" : data.ccVisited.toLocaleString("ru-RU")}
+                sub={data.ccVisited === null
+                  ? "нужно обновить сервер"
+                  : `не пришли ${data.ccMissed} · ещё ждут ${data.ccWaiting}`}
+                accentBg="bg-emerald-50 dark:bg-emerald-950/30"
+                accentText="text-emerald-700 dark:text-emerald-300"
+              />
+            </FunnelBlock>
+
+            {/* Вся клиника */}
+            <FunnelBlock
+              title="Вся клиника"
+              note="Все записи на приём в этом периоде, кто бы их ни сделал: колл-центр, администраторы и другие сотрудники"
+            >
+              <FunnelCard
+                label="Записей на приём"
+                value={data.clinicTotal.toLocaleString("ru-RU")}
+                sub={data.sources.map(g => `${g.label.toLowerCase()} ${g.count.toLocaleString("ru-RU")}`).join(" · ")}
+                accentBg="bg-violet-50 dark:bg-violet-950/30"
+                accentText="text-violet-700 dark:text-violet-300"
+              />
+              <Arrow pct={data.clinicVisitPct} good={80} bad={60} />
+              <FunnelCard
+                label="Пришли на приём"
+                value={data.clinicVisits.toLocaleString("ru-RU")}
+                sub={`приём впереди или не отмечен: ${data.clinicAhead.toLocaleString("ru-RU")}`}
                 accentBg="bg-emerald-50 dark:bg-emerald-950/30"
                 accentText="text-emerald-700 dark:text-emerald-300"
               />
@@ -332,11 +405,11 @@ export function FunnelPage() {
               <FunnelCard
                 label="Выручка"
                 value={fmtRub(data.revenue)}
-                sub={`${fmtRub(data.revenuePerVisit)} на пациента`}
+                sub={`${fmtRub(data.revenuePerVisit)} на визит`}
                 accentBg="bg-amber-50 dark:bg-amber-950/30"
                 accentText="text-amber-700 dark:text-amber-300"
               />
-            </div>
+            </FunnelBlock>
 
             {/* График динамики */}
             {trend.length >= 2 && <TrendChart points={trend} />}
@@ -356,7 +429,7 @@ export function FunnelPage() {
                   <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                   <div>
                     <p className="font-medium">Записи → Явка: хорошо от 80%</p>
-                    <p className="text-[12px] text-muted-foreground">Из 100 записей должны прийти минимум 80 человек</p>
+                    <p className="text-[12px] text-muted-foreground">Из 100 пациентов, чей приём уже прошёл, должны прийти минимум 80. Те, кто ещё ждёт приёма, не учитываются</p>
                   </div>
                 </div>
               </div>
@@ -376,6 +449,7 @@ export function FunnelPage() {
                         <th className="px-5 py-3 text-left font-medium text-muted-foreground">Оператор</th>
                         <th className="px-4 py-3 text-right font-medium text-muted-foreground">Звонков</th>
                         <th className="px-4 py-3 text-right font-medium text-muted-foreground">Записей</th>
+                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Пришли</th>
                         <th className="px-4 py-3 text-right font-medium text-muted-foreground">Конверсия</th>
                         <th className="px-5 py-3 text-right font-medium text-muted-foreground">Доля</th>
                       </tr>
@@ -394,6 +468,7 @@ export function FunnelPage() {
                               <td className="px-5 py-3 font-medium">{op.name}</td>
                               <td className="px-4 py-3 text-right tabular-nums">{op.calls.toLocaleString("ru-RU")}</td>
                               <td className="px-4 py-3 text-right tabular-nums">{op.appointments.toLocaleString("ru-RU")}</td>
+                              <td className="px-4 py-3 text-right tabular-nums">{op.visits === null ? "—" : op.visits.toLocaleString("ru-RU")}</td>
                               <td className="px-4 py-3 text-right">
                                 <ConvPct value={op.conversion} good={30} bad={15} />
                               </td>
