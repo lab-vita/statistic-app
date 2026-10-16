@@ -18,6 +18,7 @@ export function MenuButton({ className }: { className?: string }) {
       type="button"
       onClick={nav.open}
       aria-label="Меню"
+      data-tour="menu-button"
       className={cn(
         "-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] text-text-2 transition-colors hover:bg-accent hover:text-foreground md:hidden",
         className,
