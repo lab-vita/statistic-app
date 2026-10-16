@@ -66,12 +66,14 @@ export function AdminPage() {
     <div className="flex flex-1 flex-col overflow-hidden">
       <PageHeader title="Настройки">
         {tabs.length > 1 && (
-          <TabGroup
-            items={tabs.map(t => (t === TAB_ACCESS && pending ? `${t} · ${pending}` : t))}
-            active={tab === TAB_ACCESS && pending ? `${tab} · ${pending}` : tab}
-            onChange={v => setTab(v.split(" · ")[0])}
-            small
-          />
+          <div data-tour="admin-tabs">
+            <TabGroup
+              items={tabs.map(t => (t === TAB_ACCESS && pending ? `${t} · ${pending}` : t))}
+              active={tab === TAB_ACCESS && pending ? `${tab} · ${pending}` : tab}
+              onChange={v => setTab(v.split(" · ")[0])}
+              small
+            />
+          </div>
         )}
       </PageHeader>
 

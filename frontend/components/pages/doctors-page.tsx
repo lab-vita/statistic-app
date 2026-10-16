@@ -226,7 +226,7 @@ export function DoctorsPage() {
             </div>
 
             {/* Bar chart */}
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-lg border border-border bg-card overflow-hidden" data-tour="doctors-chart">
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border">
                 <h3 className="text-[13px] font-semibold">
                   {chartMode === "Средний чек" ? "Средний чек по врачам" : "Рейтинг врачей по выручке"}
@@ -239,7 +239,7 @@ export function DoctorsPage() {
             </div>
 
             {/* Doctors table */}
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-lg border border-border bg-card overflow-hidden" data-tour="doctors-table">
               <div className="px-4 py-3 border-b border-border">
                 <h3 className="text-[13px] font-semibold">Детализация по врачам</h3>
               </div>
