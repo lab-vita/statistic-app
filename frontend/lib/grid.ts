@@ -216,10 +216,10 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   },
   // ── Планы
   {
-    id: "plans_progress", group: "Планы", permission: "view:plans", data: ["plan", "stats", "appointments"],
+    id: "plans_progress", group: "Планы", permission: "view:plans", data: ["plan", "stats", "appointments", "payments", "conversion"],
     name: "Выполнение планов",
-    description: "Принятые, исходящие и записи против плана на выбранный период. План задаётся в разделе «Планы».",
-    defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 12, maxH: 4,
+    description: "Звонки, записи и выручка против плана на выбранный период, конверсия и явки — против цели. План задаётся в разделе «Планы».",
+    defaultW: 4, defaultH: 4, minW: 3, minH: 3, maxW: 12, maxH: 5,
   },
   // ── Отчёты
   {
@@ -232,7 +232,7 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
 
 export const widgetDef = (type: WidgetTypeId) => WIDGET_TYPES.find(d => d.id === type);
 
-// ─── Размещённый виджет ──────────────────────────────────────
+// ─── Размещённый виджет ──────────────────────────────────────────
 
 export interface PlacedWidget {
   id:   string;

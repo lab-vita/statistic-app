@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/primitives";
 import { CallsTimeChart } from "@/components/charts/calls-time-chart";
 import { HeatmapChart }   from "@/components/charts/heatmap-chart";
+import { PlanMeter, TargetMeter, usePeriodPlan } from "@/components/plan-meter";
+import { verdictOf, VERDICT_TEXT } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 const PERIODS = ["День","Неделя","Месяц","Квартал","Год","Период"];
@@ -263,6 +265,14 @@ export function CallsPage() {
   const total  = stats?.operators["total"];
 
   const MISSED_THRESHOLD = 6;
+  // план — на всю команду, поэтому при выбранном операторе не показываем
+  const planInfo = usePeriodPlan(period, !opId);
+  const convTarget = planInfo?.targets.conversion_pct;
+  const convClass = (pct: number) => convTarget
+    ? VERDICT_TEXT[verdictOf(pct / convTarget * 100)]
+    : pct >= 70 ? "text-emerald-600 dark:text-emerald-400"
+    : pct >= 40 ? "text-amber-600 dark:text-amber-400"
+    : "text-red-600 dark:text-red-400";
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -310,12 +320,16 @@ export function CallsPage() {
                 label="Принятые" value={fmt(s.incoming)} valueClass="text-emerald-600 dark:text-emerald-400"
                 sub={`из ${fmt(s.received)} поступивших`}
                 deltaDir={s.incoming_delta_dir} deltaPct={s.incoming_delta_pct}
-              />
+              >
+                <PlanMeter info={planInfo} metric="calls_incoming" fact={s.incoming} />
+              </MetricCard>
               <MetricCard
                 label="Исходящие" value={fmt(s.outgoing)} valueClass="text-blue-600 dark:text-blue-400"
                 sub="совершённые звонки"
                 deltaDir={s.outgoing_delta_dir} deltaPct={s.outgoing_delta_pct}
-              />
+              >
+                <PlanMeter info={planInfo} metric="calls_outgoing" fact={s.outgoing} />
+              </MetricCard>
               <MetricCard
                 label="Пропущенные" value={fmt(s.missed)} valueClass="text-red-600 dark:text-red-400"
                 sub={`${fmtPct(s.missed_pct)} от поступивших`}
@@ -376,12 +390,7 @@ export function CallsPage() {
                                 {op.incoming} прин. → {op.appointments} зап.
                               </span>
                             </div>
-                            <span className={cn(
-                              "text-[13px] font-bold tabular-nums",
-                              op.conversion_pct >= 70 ? "text-emerald-600 dark:text-emerald-400"
-                              : op.conversion_pct >= 40 ? "text-amber-600 dark:text-amber-400"
-                              : "text-red-600 dark:text-red-400"
-                            )}>
+                            <span className={cn("text-[13px] font-bold tabular-nums", convClass(op.conversion_pct))}>
                               {op.conversion_pct}%
                             </span>
                           </div>
@@ -390,14 +399,12 @@ export function CallsPage() {
                       ))}
                       <div className="pt-3 border-t border-border flex justify-between items-center">
                         <span className="text-[13px] font-semibold">Итого</span>
-                        <span className={cn(
-                          "text-[15px] font-black tabular-nums",
-                          conversion.total.conversion_pct >= 70 ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-amber-600 dark:text-amber-400"
-                        )}>
+                        <span className={cn("text-[15px] font-black tabular-nums", convClass(conversion.total.conversion_pct))}>
                           {conversion.total.conversion_pct}%
                         </span>
                       </div>
+                      <TargetMeter info={planInfo} metric="conversion_pct" value={conversion.total.conversion_pct}
+                                   label="Цель на период" className="mt-0" />
                     </div>
                   </SectionCard>
                 )}

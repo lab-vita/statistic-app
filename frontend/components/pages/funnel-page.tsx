@@ -19,6 +19,7 @@ import {
   toDateStr, addDays, fmtRub,
   type ConversionOperator,
 } from "@/lib/api";
+import { PlanMeter, TargetMeter, usePeriodPlan } from "@/components/plan-meter";
 import { cn } from "@/lib/utils";
 
 // ─── Константы
@@ -96,15 +97,16 @@ function FunnelBlock({ title, note, children }: { title: string; note: string; c
   );
 }
 
-function FunnelCard({ label, value, sub, accentBg, accentText }: {
+function FunnelCard({ label, value, sub, accentBg, accentText, children }: {
   label: string; value: string; sub?: string;
-  accentBg: string; accentText: string;
+  accentBg: string; accentText: string; children?: ReactNode;
 }) {
   return (
     <div className={cn("flex-1 min-w-0 rounded-xl border border-border p-4 @[44rem]:p-5", accentBg)}>
       <p className="text-[12px] font-medium text-muted-foreground mb-2">{label}</p>
       <p className={cn("text-2xl font-bold tabular-nums tracking-tight", accentText)}>{value}</p>
       {sub && <p className="mt-1 text-[12px] text-muted-foreground">{sub}</p>}
+      {children}
     </div>
   );
 }
@@ -118,6 +120,11 @@ function Arrow({ pct, good, bad }: { pct: number | null; good: number; bad: numb
         : <ConvPct value={pct} good={good} bad={bad} />}
     </div>
   );
+}
+
+/** Пороги стрелки: если в «Планах» задана цель — по ней (как оценка плана: 100% / 90%). */
+function thresholds(target: number | undefined, good: number, bad: number) {
+  return target ? { good: target, bad: target * 0.9 } : { good, bad };
 }
 
 // ─── График динамики
@@ -231,6 +238,7 @@ export function FunnelPage() {
   const dateTo    = toDateStr(period.dateTo);
   const yesterday = toDateStr(addDays(new Date(), -1));
   const isDay     = period.type === "day";
+  const planInfo  = usePeriodPlan(period);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -362,16 +370,20 @@ export function FunnelPage() {
                 sub="входящие операторам"
                 accentBg="bg-blue-50 dark:bg-blue-950/30"
                 accentText="text-blue-700 dark:text-blue-300"
-              />
-              <Arrow pct={data.callsToAppt} good={30} bad={15} />
+              >
+                <PlanMeter info={planInfo} metric="calls_incoming" fact={data.calls} />
+              </FunnelCard>
+              <Arrow pct={data.callsToAppt} {...thresholds(planInfo?.targets.conversion_pct, 30, 15)} />
               <FunnelCard
                 label="Записались"
                 value={data.appointments.toLocaleString("ru-RU")}
                 sub={`пациентов, ${data.callsToAppt.toFixed(1)}% от звонков`}
                 accentBg="bg-violet-50 dark:bg-violet-950/30"
                 accentText="text-violet-700 dark:text-violet-300"
-              />
-              <Arrow pct={data.ccVisitPct} good={80} bad={60} />
+              >
+                <TargetMeter info={planInfo} metric="conversion_pct" value={data.callsToAppt} label="Цель конверсии" />
+              </FunnelCard>
+              <Arrow pct={data.ccVisitPct} {...thresholds(planInfo?.targets.visit_pct, 80, 60)} />
               <FunnelCard
                 label="Пришли на приём"
                 value={data.ccVisited === null ? "—" : data.ccVisited.toLocaleString("ru-RU")}
@@ -394,15 +406,19 @@ export function FunnelPage() {
                 sub={data.sources.map(g => `${g.label.toLowerCase()} ${g.count.toLocaleString("ru-RU")}`).join(" · ")}
                 accentBg="bg-violet-50 dark:bg-violet-950/30"
                 accentText="text-violet-700 dark:text-violet-300"
-              />
-              <Arrow pct={data.clinicVisitPct} good={80} bad={60} />
+              >
+                <PlanMeter info={planInfo} metric="appt_count" fact={data.clinicTotal} />
+              </FunnelCard>
+              <Arrow pct={data.clinicVisitPct} {...thresholds(planInfo?.targets.visit_pct, 80, 60)} />
               <FunnelCard
                 label="Пришли на приём"
                 value={data.clinicVisits.toLocaleString("ru-RU")}
                 sub={`приём впереди или не отмечен: ${data.clinicAhead.toLocaleString("ru-RU")}`}
                 accentBg="bg-emerald-50 dark:bg-emerald-950/30"
                 accentText="text-emerald-700 dark:text-emerald-300"
-              />
+              >
+                <TargetMeter info={planInfo} metric="visit_pct" value={data.clinicVisitPct} label="Цель явок" />
+              </FunnelCard>
               <div className="flex items-center justify-center px-1 shrink-0">
                 <ArrowRight className="h-4 w-4 rotate-90 text-muted-foreground/40 @[44rem]:h-5 @[44rem]:w-5 @[44rem]:rotate-0 @[44rem]:text-muted-foreground/30" />
               </div>
@@ -412,7 +428,9 @@ export function FunnelPage() {
                 sub={`${fmtRub(data.revenuePerVisit)} на визит`}
                 accentBg="bg-amber-50 dark:bg-amber-950/30"
                 accentText="text-amber-700 dark:text-amber-300"
-              />
+              >
+                <PlanMeter info={planInfo} metric="revenue" fact={data.revenue} unit="rub" />
+              </FunnelCard>
             </FunnelBlock>
 
             {/* График динамики */}

@@ -269,6 +269,31 @@ async def get_month(year: int, month: int, db: AsyncSession = Depends(get_db)):
     }
 
 
+async def _range_targets(db: AsyncSession, d_from: date, d_to: date) -> dict[str, float]:
+    """
+    Целевые проценты за период. Период внутри месяца — цель этого месяца;
+    квартал, год, несколько месяцев — среднее по месяцам, где цель задана,
+    с весом по числу дней месяца, попавших в период.
+    """
+    if d_to < d_from:
+        return {}
+    acc: dict[str, list[float]] = {}
+    y, m = d_from.year, d_from.month
+    while (y, m) <= (d_to.year, d_to.month):
+        start = max(d_from, date(y, m, 1))
+        end = min(d_to, date(y, m, monthrange(y, m)[1]))
+        weight = (end - start).days + 1
+        cfg, _ = await _load_config(db, y, m)
+        for k in PCT_METRICS:
+            v = cfg["targets"].get(k)
+            if v is not None:
+                s = acc.setdefault(k, [0.0, 0.0])
+                s[0] += v * weight
+                s[1] += weight
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return {k: round(s[0] / s[1], 1) for k, s in acc.items() if s[1]}
+
+
 @router.get("/range")
 async def get_range(date_from: date, date_to: date, db: AsyncSession = Depends(get_db)):
     """Планы за произвольный период — для сравнения факт/план в карточках."""
@@ -283,14 +308,12 @@ async def get_range(date_from: date, date_to: date, db: AsyncSession = Depends(g
             if metric in totals:
                 totals[metric] += val
 
-    # целевые проценты месяца, в который попадает начало периода
-    cfg, _ = await _load_config(db, date_from.year, date_from.month)
     return {
         "date_from": date_from,
         "date_to":   date_to,
         "by_day":    by_day,
         "totals":    totals,
-        "targets":   {k: v for k, v in cfg["targets"].items() if k in PCT_METRICS},
+        "targets":   await _range_targets(db, date_from, date_to),
         "fixed":     FIXED_THRESHOLDS,
     }
 
