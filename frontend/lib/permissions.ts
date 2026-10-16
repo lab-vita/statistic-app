@@ -1,4 +1,5 @@
-// Права доступа к разделам
+// Права доступа к разделам. Каталог прав и роли — на сервере (app/core/permissions.py),
+// права пользователя приходят в /api/auth/me уже посчитанными по его роли.
 export type Section =
   | "home"
   | "calls"
@@ -13,46 +14,40 @@ export type Section =
   | "about";
 
 export type Permission =
-  | "view:revenue"
   | "view:calls"
   | "view:appointments"
-  | "view:reports"
+  | "view:patients"
+  | "view:revenue"
   | "view:funnel"
   | "view:plans"
-  | "view:admin";
+  | "view:reports"
+  | "plans:edit"
+  | "digest:manage"
+  | "data:collect"
+  | "users:manage";
 
-// Какое право нужно для просмотра раздела
-export const SECTION_PERMISSIONS: Partial<Record<Section, Permission>> = {
-  calls:        "view:calls",
-  appointments: "view:appointments",
-  patients:     "view:appointments",
-  revenue:      "view:revenue",
-  reports:      "view:reports",
-  funnel:       "view:funnel",
-  plans:        "view:plans",
-  doctors:      "view:revenue",
-  admin:        "view:admin",
+/** Какие права открывают раздел (хватит любого). Без записи — раздел доступен всем. */
+export const SECTION_PERMISSIONS: Partial<Record<Section, Permission[]>> = {
+  calls:        ["view:calls"],
+  appointments: ["view:appointments"],
+  patients:     ["view:patients"],
+  revenue:      ["view:revenue"],
+  doctors:      ["view:revenue"],
+  funnel:       ["view:funnel"],
+  plans:        ["view:plans"],
+  reports:      ["view:reports"],
+  admin:        ["users:manage", "digest:manage"],
 };
 
-// Вспомогательные функции для проверки прав
-
-/** Есть ли нужное право в списке или роль admin/owner */
-export function canWith(
-  permissions: string[],
-  role: string,
-  perm: string,
-): boolean {
-  if (role === "admin" || role === "owner") return true;
+/** Есть ли право. У владельца — все права. */
+export function canWith(permissions: string[], role: string, perm: string): boolean {
+  if (role === "owner") return true;
   return permissions.includes(perm);
 }
 
 /** Разрешён ли раздел для данного набора прав */
-export function sectionAllowed(
-  permissions: string[],
-  role: string,
-  section: Section,
-): boolean {
+export function sectionAllowed(permissions: string[], role: string, section: Section): boolean {
   const required = SECTION_PERMISSIONS[section];
   if (!required) return true; // home / about — доступны всем
-  return canWith(permissions, role, required);
+  return required.some(p => canWith(permissions, role, p));
 }
