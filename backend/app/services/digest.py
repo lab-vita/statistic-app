@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import httpx
 from sqlalchemy import select
@@ -42,11 +43,16 @@ DEFAULT_CONFIG: dict = {
     "app_url":    "",          # ссылка на приложение в портале — для кнопки «Открыть»
     "bot_id":     None,        # ID чат-бота «Пульс» в портале
     "bot_error":  None,        # почему бота создать не удалось (для админки)
+    "avatar_version": 0,       # какая версия аватарки уже стоит у бота в портале
     "last_sent_for": None,     # за какой день сводка уже ушла (защита от повторов)
     "last_result":   None,     # итог последней отправки (для админки)
 }
 
 BOT_CODE      = "pulse_digest"
+# Аватарка бота: JPEG 256×256 в base64 (файл текстовый — так его проще хранить и обновлять).
+# Поменяли картинку — увеличьте AVATAR_VERSION, и при следующем старте она обновится в портале.
+AVATAR_FILE    = Path(__file__).resolve().parent.parent / "assets" / "bot_avatar.jpg.b64"
+AVATAR_VERSION = 1
 MISSED_LIMIT  = 6.0      # % пропущенных — тот же порог, что в разделе «Планы»
 CONV_GOOD     = 30.0     # конверсия звонок → запись: хорошо от 30% (как на «Воронке»)
 VISIT_GOOD    = 80.0     # явка: хорошо от 80%
@@ -171,7 +177,7 @@ _MONTHS = ["январь", "февраль", "март", "апрель", "май
 
 
 def _num(n: float) -> str:
-    return f"{round(n):,}".replace(",", " ")
+    return f"{round(n):,}".replace(",", " ")
 
 
 def _pct(x: float) -> str:
@@ -179,7 +185,7 @@ def _pct(x: float) -> str:
 
 
 def _rub(n: float) -> str:
-    return f"{_num(n)} ₽"
+    return f"{_num(n)} ₽"
 
 
 def _dur(sec: float) -> str:
@@ -414,10 +420,40 @@ def explain_error(e: Exception) -> str:
     return str(e) or "Неизвестная ошибка Битрикс24"
 
 
+def _avatar_b64() -> str | None:
+    try:
+        return "".join(AVATAR_FILE.read_text().split()) or None
+    except OSError:
+        logger.warning("[digest] нет файла аватарки бота: %s", AVATAR_FILE)
+        return None
+
+
+async def sync_avatar(db: AsyncSession) -> None:
+    """Поставить боту текущую аватарку, если в портале стоит старая. Ошибки не мешают сводке."""
+    cfg = await get_config(db)
+    if not cfg.get("bot_id") or (cfg.get("avatar_version") or 0) >= AVATAR_VERSION:
+        return
+    photo = _avatar_b64()
+    if not photo:
+        return
+    try:
+        await _call("imbot.update", {
+            "BOT_ID": int(cfg["bot_id"]),
+            "CLIENT_ID": _client_id(),
+            "FIELDS": {"PROPERTIES": {"PERSONAL_PHOTO": photo}},
+        })
+    except Exception as e:  # noqa: BLE001 — аватарка не критична
+        logger.warning("[digest] не удалось обновить аватарку бота: %s", e)
+        return
+    await update_config(db, avatar_version=AVATAR_VERSION)
+    logger.info("[digest] аватарка бота обновлена (версия %s)", AVATAR_VERSION)
+
+
 async def ensure_bot(db: AsyncSession) -> int:
     """ID бота «Пульс»: из настроек, найденный в портале или только что созданный."""
     cfg = await get_config(db)
     if cfg.get("bot_id"):
+        await sync_avatar(db)
         return int(cfg["bot_id"])
 
     try:
@@ -425,6 +461,7 @@ async def ensure_bot(db: AsyncSession) -> int:
         for b in (bots or {}).values() if isinstance(bots, dict) else (bots or []):
             if b.get("CODE") == BOT_CODE:
                 await update_config(db, bot_id=int(b["ID"]), bot_error=None)
+                await sync_avatar(db)
                 return int(b["ID"])
     except BitrixError:
         pass  # список недоступен — пробуем создать
@@ -435,6 +472,14 @@ async def ensure_bot(db: AsyncSession) -> int:
         await update_config(db, bot_error=err)
         raise BitrixError("NO_PUBLIC_URL", err)
 
+    props = {
+        "NAME": "Пульс",
+        "WORK_POSITION": "Утренняя сводка по клинике",
+        "COLOR": "AZURE",
+    }
+    photo = _avatar_b64()
+    if photo:
+        props["PERSONAL_PHOTO"] = photo
     try:
         bot_id = await _call("imbot.register", {
             "CODE": BOT_CODE,
@@ -442,16 +487,13 @@ async def ensure_bot(db: AsyncSession) -> int:
             "CLIENT_ID": _client_id(),
             "EVENT_HANDLER": f"{base}/bitrix/bot-event",
             "OPENLINE": "N",
-            "PROPERTIES": {
-                "NAME": "Пульс",
-                "WORK_POSITION": "Утренняя сводка по клинике",
-                "COLOR": "AZURE",
-            },
+            "PROPERTIES": props,
         })
     except BitrixError as e:
         await update_config(db, bot_error=explain_error(e))
         raise
-    await update_config(db, bot_id=int(bot_id), bot_error=None)
+    await update_config(db, bot_id=int(bot_id), bot_error=None,
+                        avatar_version=AVATAR_VERSION if photo else 0)
     logger.info("[digest] зарегистрирован бот «Пульс», id=%s", bot_id)
     return int(bot_id)
 
