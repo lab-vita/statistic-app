@@ -21,6 +21,7 @@
 import asyncio
 import json
 import logging
+import time
 from datetime import date
 
 try:
@@ -35,6 +36,7 @@ from app.core.config import settings
 from app.core.utils import normalize_service_title
 from app.models.sale import Sale
 from app.models.service import Service
+from app.services import exchange_log
 from app.services.medods import login
 
 logger = logging.getLogger(__name__)
@@ -217,10 +219,29 @@ async def collect_sales(db: AsyncSession, date_from: date, date_to: date) -> dic
     client = await login()
     stats = {"fetched": 0, "created": 0, "updated": 0}
 
+    ws_url = settings.MEDODS_URL.replace("https://", "wss://").replace("http://", "ws://") + _WS_URL_PATH
+    title = f"Продажи по услугам за {_fmt_period(date_from, date_to)} (данные по WebSocket)"
+    t0 = time.monotonic()
     try:
         entries = await _collect_via_websocket(client, date_from, date_to)
+    except Exception as exc:
+        await exchange_log.record(
+            source="medods", method="WS", url=ws_url, endpoint="/_ws (ReportChannel)", ok=False,
+            duration_ms=int((time.monotonic() - t0) * 1000), error=f"{type(exc).__name__}: {exc}",
+            described=exchange_log.Described(title, ""))
+        raise
     finally:
         await client.aclose()
+
+    total = sum(float(e.get("finalSum") or 0) for e in entries)
+    await exchange_log.record(
+        source="medods", method="WS", url=ws_url, endpoint="/_ws (ReportChannel)",
+        duration_ms=int((time.monotonic() - t0) * 1000), content_type="application/json",
+        body=json.dumps(entries, ensure_ascii=False, indent=1),
+        described=exchange_log.Described(
+            title,
+            f"Строк услуг: {len(entries)}, итого к оплате {total:,.0f} ₽".replace(",", " "),
+            len(entries), exchange_log.fields_of(entries)))
 
     stats["fetched"] = len(entries)
     logger.info("[sales] Получено %d записей за %s", len(entries), date_from)

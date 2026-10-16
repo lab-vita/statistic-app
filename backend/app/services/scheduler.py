@@ -24,7 +24,7 @@ from app.services.medods_collector import collect_appointments, refresh_appointm
 from app.services.revenue_collector import collect_revenue
 from app.services.payment_detail_collector import collect_payment_details
 from app.services.sales_collector import collect_sales
-from app.services import digest
+from app.services import digest, exchange_log
 from app.core.utils import today_local
 
 logger = logging.getLogger(__name__)
@@ -42,24 +42,26 @@ async def _collect_appointments(db, day: date, to: date):
     return new
 
 
-# Список коллекторов: (имя, функция(db, date_from, date_to))
-_COLLECTORS: list[tuple[str, Callable]] = [
-    ("звонки",           collect_calls),
-    ("записи",           _collect_appointments),
-    ("revenue",          collect_revenue),
-    ("payment_details",  collect_payment_details),
-    ("sales",            collect_sales),
+# Список коллекторов: (ключ, название в журнале, источник, функция(db, date_from, date_to))
+_COLLECTORS: list[tuple[str, str, str, Callable]] = [
+    ("calls",           "Звонки",                         "bitrix", collect_calls),
+    ("appointments",    "Записи на приём и их статусы",   "medods", _collect_appointments),
+    ("revenue",         "Выручка по способам оплаты",     "medods", collect_revenue),
+    ("payment_details", "Платежи подробно",               "medods", collect_payment_details),
+    ("sales",           "Продажи по услугам",             "medods", collect_sales),
 ]
 
 
-async def _run_collector(name: str, fn: Callable, today: date) -> None:
-    """Запускает один коллектор в отдельной сессии, логирует результат/ошибку."""
+async def _run_collector(key: str, title: str, source: str, fn: Callable, day: date,
+                         trigger: str = "schedule") -> None:
+    """Запускает один коллектор в отдельной сессии и сеансе журнала обмена."""
     async with async_session_factory() as db:
         try:
-            result = await fn(db, today, today)
-            logger.info("[scheduler] %s: %s", name, result)
+            async with exchange_log.run(key, title, source, trigger, day, day) as run:
+                run.result = await fn(db, day, day)
+            logger.info("[scheduler] %s: %s", title, run.result)
         except Exception as exc:
-            logger.error("[scheduler] Ошибка коллектора '%s': %s", name, exc, exc_info=True)
+            logger.error("[scheduler] Ошибка коллектора '%s': %s", title, exc, exc_info=True)
 
 
 async def _sync_today() -> None:
@@ -68,8 +70,8 @@ async def _sync_today() -> None:
     logger.info("[scheduler] Запуск синхронизации за %s", today)
 
     await asyncio.gather(*[
-        _run_collector(name, fn, today)
-        for name, fn in _COLLECTORS
+        _run_collector(key, title, source, fn, today)
+        for key, title, source, fn in _COLLECTORS
     ])
 
     logger.info("[scheduler] Синхронизация завершена за %s", today)
@@ -91,11 +93,16 @@ async def _daily_digest() -> None:
         return
 
     logger.info("[scheduler] утренняя сводка: дособираю %s", yesterday)
-    await asyncio.gather(*[_run_collector(name, fn, yesterday) for name, fn in _COLLECTORS])
+    await asyncio.gather(*[_run_collector(key, title, source, fn, yesterday, "digest")
+                           for key, title, source, fn in _COLLECTORS])
 
     async with async_session_factory() as db:
         try:
-            result = await digest.send_digest(db, yesterday)
+            async with exchange_log.run("digest", "Утренняя сводка: рассылка", "bitrix", "schedule",
+                                        yesterday, yesterday) as run:
+                result = await digest.send_digest(db, yesterday)
+                run.result = {"sent": result.get("sent", []), "failed": result.get("failed", []),
+                              "skipped": result.get("skipped") or ""}
         except Exception as exc:
             logger.error("[scheduler] сводка не отправлена: %s", exc, exc_info=True)
             result = {"for_day": yesterday.isoformat(), "sent": [], "failed": [],
@@ -167,7 +174,10 @@ async def _resync_appointments_history() -> None:
         chunk_end = min(month_end, end)
         async with async_session_factory() as db:
             try:
-                total += await refresh_appointments_by_date(db, start, chunk_end)
+                async with exchange_log.run("resync", "Пересбор статусов записей", "medods", "resync",
+                                            start, chunk_end) as run:
+                    run.result = await refresh_appointments_by_date(db, start, chunk_end)
+                total += run.result
                 logger.info("[scheduler] пересбор: %s — %s готово", start, chunk_end)
             except Exception as exc:
                 errors.append(f"{start}: {exc}")
@@ -208,6 +218,15 @@ def create_scheduler() -> AsyncIOScheduler:
         name="Синхронизация данных за сегодня",
         replace_existing=True,
         misfire_grace_time=300,
+    )
+
+    scheduler.add_job(
+        exchange_log.cleanup,
+        trigger=CronTrigger(hour=3, minute=17, timezone=TZ_KEMEROVO),
+        id="exchange_log_cleanup",
+        name="Очистка журнала обмена",
+        replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     logger.info("[scheduler] Настроен: 09:00, 12:00, 15:00, 18:00 (Кемерово)")
