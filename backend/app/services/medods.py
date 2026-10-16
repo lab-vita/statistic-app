@@ -3,11 +3,13 @@ import re
 import json
 from datetime import date
 from app.core.config import settings
+from app.services import exchange_log
 
 
 async def login() -> httpx.AsyncClient:
     """Авторизуется в МедОДС и возвращает готовый клиент с куками."""
-    client = httpx.AsyncClient(
+    client = exchange_log.make_client(
+        "medods",
         headers={
             "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept-Language": "ru,en;q=0.9",
