@@ -87,6 +87,7 @@ export function HomePage() {
             type="button"
             onClick={() => setEditMode(v => !v)}
             aria-pressed={editMode}
+            data-tour="home-customize"
             className={cn(
               "inline-flex h-7 items-center gap-1.5 rounded-[7px] border px-2.5 text-[12px] font-semibold transition-colors",
               editMode
@@ -116,14 +117,16 @@ export function HomePage() {
       </PageHeader>
 
       <PageContent>
-        <HomeDashboard
-          data={data}
-          loading={loading}
-          editMode={editMode}
-          onEditMode={setEditMode}
-          can={canWidget}
-          onLayout={onLayout}
-        />
+        <div data-tour="home-grid">
+          <HomeDashboard
+            data={data}
+            loading={loading}
+            editMode={editMode}
+            onEditMode={setEditMode}
+            can={canWidget}
+            onLayout={onLayout}
+          />
+        </div>
       </PageContent>
     </div>
   );
