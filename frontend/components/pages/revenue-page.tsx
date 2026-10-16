@@ -17,6 +17,7 @@ import {
   Topbar, PageContent, MetricCard, SectionCard,
   Skeleton, Empty, ErrorBanner,
 } from "@/components/ui/primitives";
+import { PlanMeter, usePeriodPlan } from "@/components/plan-meter";
 import { RevenueChart } from "@/components/charts/revenue-chart";
 import { RevenuePeriodChart } from "@/components/charts/revenue-period-chart";
 import { CategoryTrendCard, ServicesTrendCard } from "@/components/revenue-categories";
@@ -134,6 +135,7 @@ export function RevenuePage() {
     setPeriod(getDefaultPeriod(type));
   }
 
+  const planInfo  = usePeriodPlan(period);
   const avgCheck  = stats && stats.count > 0 ? Math.round(stats.total_paid / stats.count) : 0;
   const maxDoctorPct = doctors?.doctors.reduce((m, d) => Math.max(m, d.pct), 0) ?? 0;
 
@@ -176,7 +178,9 @@ export function RevenuePage() {
                 valueClass="text-emerald-600 dark:text-emerald-400"
                 deltaDir={stats.total_paid_delta_dir}
                 deltaPct={stats.total_paid_delta_pct}
-              />
+              >
+                <PlanMeter info={planInfo} metric="revenue" fact={stats.total_paid} unit="rub" />
+              </MetricCard>
               <MetricCard
                 label="Платежей"
                 value={fmt(stats.count)}
