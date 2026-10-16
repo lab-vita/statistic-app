@@ -22,7 +22,8 @@ from app.services.analytics.call_stats import (
 from app.core.config import settings
 from app.core.utils import prev_period, to_local, local_date, local_window_utc, today_local, TZ_LOCAL
 from app.core.constants import DAY_NAMES_RU
-from app.core.auth import require_any
+from app.core.auth import CurrentUser, require_any
+from app.services import exchange_log
 
 router = APIRouter()
 
@@ -76,17 +77,19 @@ def _filter_by_operator(calls: list, operator_id: Optional[str]) -> list:
     return calls
 
 
-@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
+@router.post("/collect")
 async def collect(
     date_from: date = Query(default=None),
     date_to:   date = Query(default=None),
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_any("data:collect")),
 ):
     if not date_from:
         date_from = today_local() - timedelta(days=1)
     if not date_to:
         date_to = date_from
-    count = await collect_calls(db, date_from, date_to)
+    async with exchange_log.job_run("calls", "manual", date_from, date_to, user) as run:
+        run.result = count = await collect_calls(db, date_from, date_to)
     return {"status": "ok", "new_calls": count, "date_from": date_from, "date_to": date_to}
 
 

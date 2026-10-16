@@ -19,7 +19,8 @@ from app.db.database import get_db
 from app.models.payment_detail import PaymentDetail
 from app.services.payment_detail_collector import collect_payment_details
 from app.core.utils import prev_period, calc_delta
-from app.core.auth import require_any
+from app.core.auth import CurrentUser, require_any
+from app.services import exchange_log
 
 router = APIRouter()
 
@@ -36,13 +37,15 @@ def _base_filter(date_from: date, date_to: date, kind: int | None = None):
     return f
 
 
-@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
+@router.post("/collect")
 async def collect(
     date_from: date = Query(...),
     date_to:   date = Query(...),
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_any("data:collect")),
 ):
-    result = await collect_payment_details(db, date_from, date_to)
+    async with exchange_log.job_run("payment_details", "manual", date_from, date_to, user) as run:
+        run.result = result = await collect_payment_details(db, date_from, date_to)
     return {"status": "ok", "date_from": date_from, "date_to": date_to, **result}
 
 
