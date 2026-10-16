@@ -52,7 +52,8 @@ BOT_CODE      = "pulse_digest"
 # Аватарка бота: JPEG 256×256 в base64 (файл текстовый — так его проще хранить и обновлять).
 # Поменяли картинку — увеличьте AVATAR_VERSION, и при следующем старте она обновится в портале.
 AVATAR_FILE    = Path(__file__).resolve().parent.parent / "assets" / "bot_avatar.jpg.b64"
-AVATAR_VERSION = 1
+AVATAR_VERSION = 2
+AVATAR_NAME    = "pulse_bot.jpg"
 MISSED_LIMIT  = 6.0      # % пропущенных — тот же порог, что в разделе «Планы»
 CONV_GOOD     = 30.0     # конверсия звонок → запись: хорошо от 30% (как на «Воронке»)
 VISIT_GOOD    = 80.0     # явка: хорошо от 80%
@@ -420,12 +421,14 @@ def explain_error(e: Exception) -> str:
     return str(e) or "Неизвестная ошибка Битрикс24"
 
 
-def _avatar_b64() -> str | None:
+def _avatar() -> list[str] | None:
+    """Аватарка в формате файла Битрикс24: [имя файла, base64]. Голый base64 портал молча игнорирует."""
     try:
-        return "".join(AVATAR_FILE.read_text().split()) or None
+        data = "".join(AVATAR_FILE.read_text().split())
     except OSError:
         logger.warning("[digest] нет файла аватарки бота: %s", AVATAR_FILE)
         return None
+    return [AVATAR_NAME, data] if data else None
 
 
 async def sync_avatar(db: AsyncSession) -> None:
@@ -433,20 +436,26 @@ async def sync_avatar(db: AsyncSession) -> None:
     cfg = await get_config(db)
     if not cfg.get("bot_id") or (cfg.get("avatar_version") or 0) >= AVATAR_VERSION:
         return
-    photo = _avatar_b64()
+    photo = _avatar()
     if not photo:
         return
+    bot_id = int(cfg["bot_id"])
     try:
         await _call("imbot.update", {
-            "BOT_ID": int(cfg["bot_id"]),
+            "BOT_ID": bot_id,
             "CLIENT_ID": _client_id(),
             "FIELDS": {"PROPERTIES": {"PERSONAL_PHOTO": photo}},
         })
+        # Портал отвечает «ок», даже если картинку не сохранил, — проверяем по профилю бота
+        user = await _call("im.user.get", {"ID": bot_id}) or {}
     except Exception as e:  # noqa: BLE001 — аватарка не критична
         logger.warning("[digest] не удалось обновить аватарку бота: %s", e)
         return
+    if not user.get("avatar"):
+        logger.warning("[digest] портал принял аватарку бота, но не сохранил её")
+        return
     await update_config(db, avatar_version=AVATAR_VERSION)
-    logger.info("[digest] аватарка бота обновлена (версия %s)", AVATAR_VERSION)
+    logger.info("[digest] аватарка бота обновлена (версия %s): %s", AVATAR_VERSION, user["avatar"])
 
 
 async def ensure_bot(db: AsyncSession) -> int:
@@ -477,7 +486,7 @@ async def ensure_bot(db: AsyncSession) -> int:
         "WORK_POSITION": "Утренняя сводка по клинике",
         "COLOR": "AZURE",
     }
-    photo = _avatar_b64()
+    photo = _avatar()
     if photo:
         props["PERSONAL_PHOTO"] = photo
     try:
@@ -492,8 +501,8 @@ async def ensure_bot(db: AsyncSession) -> int:
     except BitrixError as e:
         await update_config(db, bot_error=explain_error(e))
         raise
-    await update_config(db, bot_id=int(bot_id), bot_error=None,
-                        avatar_version=AVATAR_VERSION if photo else 0)
+    # аватарку проверит sync_avatar при следующей отправке или старте сервера
+    await update_config(db, bot_id=int(bot_id), bot_error=None, avatar_version=0)
     logger.info("[digest] зарегистрирован бот «Пульс», id=%s", bot_id)
     return int(bot_id)
 
