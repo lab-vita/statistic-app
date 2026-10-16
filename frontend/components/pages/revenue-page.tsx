@@ -171,7 +171,7 @@ export function RevenuePage() {
         ) : (
           <>
             {/* KPI */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-tour="revenue-kpi">
               <MetricCard
                 label="Выручка"
                 value={`${fmt(stats.total_paid)} ₽`}
@@ -225,14 +225,16 @@ export function RevenuePage() {
 
             {/* Динамика текущий vs предыдущий период */}
             {daily && daily.days.length > 0 && (
-              <SectionCard title="Динамика выручки">
-                <RevenuePeriodChart current={daily.days} prev={prevDaily?.days ?? null} />
-              </SectionCard>
+              <div data-tour="revenue-chart">
+                <SectionCard title="Динамика выручки">
+                  <RevenuePeriodChart current={daily.days} prev={prevDaily?.days ?? null} />
+                </SectionCard>
+              </div>
             )}
 
             {/* Рейтинг врачей */}
             {doctors && doctors.doctors.length > 0 && (
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="rounded-lg border border-border bg-card overflow-hidden" data-tour="revenue-doctors">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <h3 className="text-[13px] font-semibold">Рейтинг врачей по выручке</h3>
                   <span className="text-[11px] text-muted-foreground/60">
@@ -286,7 +288,7 @@ export function RevenuePage() {
             )}
 
             {/* Направления и услуги в динамике */}
-            {sales && sales.categories.length > 0 && <CategoryTrendCard data={sales} />}
+            {sales && sales.categories.length > 0 && <div data-tour="revenue-categories"><CategoryTrendCard data={sales} /></div>}
             {sales && sales.services.length > 0 && <ServicesTrendCard data={sales} />}
           </>
         )}
