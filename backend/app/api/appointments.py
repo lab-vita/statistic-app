@@ -15,7 +15,8 @@ from app.services.analytics.appt_stats import (
 )
 from app.core.utils import prev_period, add_deltas
 from app.core.config import settings
-from app.core.auth import require_any
+from app.core.auth import CurrentUser, require_any
+from app.services import exchange_log
 
 router = APIRouter()
 
@@ -37,17 +38,19 @@ async def _load_appts(
     return list(await db.scalars(q))
 
 
-@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
+@router.post("/collect")
 async def collect(
     date_from: date = Query(default=None),
     date_to:   date = Query(default=None),
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_any("data:collect")),
 ):
     if not date_from:
         date_from = date.today() - timedelta(days=1)
     if not date_to:
         date_to = date_from
-    count = await collect_appointments(db, date_from, date_to)
+    async with exchange_log.job_run("appointments", "manual", date_from, date_to, user) as run:
+        run.result = count = await collect_appointments(db, date_from, date_to)
     return {"status": "ok", "new_appointments": count,
             "date_from": date_from, "date_to": date_to}
 

@@ -38,6 +38,10 @@ PERMISSION_DEFS: list[PermissionDef] = [
                   "Вручную обновить данные из МедОДС и Битрикс24"),
     PermissionDef("users:manage",      "Управлять доступом", "Действия",
                   "Добавлять сотрудников, назначать и редактировать роли"),
+    PermissionDef("logs:view",         "Журнал обмена", "Система",
+                  "Все запросы к МедОДС и Битрикс24 и полученные данные — в том числе данные пациентов"),
+    PermissionDef("data:export",       "Выгрузка базы", "Система",
+                  "Скачать всю базу данных одним файлом"),
 ]
 
 # совместимость: (ключ, подпись, группа)
@@ -46,7 +50,7 @@ PERMISSION_BY_KEY: dict[str, PermissionDef] = {p.key: p for p in PERMISSION_DEFS
 ALL_PERMISSIONS: frozenset[str] = frozenset(PERMISSION_BY_KEY)
 
 # Права, которые может выдавать (и включать в роли) только владелец
-OWNER_ONLY_PERMISSIONS: frozenset[str] = frozenset({"users:manage"})
+OWNER_ONLY_PERMISSIONS: frozenset[str] = frozenset({"users:manage", "logs:view", "data:export"})
 
 OWNER_ROLE = "owner"
 DEFAULT_ROLE = "viewer"

@@ -24,7 +24,9 @@ export type Permission =
   | "plans:edit"
   | "digest:manage"
   | "data:collect"
-  | "users:manage";
+  | "users:manage"
+  | "logs:view"
+  | "data:export";
 
 /** Какие права открывают раздел (хватит любого). Без записи — раздел доступен всем. */
 export const SECTION_PERMISSIONS: Partial<Record<Section, Permission[]>> = {
@@ -36,7 +38,7 @@ export const SECTION_PERMISSIONS: Partial<Record<Section, Permission[]>> = {
   funnel:       ["view:funnel"],
   plans:        ["view:plans"],
   reports:      ["view:reports"],
-  admin:        ["users:manage", "digest:manage"],
+  admin:        ["users:manage", "digest:manage", "logs:view", "data:export"],
 };
 
 /** Есть ли право. У владельца — все права. */

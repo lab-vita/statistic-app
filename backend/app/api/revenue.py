@@ -18,7 +18,8 @@ from app.db.database import get_db
 from app.models.revenue import Revenue
 from app.services.revenue_collector import collect_revenue
 from app.core.utils import prev_period, calc_delta
-from app.core.auth import require_any
+from app.core.auth import CurrentUser, require_any
+from app.services import exchange_log
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -41,17 +42,19 @@ async def _total_by_period(db: AsyncSession, date_from: date, date_to: date) -> 
     }
 
 
-@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
+@router.post("/collect")
 async def collect(
     date_from: date = Query(...),
     date_to:   date = Query(...),
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_any("data:collect")),
 ):
     if date_from > date_to:
         raise HTTPException(400, "date_from должна быть <= date_to")
     if (date_to - date_from).days > 366:
         raise HTTPException(400, "Период не может превышать 366 дней")
-    results = await collect_revenue(db, date_from, date_to)
+    async with exchange_log.job_run("revenue", "manual", date_from, date_to, user) as run:
+        run.result = results = await collect_revenue(db, date_from, date_to)
     return {
         "status": "ok", "date_from": str(date_from), "date_to": str(date_to),
         "days": len(results), "total_types": sum(results.values()), "by_day": results,

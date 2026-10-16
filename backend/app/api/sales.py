@@ -24,7 +24,8 @@ from app.models.sale import Sale
 from app.models.service import Service, ServiceCategory
 from app.services.sales_collector import collect_sales
 from app.core.utils import prev_period, calc_delta
-from app.core.auth import require_any
+from app.core.auth import CurrentUser, require_any
+from app.services import exchange_log
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -92,24 +93,28 @@ async def _run_match(db: AsyncSession) -> dict:
 # Эндпоинты
 # ──────────────────────────────────────────────────────────────────────
 
-@router.post("/collect", dependencies=[Depends(require_any("data:collect"))])
+@router.post("/collect")
 async def collect(
     date_from: date = Query(...),
     date_to:   date = Query(...),
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_any("data:collect")),
 ):
     if date_from > date_to:
         raise HTTPException(400, "date_from должна быть <= date_to")
     if (date_to - date_from).days > 31:
         raise HTTPException(400, "Период не может превышать 31 день")
-    stats = await collect_sales(db, date_from, date_to)
+    async with exchange_log.job_run("sales", "manual", date_from, date_to, user) as run:
+        run.result = stats = await collect_sales(db, date_from, date_to)
     return {"status": "ok", "date_from": str(date_from), "date_to": str(date_to), **stats}
 
 
-@router.post("/match", dependencies=[Depends(require_any("data:collect"))])
-async def match_services(db: AsyncSession = Depends(get_db)):
+@router.post("/match")
+async def match_services(db: AsyncSession = Depends(get_db),
+                         user: CurrentUser = Depends(require_any("data:collect"))):
     """Матчинг названий из sales со справочником services."""
-    stats = await _run_match(db)
+    async with exchange_log.job_run("sales_match", "manual", user=user) as run:
+        run.result = stats = await _run_match(db)
     return {"status": "ok", **stats}
 
 

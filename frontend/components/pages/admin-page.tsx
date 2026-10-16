@@ -5,12 +5,16 @@ import { PageContent, Skeleton, ErrorBanner, PageHeader, TabGroup } from "@/comp
 import { DigestSettingsCard } from "@/components/digest-settings";
 import { AccessPanel } from "@/components/admin-panel";
 import { RolesPanel } from "@/components/roles-panel";
+import { ExchangeLogPanel } from "@/components/exchange-log";
+import { DbExportPanel } from "@/components/db-export";
 import { useAuth } from "@/components/auth-gate";
 import { adminApi, type AccessRequest, type AdminMeta, type AdminUser } from "@/lib/admin-api";
 
 const TAB_ACCESS = "Доступ";
 const TAB_ROLES  = "Роли";
 const TAB_DIGEST = "Утренняя сводка";
+const TAB_LOG    = "Журнал обмена";
+const TAB_DB     = "База данных";
 
 export interface AdminData {
   meta:     AdminMeta;
@@ -22,13 +26,22 @@ export function AdminPage() {
   const { user, can } = useAuth();
   const canUsers  = can("users:manage");
   const canDigest = can("digest:manage");
-  const tabs = [...(canUsers ? [TAB_ACCESS, TAB_ROLES] : []), ...(canDigest ? [TAB_DIGEST] : [])];
+  const canLogs   = can("logs:view");
+  const canExport = can("data:export");
+  const needsData = canUsers || canDigest;      // доступы, роли и сводка читают /api/admin
+  const tabs = [
+    ...(canUsers ? [TAB_ACCESS, TAB_ROLES] : []),
+    ...(canDigest ? [TAB_DIGEST] : []),
+    ...(canLogs ? [TAB_LOG] : []),
+    ...(canExport ? [TAB_DB] : []),
+  ];
 
   const [tab,   setTab]   = useState(tabs[0] ?? TAB_DIGEST);
   const [data,  setData]  = useState<AdminData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
+    if (!needsData) return;
     try {
       const [meta, users, requests] = await Promise.all([
         adminApi.meta(),
@@ -40,7 +53,7 @@ export function AdminPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось загрузить настройки");
     }
-  }, [canUsers]);
+  }, [canUsers, needsData]);
 
   useEffect(() => {
     const t = setTimeout(reload, 0);
@@ -65,7 +78,11 @@ export function AdminPage() {
       <PageContent>
         {error && <ErrorBanner message={error} />}
 
-        {!data ? (
+        {tab === TAB_LOG && canLogs ? (
+          <ExchangeLogPanel />
+        ) : tab === TAB_DB && canExport ? (
+          <DbExportPanel />
+        ) : !data ? (
           !error && <><Skeleton className="h-24" /><Skeleton className="h-64" /></>
         ) : tab === TAB_ACCESS && canUsers ? (
           <AccessPanel data={data} meId={user.id} onChanged={reload} />

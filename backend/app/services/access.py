@@ -12,7 +12,6 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 
-import httpx
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +25,7 @@ from app.core.permissions import (
     with_requirements,
 )
 from app.models.app_user import AccessRequest, AppRole, AppUser
+from app.services import exchange_log
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ SCOPE_HINT = ("Чтобы видеть весь список сотрудник�
               "Пока работает поиск по имени.")
 
 
-# ─── Роли ────────────────────────────────────────────────────
+# ─── Роли ────────────────────────────────────────────────────────
 
 async def load_roles(db: AsyncSession) -> list[AppRole]:
     rows = (await db.execute(select(AppRole).order_by(AppRole.position, AppRole.created_at))).scalars().all()
@@ -117,7 +117,7 @@ async def _seed_and_migrate(db: AsyncSession) -> None:
     logger.info("[access] роли созданы; особых наборов прав перенесено: %s", len(custom))
 
 
-# ─── Битрикс24 ───────────────────────────────────────────────
+# ─── Битрикс24 ───────────────────────────────────────────────────
 
 def _photo(value) -> str | None:
     return value if isinstance(value, str) and value.startswith("http") else None
@@ -160,7 +160,7 @@ async def _all_employees() -> list[dict]:
 
     out: list[dict] = []
     start = 0
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with exchange_log.make_client("bitrix", timeout=20) as client:
         for _ in range(100):                      # до 5000 сотрудников
             resp = await client.post(settings.BITRIX_WEBHOOK_URL + "user.get", json={
                 "FILTER": {"ACTIVE": True, "USER_TYPE": "employee"},

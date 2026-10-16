@@ -15,16 +15,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.models.service import Service, ServiceCategory
 from app.services.service_collector import collect_services
-from app.core.auth import require_any
+from app.core.auth import CurrentUser, require_any
+from app.services import exchange_log
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/sync", dependencies=[Depends(require_any("data:collect"))])
-async def sync(db: AsyncSession = Depends(get_db)):
+@router.post("/sync")
+async def sync(db: AsyncSession = Depends(get_db),
+               user: CurrentUser = Depends(require_any("data:collect"))):
     """Синхронизировать справочник услуг с МедОДС."""
-    stats = await collect_services(db)
+    async with exchange_log.job_run("services", "manual", user=user) as run:
+        run.result = stats = await collect_services(db)
     return {"status": "ok", **stats}
 
 

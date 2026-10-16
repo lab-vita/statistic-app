@@ -6,9 +6,21 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Шрифт с кириллицей для выгрузки отчётов в PDF
+# Шрифт с кириллицей для выгрузки отчётов в PDF.
+# pg_dump для кнопки «Скачать базу»: клиент той же версии, что и база (postgres:16 в
+# docker-compose.prod.yml) — из официального репозитория PostgreSQL. Если репозиторий
+# недоступен — клиент из Debian; если и он не встал — сборка всё равно проходит,
+# а в настройках остаётся выгрузка таблиц в CSV.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core ca-certificates curl \
+    && ( ( install -d /usr/share/postgresql-common/pgdg \
+           && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+           && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+           && apt-get update \
+           && apt-get install -y --no-install-recommends postgresql-client-16 ) \
+         || ( rm -f /etc/apt/sources.list.d/pgdg.list && apt-get update \
+              && apt-get install -y --no-install-recommends postgresql-client ) \
+         || echo "pg_dump не установлен: в настройках будет доступна только выгрузка в CSV" ) \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

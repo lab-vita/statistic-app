@@ -22,7 +22,6 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +30,7 @@ from app.core.permissions import effective_permissions
 from app.core.utils import calc_delta, today_local
 from app.models.app_setting import AppSetting
 from app.models.app_user import AppUser
+from app.services import exchange_log
 
 logger = logging.getLogger(__name__)
 
@@ -383,7 +383,7 @@ class BitrixError(Exception):
 
 async def _call(method: str, payload: dict) -> object:
     """Вызов REST-метода через входящий вебхук."""
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with exchange_log.make_client("bitrix", timeout=20) as client:
         resp = await client.post(settings.BITRIX_WEBHOOK_URL + method, json=payload)
     try:
         data = resp.json()

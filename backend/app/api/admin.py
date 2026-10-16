@@ -23,6 +23,7 @@ from app.core.permissions import (
     ALL_PERMISSIONS,
     DEFAULT_ROLE,
     OWNER_ONLY_PERMISSIONS,
+    PERMISSION_BY_KEY,
     OWNER_ROLE,
     PERMISSION_DEFS,
     effective_permissions,
@@ -69,8 +70,10 @@ def _can_control(actor: CurrentUser, perms: frozenset[str] | set[str], what: str
     """actor может выдавать/менять набор прав perms."""
     if actor.is_owner:
         return
-    if OWNER_ONLY_PERMISSIONS & set(perms):
-        raise HTTPException(403, f"{what}: право «Управлять доступом» выдаёт только владелец")
+    only = OWNER_ONLY_PERMISSIONS & set(perms)
+    if only:
+        names = ", ".join(f"«{PERMISSION_BY_KEY[p].label}»" for p in sorted(only) if p in PERMISSION_BY_KEY)
+        raise HTTPException(403, f"{what}: права {names} выдаёт только владелец")
     if not set(perms) <= actor.permissions:
         raise HTTPException(403, f"{what}: нельзя выдать права, которых нет у вас самого")
 
@@ -149,7 +152,7 @@ async def meta(actor: CurrentUser = Depends(_any_admin), db: AsyncSession = Depe
     }
 
 
-# ─── Роли ───────────────────────────────────────────────────
+# ─── Роли ──────────────────────────────────────────────────────
 
 class RoleIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)

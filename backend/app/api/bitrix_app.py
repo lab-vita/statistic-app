@@ -27,6 +27,7 @@ from app.core.permissions import ALL_PERMISSIONS
 from app.core.security import create_token
 from app.db.database import get_db
 from app.models.app_user import AccessRequest, AppUser
+from app.services import exchange_log
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -60,7 +61,7 @@ async def _fetch_profile(auth_id: str) -> dict | None:
     """Спросить у портала: чей это токен. Возвращает профиль или None."""
     url = f"https://{settings.BITRIX_PORTAL_DOMAIN}/rest/profile.json"
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with exchange_log.make_client("bitrix", timeout=10) as client:
             resp = await client.get(url, params={"auth": auth_id})
     except httpx.HTTPError as exc:
         logger.warning("[bitrix_app] портал не ответил: %s", exc)
