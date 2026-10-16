@@ -177,7 +177,7 @@ _MONTHS = ["январь", "февраль", "март", "апрель", "май
 
 
 def _num(n: float) -> str:
-    return f"{round(n):,}".replace(",", " ")
+    return f"{round(n):,}".replace(",", " ")
 
 
 def _pct(x: float) -> str:
@@ -185,7 +185,7 @@ def _pct(x: float) -> str:
 
 
 def _rub(n: float) -> str:
-    return f"{_num(n)} ₽"
+    return f"{_num(n)} ₽"
 
 
 def _dur(sec: float) -> str:
