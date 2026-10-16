@@ -4,8 +4,8 @@ import { Activity, Monitor, Server, CheckCircle2, Sparkles, Wrench, Shield } fro
 import { PageHeader, PageContent } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION_FRONTEND = "0.13.0";
-const APP_VERSION_BACKEND  = "0.14.0";
+const APP_VERSION_FRONTEND = "0.14.0";
+const APP_VERSION_BACKEND  = "0.15.0";
 const APP_UPDATED          = "16 октября 2026";
 
 // ─── Типы ────────────────────────────────────────────────────
@@ -29,6 +29,17 @@ interface Release {
 // исправлено, без технических подробностей.
 
 const FRONTEND_RELEASES: Release[] = [
+  {
+    version: "0.14.0",
+    date: "16 октября 2026",
+    title: "План во всех разделах",
+    changes: [
+      { kind: "new",     text: "Звонки, Записи, Выручка и Воронка показывают, сколько плана выполнено за выбранный период — день, неделю, месяц, квартал, год" },
+      { kind: "new",     text: "Для текущего месяца (квартала, года) — план на весь период и прогноз при нынешнем темпе" },
+      { kind: "new",     text: "Конверсия в запись и доля явок сравниваются с целью из «Планов»; цвета в воронке и у операторов — тоже по цели" },
+      { kind: "improve", text: "Виджет «Выполнение планов» на главной: добавлены выручка, конверсия и явки" },
+    ],
+  },
   {
     version: "0.13.0",
     date: "16 октября 2026",
@@ -178,6 +189,14 @@ const FRONTEND_RELEASES: Release[] = [
 ];
 
 const BACKEND_RELEASES: Release[] = [
+  {
+    version: "0.15.0",
+    date: "16 октября 2026",
+    title: "Цели за любой период",
+    changes: [
+      { kind: "improve", text: "Цели по конверсии и явкам за квартал или год — среднее по месяцам с учётом числа дней" },
+    ],
+  },
   {
     version: "0.14.0",
     date: "16 октября 2026",
