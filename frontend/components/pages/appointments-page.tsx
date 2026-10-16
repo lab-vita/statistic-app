@@ -6,6 +6,7 @@ import {
   toDateStr, addDays,
   type AppointmentStatsResponse, type AppointmentDailyResponse, type Admin, type PlanRangeResponse,
 } from "@/lib/api";
+import { PlanMeter, TargetMeter, usePeriodPlan } from "@/components/plan-meter";
 import { getDefaultPeriod, shiftPeriod, formatPeriodLabel, type Period, type PeriodType } from "@/lib/periods";
 import {
   Topbar, MenuItem, MenuDivider, MenuLabel, PageContent, MetricCard, SectionCard, SrcBar,
@@ -186,6 +187,10 @@ export function AppointmentsPage() {
   }, {} as Record<string, Admin[]>);
 
   const adminName = adminId ?? "Все сотрудники";
+  // план — на всю клинику, при выбранном сотруднике не показываем
+  const planInfo = usePeriodPlan(period, !adminId);
+  // доля явок для цели — от прошедших записей, как на странице «Планы»
+  const visitPctPast = s && s.total - s.pending > 0 ? s.visits / (s.total - s.pending) * 100 : null;
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -239,8 +244,17 @@ export function AppointmentsPage() {
           <>
             {/* Cards row 1 */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <MetricCard label="Всего записей"   value={fmt(s.total)}        sub="за период" />
-              <MetricCard label="Явки"             value={fmt(s.visits)}       valueClass="text-emerald-600 dark:text-emerald-400" sub={`${fmtPct(s.visit_pct)} от записей`} />
+              <MetricCard label="Всего записей"   value={fmt(s.total)}        sub="за период">
+                <PlanMeter info={planInfo} metric="appt_count" fact={s.total} />
+              </MetricCard>
+              <MetricCard label="Явки"             value={fmt(s.visits)}       valueClass="text-emerald-600 dark:text-emerald-400" sub={`${fmtPct(s.visit_pct)} от записей`}>
+                {visitPctPast != null && planInfo?.targets.visit_pct != null && (
+                  <>
+                    <TargetMeter info={planInfo} metric="visit_pct" value={visitPctPast} label="Цель явок" />
+                    <p className="mt-1 text-[11px] text-text-3 tabular-nums">{fmtPct(Math.round(visitPctPast * 10) / 10)} от прошедших</p>
+                  </>
+                )}
+              </MetricCard>
               <MetricCard label="Неявки"           value={fmt(s.noshow)}       valueClass={s.noshow_pct > 10 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"} sub={`${fmtPct(s.noshow_pct)} от записей`} />
               <MetricCard label="Новые пациенты"   value={fmt(s.new_patients)} valueClass="text-violet-600 dark:text-violet-400" sub={`${fmtPct(s.new_pct)} от записей`} />
             </div>
