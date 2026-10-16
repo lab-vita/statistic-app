@@ -44,7 +44,7 @@ export type WidgetGroup = "Звонки" | "Записи" | "Пациенты" |
 
 /** Право, без которого виджет не показывается (как у разделов в сайдбаре). */
 export type WidgetPermission =
-  | "view:calls" | "view:appointments" | "view:revenue"
+  | "view:calls" | "view:appointments" | "view:patients" | "view:revenue"
   | "view:funnel" | "view:plans" | "view:reports";
 
 // ─── Определение типа (метаданные для каталога) ──────────────
@@ -152,13 +152,13 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   },
   // ── Пациенты
   {
-    id: "patients_noshows", group: "Пациенты", permission: "view:appointments", data: ["noshows"],
+    id: "patients_noshows", group: "Пациенты", permission: "view:patients", data: ["noshows"],
     name: "Неявки по дням недели",
     description: "Доля неявок за период и в какие дни недели пациенты не приходят чаще всего.",
     defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 8, maxH: 5,
   },
   {
-    id: "patients_returns", group: "Пациенты", permission: "view:appointments", data: ["returns"],
+    id: "patients_returns", group: "Пациенты", permission: "view:patients", data: ["returns"],
     name: "Повторные визиты",
     description: "Сколько пациентов уже бывали в клинике, сколько вернулись за 30 дней и через сколько дней обычно приходят снова.",
     defaultW: 4, defaultH: 3, minW: 3, minH: 3, maxW: 8, maxH: 4,

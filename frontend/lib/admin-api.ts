@@ -1,14 +1,39 @@
 import { API_URL } from "./api";
 import { authFetch } from "./auth";
 
-export interface PermissionDef { key: string; label: string; group: string }
-export interface RoleDef { id: string; label: string; permissions: string[] }
-export interface AdminMeta { permissions: PermissionDef[]; roles: RoleDef[]; owner_only: string[] }
+// /api/auth/me отдаёт ещё фото и название роли
+declare module "./api" {
+  interface AuthUser {
+    avatar?:     string | null;
+    role_label?: string;
+  }
+}
+
+export interface PermissionDef { key: string; label: string; group: string; hint: string; requires: string[] }
+export interface RoleDef {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  /** встроенная (Владелец) — менять нельзя */
+  system: boolean;
+  /** сколько сотрудников с этой ролью */
+  users: number;
+}
+export interface AdminMeta {
+  permissions: PermissionDef[];
+  roles: RoleDef[];
+  owner_only: string[];
+  me: { id: string; is_owner: boolean; permissions: string[] };
+}
 
 export interface AdminUser {
   id: string;
   name: string;
+  avatar: string | null;
+  position: string | null;
   role: string;
+  role_name: string;
   permissions: string[];
   is_active: boolean;
   created_at: string | null;
@@ -18,8 +43,26 @@ export interface AdminUser {
 export interface AccessRequest {
   id: string;
   name: string;
+  avatar: string | null;
+  position: string | null;
   first_requested_at: string;
   last_requested_at: string;
+}
+
+/** Сотрудник портала Битрикс24 — для выбора, кому дать доступ */
+export interface Employee {
+  id: string;
+  name: string;
+  position: string | null;
+  avatar: string | null;
+  has_access: boolean;
+  role: string | null;
+}
+export interface EmployeesResponse {
+  /** full — весь список портала; search — только поиск по имени (у вебхука нет права «user») */
+  mode: "full" | "search";
+  users: Employee[];
+  hint: string | null;
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -41,16 +84,23 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+export interface RoleInput { name: string; description: string; permissions: string[] }
+
 export const adminApi = {
-  meta:     ()                                  => call<AdminMeta>("GET", "/meta"),
-  users:    ()                                  => call<{ users: AdminUser[] }>("GET", "/users"),
-  requests: ()                                  => call<{ requests: AccessRequest[] }>("GET", "/requests"),
-  addUser:  (b: { bitrix_user_id: string; name?: string; role: string; permissions?: string[] }) =>
-              call<AdminUser>("POST", "/users", b),
-  patchUser:(id: string, b: { role?: string; permissions?: string[]; is_active?: boolean }) =>
-              call<AdminUser>("PATCH", `/users/${encodeURIComponent(id)}`, b),
-  approve:  (id: string, role: string)          => call<AdminUser>("POST", `/requests/${encodeURIComponent(id)}/approve`, { role }),
-  dismiss:  (id: string)                        => call<void>("DELETE", `/requests/${encodeURIComponent(id)}`),
+  meta:       ()                                  => call<AdminMeta>("GET", "/meta"),
+  users:      ()                                  => call<{ users: AdminUser[] }>("GET", "/users"),
+  requests:   ()                                  => call<{ requests: AccessRequest[] }>("GET", "/requests"),
+  employees:  (q: string)                         => call<EmployeesResponse>("GET", `/bitrix/employees?q=${encodeURIComponent(q)}`),
+  addUsers:   (users: Pick<Employee, "id" | "name" | "avatar" | "position">[], role: string) =>
+                call<{ added: string[]; skipped: string[] }>("POST", "/users", { users, role }),
+  patchUser:  (id: string, b: { role?: string; is_active?: boolean }) =>
+                call<AdminUser>("PATCH", `/users/${encodeURIComponent(id)}`, b),
+  removeUser: (id: string)                        => call<void>("DELETE", `/users/${encodeURIComponent(id)}`),
+  approve:    (id: string, role: string)          => call<AdminUser>("POST", `/requests/${encodeURIComponent(id)}/approve`, { role }),
+  dismiss:    (id: string)                        => call<void>("DELETE", `/requests/${encodeURIComponent(id)}`),
+  createRole: (b: RoleInput)                      => call<RoleDef>("POST", "/roles", b),
+  updateRole: (id: string, b: Partial<RoleInput>) => call<RoleDef>("PATCH", `/roles/${encodeURIComponent(id)}`, b),
+  deleteRole: (id: string)                        => call<void>("DELETE", `/roles/${encodeURIComponent(id)}`),
 };
 
 // ─── Утренняя сводка ────────────────────────────────────────

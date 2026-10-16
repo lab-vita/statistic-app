@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import type { Section } from "@/lib/permissions";
 import { useAuth } from "@/components/auth-gate";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   Home, Phone, Calendar, TrendingUp, FileText, Filter, Clock,
   Users, Settings, Info, Activity, ChevronLeft, Moon, Sun, X, HeartPulse,
@@ -24,16 +25,7 @@ const SECTIONS: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "about",        label: "О системе",  icon: Info },
 ];
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Владелец", admin: "Администратор", viewer: "Наблюдатель",
-};
-
 const STORAGE_KEY = "pulse.sidebar.expanded";
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return parts.slice(0, 2).map(p => p[0]).join("").toUpperCase() || "—";
-}
 
 interface Props {
   section:         Section;
@@ -227,15 +219,12 @@ function SidebarBody({ expanded, section, onSelect, head }: {
 
       {/* User */}
       <div className="flex shrink-0 items-center gap-[9px] overflow-hidden whitespace-nowrap border-t border-sidebar-border p-[14px]">
-        <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-text-2"
-          title={expanded ? undefined : user.name}
-        >
-          {initials(user.name)}
+        <span title={expanded ? undefined : user.name} className="shrink-0">
+          <UserAvatar name={user.name} src={user.avatar} size={28} />
         </span>
         <div className={cn("min-w-0 transition-opacity duration-150", expanded ? "opacity-100" : "opacity-0")}>
           <div className="truncate text-[12px] font-semibold text-foreground">{user.name}</div>
-          <div className="text-[10px] text-text-3">{ROLE_LABELS[user.role] ?? user.role}</div>
+          <div className="text-[10px] text-text-3">{user.role_label ?? user.role}</div>
         </div>
       </div>
     </>

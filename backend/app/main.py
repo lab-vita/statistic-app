@@ -10,6 +10,7 @@ from app.api import calls, appointments, plans, revenue, sales, services, staff,
 from app.api import report_builder
 from app.api import admin as admin_api, auth as auth_api, bitrix_app
 from app.core.auth import current_user, require_any
+from app.services import access
 from app.services.scheduler import create_scheduler, setup_digest
 
 logging.basicConfig(
@@ -28,6 +29,10 @@ async def lifespan(app: FastAPI):
         await report_builder.create_tables(engine)
     except Exception as exc:  # noqa: BLE001 — без шаблонов приложение всё равно работает
         logger.error("[main] таблица шаблонов отчётов не создана: %s", exc)
+    try:
+        await access.create_tables(engine)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("[main] роли не подготовлены: %s", exc)
     try:
         await plans.create_tables(engine)
     except Exception as exc:  # noqa: BLE001
@@ -57,7 +62,7 @@ def _guard(*perms: str):
 
 app.include_router(calls.router,        prefix="/api/calls",        tags=["calls"],        dependencies=_guard("view:calls", "view:reports"))
 app.include_router(appointments.router, prefix="/api/appointments", tags=["appointments"], dependencies=_guard("view:appointments", "view:reports"))
-app.include_router(patients.router,     prefix="/api/patients",     tags=["patients"],     dependencies=_guard("view:appointments", "view:reports"))
+app.include_router(patients.router,     prefix="/api/patients",     tags=["patients"],     dependencies=_guard("view:patients", "view:reports"))
 app.include_router(plans.router,        prefix="/api/plans",        tags=["plans"],        dependencies=[Depends(current_user)])
 app.include_router(revenue.router,      prefix="/api/revenue",      tags=["revenue"],      dependencies=_guard("view:revenue"))
 app.include_router(sales.router,        prefix="/api/sales",        tags=["sales"],        dependencies=_guard("view:revenue"))
@@ -67,7 +72,7 @@ app.include_router(payments.router,     prefix="/api/payments",     tags=["payme
 app.include_router(reports.router,      prefix="/api/reports",      tags=["reports"],      dependencies=_guard("view:reports"))
 # Конструктор: доступ к разделу — view:reports, к каждому источнику — его собственное право (см. report_builder)
 app.include_router(report_builder.router, prefix="/api/reports",    tags=["reports"],      dependencies=_guard("view:reports"))
-app.include_router(admin_api.router,    prefix="/api/admin",        tags=["admin"],        dependencies=_guard("users:manage"))
+app.include_router(admin_api.router,    prefix="/api/admin",        tags=["admin"],        dependencies=_guard("users:manage", "digest:manage"))  # точнее — в admin.py
 
 # Вход и служебное (без защиты токеном: auth/me сам проверяет, handler/install вызывает Битрикс24)
 app.include_router(auth_api.router,     prefix="/api/auth",         tags=["auth"])

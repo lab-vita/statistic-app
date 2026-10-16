@@ -1,546 +1,378 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/components/auth-gate";
+/**
+ * Настройки → Доступ: кто открывает «Пульс» и с какой ролью.
+ * Сотрудники добавляются выбором из списка портала Битрикс24, фото и должности — оттуда же.
+ */
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Info, Loader2, Search, Trash2, UserPlus, X } from "lucide-react";
+import { SectionCard, StatusPill } from "@/components/ui/primitives";
+import { UserAvatar } from "@/components/user-avatar";
+import { cn } from "@/lib/utils";
 import {
   adminApi,
-  type AccessRequest,
-  type AdminMeta,
-  type AdminUser,
+  type AdminMeta, type AdminUser, type Employee, type EmployeesResponse, type RoleDef,
 } from "@/lib/admin-api";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { ChevronDown } from "lucide-react";
+import type { AdminData } from "@/components/pages/admin-page";
 
-const inputCls =
-  "h-8 rounded-lg border border-input bg-background px-2.5 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
+// ─── Общее ──────────────────────────────────────────────────
 
-const fmt = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleString("ru-RU", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+export function ago(iso: string | null): string {
+  if (!iso) return "ещё не входил(а)";
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (min < 2) return "только что";
+  if (min < 60) return `${min} мин назад`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} ч назад`;
+  const d = Math.round(h / 24);
+  if (d < 31) return `${d} дн назад`;
+  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+}
 
-const sameSet = (a: string[], b: string[]) =>
-  a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
+/** Может ли текущий пользователь выдавать эту роль */
+export function canGrant(meta: AdminMeta, role: RoleDef): boolean {
+  if (meta.me.is_owner) return true;
+  if (role.id === "owner") return false;
+  const mine = new Set(meta.me.permissions);
+  return role.permissions.every(p => mine.has(p) && !meta.owner_only.includes(p));
+}
 
-// ─── Галочки прав ────────────────────────────────────────────
+function canTouch(meta: AdminMeta, u: AdminUser): boolean {
+  if (u.id === meta.me.id) return false;
+  if (meta.me.is_owner) return true;
+  if (u.role === "owner") return false;
+  const mine = new Set(meta.me.permissions);
+  return u.permissions.every(p => mine.has(p));
+}
 
-function PermissionChecks({
-  meta,
-  value,
-  onChange,
-  disabled,
-  canGrant,
-}: {
-  meta: AdminMeta;
-  value: string[];
-  onChange: (next: string[]) => void;
-  disabled: boolean;
-  canGrant: (key: string) => boolean;
+const selectCls =
+  "h-8 rounded-[7px] border border-border bg-card px-2 text-[12px] font-medium text-foreground " +
+  "outline-none transition-colors hover:border-brand/50 focus-visible:border-brand disabled:cursor-not-allowed disabled:opacity-60";
+
+export function RoleSelect({ meta, value, onChange, disabled, label }: {
+  meta: AdminMeta; value: string; onChange: (v: string) => void; disabled?: boolean; label: string;
 }) {
-  const groups = Array.from(new Set(meta.permissions.map((p) => p.group)));
+  const options = meta.roles.filter(r => r.id === value || canGrant(meta, r));
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {groups.map((g) => (
-        <div key={g}>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            {g}
-          </div>
-          <div className="space-y-2">
-            {meta.permissions
-              .filter((p) => p.group === g)
-              .map((p) => {
-                const blocked = !canGrant(p.key);
-                return (
-                  <label
-                    key={p.key}
-                    className={`flex items-center gap-2.5 text-xs ${
-                      disabled || blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                    }`}
-                    title={blocked && !disabled ? "Выдать это право вы не можете" : undefined}
-                  >
-                    <input
-                      type="checkbox"
-                      aria-label={p.label}
-                      checked={value.includes(p.key)}
-                      disabled={disabled || blocked}
-                      className="accent-foreground"
-                      onChange={(e) =>
-                        onChange(
-                          e.target.checked
-                            ? [...value, p.key]
-                            : value.filter((k) => k !== p.key),
-                        )
-                      }
-                    />
-                    <span className="leading-none">{p.label}</span>
-                  </label>
-                );
-              })}
-          </div>
-        </div>
-      ))}
-    </div>
+    <select aria-label={label} className={selectCls} value={value} disabled={disabled}
+            onChange={e => onChange(e.target.value)}>
+      {options.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+    </select>
   );
 }
 
-// ─── Строка сотрудника ───────────────────────────────────────
-
-function UserRow({
-  u,
-  meta,
-  roleOptions,
-  canGrant,
-  onChanged,
-  onError,
-}: {
-  u: AdminUser;
-  meta: AdminMeta;
-  roleOptions: { id: string; label: string }[];
-  canGrant: (key: string) => boolean;
-  onChanged: (msg: string) => void;
-  onError: (msg: string) => void;
-}) {
-  const { user: me } = useAuth();
-  const [role, setRole] = useState(u.role);
-  const [perms, setPerms] = useState<string[]>(u.permissions);
-  const [open, setOpen] = useState(false);
+function useRowAction() {
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true); setErr(null);
+    try { await fn(); } catch (e) { setErr(e instanceof Error ? e.message : "Ошибка"); }
+    finally { setBusy(false); }
+  };
+  return { busy, err, run };
+}
 
-  const isSelf = u.id === me.id;
-  const lockedByOwner = u.role === "owner" && me.role !== "owner";
-  const readOnly = isSelf || lockedByOwner;
-  const dirty = role !== u.role || !sameSet(perms, u.permissions);
-  const roleLabel = meta.roles.find((r) => r.id === role)?.label ?? role;
+// ─── Строка сотрудника ────────────────────────────────────────
 
-  function pickRole(next: string) {
-    setRole(next);
-    setPerms(meta.roles.find((r) => r.id === next)?.permissions ?? []);
-  }
-
-  async function run(fn: () => Promise<unknown>, okMsg: string) {
-    setBusy(true);
-    try {
-      await fn();
-      onChanged(okMsg);
-    } catch (e) {
-      onError(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
+function UserRow({ u, meta, meId, onChanged }: {
+  u: AdminUser; meta: AdminMeta; meId: string; onChanged: () => Promise<void>;
+}) {
+  const { busy, err, run } = useRowAction();
+  const [confirm, setConfirm] = useState(false);
+  const editable = canTouch(meta, u);
 
   return (
-    <Card className={`p-4 ${u.is_active ? "" : "opacity-60"}`}>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">
-              {u.name || "Без имени"}
-            </span>
-            {isSelf && (
-              <Badge variant="secondary" className="h-4 text-[10px]">
-                вы
-              </Badge>
-            )}
-            {!u.is_active && (
-              <Badge variant="outline" className="h-4 text-[10px] text-muted-foreground">
-                Отключён
-              </Badge>
-            )}
-          </div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">
-            ID {u.id} · последний вход: {fmt(u.last_login_at)}
-          </div>
+    <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5", !u.is_active && "opacity-60")}>
+      <UserAvatar name={u.name || u.id} src={u.avatar} size={36} />
+      <div className="min-w-0 flex-1 basis-48">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="truncate text-[13px] font-semibold">{u.name || `ID ${u.id}`}</span>
+          {u.id === meId && <StatusPill color="blue">вы</StatusPill>}
+          {!u.is_active && <StatusPill color="muted">отключён</StatusPill>}
         </div>
+        <p className="truncate text-[11px] text-text-3">
+          {u.position ? `${u.position} · ` : ""}{u.last_login_at ? `входил(а) ${ago(u.last_login_at)}` : "ещё не входил(а)"}
+        </p>
+        {err && <p className="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{err}</p>}
+      </div>
 
-        <select
-          aria-label={`Роль: ${u.name || u.id}`}
-          className={inputCls}
-          value={role}
-          disabled={readOnly || busy}
-          onChange={(e) => pickRole(e.target.value)}
-        >
-          {!roleOptions.some((r) => r.id === role) && (
-            <option value={role}>{roleLabel}</option>
-          )}
-          {roleOptions.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1"
-          onClick={() => setOpen((o) => !o)}
-        >
-          Права ({role === "owner" ? "все" : `${perms.length} из ${meta.permissions.length}`})
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-        </Button>
-
-        {dirty && !readOnly && (
-          <Button
-            size="sm"
+      <div className="flex items-center gap-2">
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-text-3" aria-hidden="true" />}
+        <RoleSelect meta={meta} value={u.role} label={`Роль: ${u.name}`} disabled={!editable || busy}
+                    onChange={role => run(async () => { await adminApi.patchUser(u.id, { role }); await onChanged(); })} />
+        {editable && (
+          <button
+            type="button"
+            onClick={() => run(async () => { await adminApi.patchUser(u.id, { is_active: !u.is_active }); await onChanged(); })}
             disabled={busy}
-            onClick={() =>
-              run(
-                () => adminApi.patchUser(u.id, { role, permissions: perms }),
-                "Права сохранены",
-              )
-            }
-          >
-            Сохранить
-          </Button>
-        )}
-        {!readOnly && (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={() =>
-              run(
-                () => adminApi.patchUser(u.id, { is_active: !u.is_active }),
-                u.is_active ? "Доступ отключён" : "Доступ включён",
-              )
-            }
+            className="h-8 rounded-[7px] border border-border bg-card px-2.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-accent disabled:opacity-60"
           >
             {u.is_active ? "Отключить" : "Включить"}
-          </Button>
+          </button>
         )}
+        {editable && (confirm ? (
+          <span className="flex items-center gap-1">
+            <button type="button" disabled={busy}
+                    onClick={() => run(async () => { await adminApi.removeUser(u.id); await onChanged(); })}
+                    className="h-8 rounded-[7px] bg-red-600 px-2.5 text-[12px] font-semibold text-brand-foreground hover:bg-red-700">
+              Убрать
+            </button>
+            <button type="button" aria-label="Не убирать" onClick={() => setConfirm(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-[7px] text-text-3 hover:bg-accent">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        ) : (
+          <button type="button" aria-label={`Убрать доступ: ${u.name}`} title="Убрать из списка доступа"
+                  onClick={() => setConfirm(true)}
+                  className="flex h-8 w-8 items-center justify-center rounded-[7px] text-text-3 transition-colors hover:bg-red-500/10 hover:text-red-600">
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+          </button>
+        ))}
       </div>
-
-      {open && (
-        <>
-          <Separator className="my-4" />
-          <PermissionChecks
-            meta={meta}
-            value={role === "owner" ? meta.permissions.map((p) => p.key) : perms}
-            onChange={setPerms}
-            disabled={readOnly || busy || role === "owner"}
-            canGrant={canGrant}
-          />
-          {isSelf && (
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Свои права менять нельзя, чтобы случайно не потерять доступ.
-            </p>
-          )}
-          {lockedByOwner && (
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Запись владельца может менять только владелец.
-            </p>
-          )}
-          {role === "owner" && !readOnly && (
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              У владельца всегда все права.
-            </p>
-          )}
-        </>
-      )}
-    </Card>
+    </li>
   );
 }
 
-// ─── Запрос на доступ ────────────────────────────────────────
+// ─── Запросы на доступ ──────────────────────────────────────
 
-function RequestRow({
-  r,
-  roleOptions,
-  onChanged,
-  onError,
-}: {
-  r: AccessRequest;
-  roleOptions: { id: string; label: string }[];
-  onChanged: (msg: string) => void;
-  onError: (msg: string) => void;
-}) {
-  const [role, setRole] = useState(
-    roleOptions.find((o) => o.id === "viewer")?.id ?? roleOptions[0]?.id ?? "viewer",
-  );
-  const [busy, setBusy] = useState(false);
-
-  async function run(fn: () => Promise<unknown>, okMsg: string) {
-    setBusy(true);
-    try {
-      await fn();
-      onChanged(okMsg);
-    } catch (e) {
-      onError(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
+function Requests({ data, onChanged }: { data: AdminData; onChanged: () => Promise<void> }) {
+  const { meta } = data;
+  const fallback = meta.roles.find(r => r.id === "viewer" && canGrant(meta, r))?.id
+    ?? meta.roles.find(r => canGrant(meta, r) && r.id !== "owner")?.id ?? "viewer";
+  const [roles, setRoles] = useState<Record<string, string>>({});
+  const { busy, err, run } = useRowAction();
+  if (data.requests.length === 0) return null;
 
   return (
-    <Card className="flex flex-wrap items-center gap-3 p-4">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{r.name || "Без имени"}</div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground">
-          ID {r.id} · запрос: {fmt(r.last_requested_at)}
-        </div>
-      </div>
-      <select
-        aria-label={`Роль для запроса: ${r.name || r.id}`}
-        className={inputCls}
-        value={role}
-        disabled={busy}
-        onChange={(e) => setRole(e.target.value)}
-      >
-        {roleOptions.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
+    <SectionCard title="Просят доступ" right={`${data.requests.length}`} noPad>
+      <p className="px-4 pb-1 text-[12px] text-text-3 sm:px-5">
+        Эти сотрудники открывали «Пульс», но их нет в списке. Выберите роль и разрешите — или отклоните.
+      </p>
+      {err && <p className="px-4 text-[12px] text-red-600 dark:text-red-400 sm:px-5">{err}</p>}
+      <ul className="divide-y divide-hairline">
+        {data.requests.map(r => (
+          <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
+            <UserAvatar name={r.name || r.id} src={r.avatar} size={36} />
+            <div className="min-w-0 flex-1 basis-48">
+              <p className="truncate text-[13px] font-semibold">{r.name || `ID ${r.id}`}</p>
+              <p className="truncate text-[11px] text-text-3">
+                {r.position ? `${r.position} · ` : ""}открывал(а) {ago(r.last_requested_at)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <RoleSelect meta={meta} label={`Роль: ${r.name}`} value={roles[r.id] ?? fallback}
+                          onChange={v => setRoles(s => ({ ...s, [r.id]: v }))} disabled={busy} />
+              <button type="button" disabled={busy}
+                      onClick={() => run(async () => { await adminApi.approve(r.id, roles[r.id] ?? fallback); await onChanged(); })}
+                      className="flex h-8 items-center gap-1.5 rounded-[7px] bg-brand px-3 text-[12px] font-semibold text-brand-foreground hover:bg-brand-strong disabled:opacity-60">
+                <Check className="h-3.5 w-3.5" /> Разрешить
+              </button>
+              <button type="button" disabled={busy}
+                      onClick={() => run(async () => { await adminApi.dismiss(r.id); await onChanged(); })}
+                      className="h-8 rounded-[7px] border border-border bg-card px-3 text-[12px] font-medium text-text-2 hover:bg-accent disabled:opacity-60">
+                Отклонить
+              </button>
+            </div>
+          </li>
         ))}
-      </select>
-      <Button
-        size="sm"
-        disabled={busy}
-        onClick={() => run(() => adminApi.approve(r.id, role), "Доступ выдан")}
-      >
-        Разрешить
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busy}
-        onClick={() => run(() => adminApi.dismiss(r.id), "Запрос отклонён")}
-      >
-        Отклонить
-      </Button>
-    </Card>
+      </ul>
+    </SectionCard>
   );
 }
 
-// ─── Панель ──────────────────────────────────────────────────
+// ─── Добавление из Битрикс24 ────────────────────────────────
 
-export function AdminPanel() {
-  const { user: me, can } = useAuth();
-  const [meta, setMeta] = useState<AdminMeta | null>(null);
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [requests, setRequests] = useState<AccessRequest[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+function AddDialog({ meta, onClose, onAdded }: {
+  meta: AdminMeta; onClose: () => void; onAdded: () => Promise<void>;
+}) {
+  const [q, setQ] = useState("");
+  const [res, setRes] = useState<EmployeesResponse | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Map<string, Employee>>(new Map());
+  const defaultRole = meta.roles.find(r => r.id === "viewer" && canGrant(meta, r))?.id
+    ?? meta.roles.find(r => canGrant(meta, r) && r.id !== "owner")?.id ?? "viewer";
+  const [role, setRole] = useState(defaultRole);
+  const { busy, err, run } = useRowAction();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const [newId, setNewId] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState("viewer");
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // поиск с задержкой; полный список сервер отдаёт и при пустой строке
+  useEffect(() => {
+    let alive = true;
+    const t = setTimeout(() => {
+      adminApi.employees(q)
+        .then(r => { if (alive) { setRes(r); setLoadErr(null); } })
+        .catch(e => { if (alive) setLoadErr(e instanceof Error ? e.message : "Не удалось получить список"); });
+    }, q ? 300 : 0);
+    return () => { alive = false; clearTimeout(t); };
+  }, [q]);
+
+  const toggle = (e: Employee) => setPicked(prev => {
+    const next = new Map(prev);
+    if (next.has(e.id)) next.delete(e.id); else next.set(e.id, e);
+    return next;
+  });
+
+  const list = res?.users ?? [];
+  const searchTooShort = res?.mode === "search" && q.trim().length < 3;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-foreground/30 p-3 sm:p-8"
+         role="dialog" aria-modal="true" aria-label="Добавить сотрудников"
+         onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="card-surface flex max-h-[calc(100vh-24px)] w-full max-w-[560px] flex-col sm:max-h-[calc(100vh-64px)]">
+        <div className="flex items-center gap-3 border-b border-hairline px-5 py-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[14px] font-bold">Добавить сотрудников</h2>
+            <p className="text-[11px] text-text-3">Список сотрудников портала Битрикс24</p>
+          </div>
+          <button type="button" aria-label="Закрыть" onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-[7px] text-text-3 hover:bg-accent">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-2.5 px-5 pt-4">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-3" />
+            <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
+                   placeholder="Имя, фамилия или должность"
+                   className="h-9 w-full rounded-[7px] border border-border bg-card pl-8 pr-3 text-[13px] outline-none focus:border-brand" />
+          </label>
+          {res?.hint && (
+            <p className="flex gap-2 rounded-[8px] bg-amber-500/10 px-3 py-2 text-[11.5px] leading-snug text-amber-700 dark:text-amber-300">
+              <Info className="mt-px h-3.5 w-3.5 shrink-0" /> {res.hint}
+            </p>
+          )}
+          {picked.size > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {[...picked.values()].map(p => (
+                <button key={p.id} type="button" onClick={() => toggle(p)}
+                        className="flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand-soft py-0.5 pl-0.5 pr-2 text-[11.5px] font-medium">
+                  <UserAvatar name={p.name} src={p.avatar} size={20} />
+                  {p.name}
+                  <X className="h-3 w-3 text-text-3" aria-label="убрать" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <ul className="mt-2 min-h-[160px] flex-1 overflow-y-auto px-2 pb-2">
+          {loadErr ? (
+            <li className="px-3 py-6 text-center text-[12px] text-red-600 dark:text-red-400">{loadErr}</li>
+          ) : !res ? (
+            <li className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-text-3" /></li>
+          ) : searchTooShort ? (
+            <li className="px-3 py-6 text-center text-[12px] text-text-3">Введите хотя бы 3 буквы имени или фамилии</li>
+          ) : list.length === 0 ? (
+            <li className="px-3 py-6 text-center text-[12px] text-text-3">Никого не нашлось</li>
+          ) : list.map(e => {
+            const on = picked.has(e.id);
+            const roleName = e.role ? meta.roles.find(r => r.id === e.role)?.name ?? e.role : null;
+            return (
+              <li key={e.id}>
+                <label className={cn(
+                  "flex items-center gap-3 rounded-[8px] px-3 py-2 transition-colors",
+                  e.has_access ? "cursor-default opacity-60" : "cursor-pointer hover:bg-accent",
+                  on && "bg-brand-soft",
+                )}>
+                  <input type="checkbox" checked={on || e.has_access} disabled={e.has_access}
+                         onChange={() => toggle(e)} className="h-3.5 w-3.5 accent-[var(--color-brand)]" />
+                  <UserAvatar name={e.name} src={e.avatar} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium">{e.name}</span>
+                    <span className="block truncate text-[11px] text-text-3">
+                      {e.has_access ? `уже есть доступ · ${roleName}` : e.position || "—"}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-hairline px-5 py-3.5">
+          <span className="text-[12px] text-text-3">Роль</span>
+          <RoleSelect meta={meta} value={role} onChange={setRole} label="Роль для выбранных" />
+          {err && <span className="basis-full text-[12px] text-red-600 dark:text-red-400">{err}</span>}
+          <button type="button" disabled={picked.size === 0 || busy}
+                  onClick={() => run(async () => {
+                    await adminApi.addUsers([...picked.values()].map(({ id, name, avatar, position }) => ({ id, name, avatar, position })), role);
+                    await onAdded();
+                    onClose();
+                  })}
+                  className="ml-auto flex h-9 items-center gap-1.5 rounded-[7px] bg-brand px-4 text-[13px] font-semibold text-brand-foreground hover:bg-brand-strong disabled:opacity-50">
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
+            Дать доступ{picked.size ? ` (${picked.size})` : ""}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Вкладка ────────────────────────────────────────────────
+
+export function AccessPanel({ data, meId, onChanged }: {
+  data: AdminData; meId: string; onChanged: () => Promise<void>;
+}) {
+  const { meta, users } = data;
+  const [q, setQ] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const [reloadKey, setReloadKey] = useState(0);
-  const reload = () => setReloadKey((k) => k + 1);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [m, u, r] = await Promise.all([
-          adminApi.meta(),
-          adminApi.users(),
-          adminApi.requests(),
-        ]);
-        if (cancelled) return;
-        setMeta(m);
-        setUsers(u.users);
-        setRequests(r.requests);
-        setError(null);
-      } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : "Не удалось загрузить данные");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
-
-  if (!meta) {
-    return error ? (
-      <div
-        role="alert"
-        className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400"
-      >
-        {error}
-      </div>
-    ) : (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-foreground" />
-        Загрузка…
-      </div>
+  const shown = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return users.filter(u =>
+      (!roleFilter || u.role === roleFilter) &&
+      (!s || u.name.toLowerCase().includes(s) || (u.position ?? "").toLowerCase().includes(s)),
     );
-  }
-
-  const isOwner = me.role === "owner";
-  const roleOptions = meta.roles
-    .filter((r) => isOwner || r.id !== "owner")
-    .map((r) => ({ id: r.id, label: r.label }));
-  const canGrant = (key: string) =>
-    isOwner || (!meta.owner_only.includes(key) && can(key));
-
-  const done = (msg: string) => {
-    setNotice(msg);
-    setError(null);
-    reload();
-  };
-  const fail = (msg: string) => {
-    setError(msg);
-    setNotice(null);
-  };
-
-  async function add() {
-    setAdding(true);
-    try {
-      await adminApi.addUser({
-        bitrix_user_id: newId.trim(),
-        name: newName.trim(),
-        role: newRole,
-      });
-      setNewId("");
-      setNewName("");
-      done("Сотрудник добавлен");
-    } catch (e) {
-      fail(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setAdding(false);
-    }
-  }
+  }, [users, q, roleFilter]);
+  const active = users.filter(u => u.is_active).length;
 
   return (
-    <div className="max-w-3xl space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Доступ</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Кто может открывать «Пульс» и что ему разрешено.
-        </p>
-      </div>
+    <>
+      <Requests data={data} onChanged={onChanged} />
 
-      {/* Alerts */}
-      {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400"
-        >
-          {error}
+      <SectionCard
+        title="Сотрудники с доступом"
+        right={`${active} активных${users.length > active ? ` · ${users.length - active} отключено` : ""}`}
+        noPad
+      >
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-3 sm:px-5">
+          <label className="relative min-w-[180px] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-3" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Найти сотрудника"
+                   aria-label="Найти сотрудника"
+                   className="h-8 w-full rounded-[7px] border border-border bg-card pl-8 pr-3 text-[12px] outline-none focus:border-brand" />
+          </label>
+          <select aria-label="Фильтр по роли" className={selectCls} value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+            <option value="">Все роли</option>
+            {meta.roles.map(r => <option key={r.id} value={r.id}>{r.name} ({r.users})</option>)}
+          </select>
+          <button type="button" onClick={() => setAdding(true)}
+                  className="flex h-8 items-center gap-1.5 rounded-[7px] bg-brand px-3 text-[12px] font-semibold text-brand-foreground hover:bg-brand-strong">
+            <UserPlus className="h-3.5 w-3.5" /> Добавить
+          </button>
         </div>
-      )}
-      {notice && (
-        <div
-          role="status"
-          className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
-        >
-          {notice}
-        </div>
-      )}
-
-      {/* Запросы */}
-      {requests.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">Запросы на доступ</h2>
-            <Badge variant="secondary">{requests.length}</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Эти сотрудники открыли приложение, но их нет в списке.
-          </p>
-          <div className="space-y-2">
-            {requests.map((r) => (
-              <RequestRow
-                key={r.id}
-                r={r}
-                roleOptions={roleOptions}
-                onChanged={done}
-                onError={fail}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Сотрудники */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Сотрудники</h2>
-          <Badge variant="secondary">{users.length}</Badge>
-        </div>
-        <div className="space-y-2">
-          {users.map((u) => (
-            <UserRow
-              key={`${u.id}|${u.role}|${u.permissions.join(",")}|${u.is_active}`}
-              u={u}
-              meta={meta}
-              roleOptions={roleOptions}
-              canGrant={canGrant}
-              onChanged={done}
-              onError={fail}
-            />
+        <ul className="divide-y divide-hairline border-t border-hairline">
+          {shown.length === 0 ? (
+            <li className="px-5 py-8 text-center text-[12px] text-text-3">Никого не нашлось</li>
+          ) : shown.map(u => (
+            <UserRow key={`${u.id}|${u.role}|${u.is_active}`} u={u} meta={meta} meId={meId} onChanged={onChanged} />
           ))}
-        </div>
-      </section>
+        </ul>
+      </SectionCard>
 
-      {/* Добавить */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Добавить сотрудника</h2>
-        <Card className="p-5">
-          <div className="flex flex-wrap items-end gap-4">
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="font-medium text-muted-foreground">ID в Битрикс24</span>
-              <input
-                aria-label="ID в Битрикс24"
-                className={`${inputCls} w-28`}
-                inputMode="numeric"
-                value={newId}
-                onChange={(e) => setNewId(e.target.value)}
-                placeholder="784"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="font-medium text-muted-foreground">Имя (необязательно)</span>
-              <input
-                aria-label="Имя"
-                className={`${inputCls} w-48`}
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="font-medium text-muted-foreground">Роль</span>
-              <select
-                aria-label="Роль нового сотрудника"
-                className={inputCls}
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value)}
-              >
-                {roleOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button
-              disabled={adding || !newId.trim()}
-              onClick={add}
-              className="shrink-0"
-            >
-              Добавить
-            </Button>
-          </div>
-        </Card>
-        <p className="text-[11px] text-muted-foreground">
-          ID — число из адреса профиля сотрудника: …/company/personal/user/
-          <strong>ЧИСЛО</strong>/. Проще всего дождаться, пока сотрудник сам откроет
-          приложение: он появится в запросах выше, и ID вводить не придётся.
-        </p>
-      </section>
-    </div>
+      {adding && <AddDialog meta={meta} onClose={() => setAdding(false)} onAdded={onChanged} />}
+    </>
   );
 }
