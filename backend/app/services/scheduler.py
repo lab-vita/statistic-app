@@ -122,6 +122,15 @@ def schedule_digest(time_str: str) -> None:
     logger.info("[scheduler] утренняя сводка: %02d:%02d (Кемерово)", hour, minute)
 
 
+async def _sync_bot_avatar() -> None:
+    """После старта: обновить аватарку бота в портале, если она поменялась."""
+    try:
+        async with async_session_factory() as db:
+            await digest.sync_avatar(db)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[scheduler] аватарка бота: %s", exc)
+
+
 async def setup_digest() -> None:
     """При старте: создать таблицу настроек при необходимости и поставить сводку на её время."""
     from app.db.database import engine
@@ -131,6 +140,7 @@ async def setup_digest() -> None:
             cfg = await digest.get_config(db)
         schedule_digest(cfg["time"])
         schedule_resync()
+        asyncio.get_running_loop().create_task(_sync_bot_avatar())
     except Exception as exc:
         logger.error("[scheduler] не удалось настроить сводку: %s", exc, exc_info=True)
 
