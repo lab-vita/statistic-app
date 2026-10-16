@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.core.permissions import ALL_PERMISSIONS, effective_permissions
 from app.core.security import verify_token
 from app.db.database import get_db
-from app.models.app_user import AppUser
+from app.models.app_user import AppRole, AppUser
 
 
 @dataclass
@@ -26,6 +26,8 @@ class CurrentUser:
     name: str
     role: str
     permissions: frozenset[str]
+    role_label: str = ""
+    avatar: str | None = None
 
     @property
     def is_owner(self) -> bool:
@@ -37,7 +39,7 @@ class CurrentUser:
 
 async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> CurrentUser:
     if settings.AUTH_DISABLED:
-        return CurrentUser(id="0", name="dev", role="owner", permissions=ALL_PERMISSIONS)
+        return CurrentUser(id="0", name="dev", role="owner", permissions=ALL_PERMISSIONS, role_label="Владелец")
 
     header = request.headers.get("authorization", "")
     scheme, _, token = header.partition(" ")
@@ -49,11 +51,15 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
     if user is None or not user.is_active:
         raise HTTPException(status_code=401, detail="Доступ запрещён")
 
+    role = await db.get(AppRole, user.role)
     return CurrentUser(
         id=user.bitrix_user_id,
         name=user.name,
         role=user.role,
-        permissions=effective_permissions(user.role, user.permissions),
+        permissions=effective_permissions(user.role, user.permissions,
+                                          role.permissions if role else None),
+        role_label=role.name if role else user.role,
+        avatar=user.avatar_url,
     )
 
 

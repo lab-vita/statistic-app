@@ -12,5 +12,7 @@ async def me(user: CurrentUser = Depends(current_user)):
         "id": user.id,
         "name": user.name,
         "role": user.role,
+        "role_label": user.role_label or user.role,
+        "avatar": user.avatar,
         "permissions": sorted(user.permissions),
     }
