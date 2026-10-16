@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 import type { Section } from "@/lib/permissions";
 import { useAuth } from "@/components/auth-gate";
 import { UserAvatar } from "@/components/user-avatar";
+import { useTour } from "@/components/tour";
 import {
   Home, Phone, Calendar, TrendingUp, FileText, Filter, Clock,
-  Users, Settings, Info, Activity, ChevronLeft, Moon, Sun, X, HeartPulse,
+  Users, Settings, Info, Activity, ChevronLeft, Moon, Sun, X, HeartPulse, CircleHelp,
 } from "lucide-react";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType }[] = [
@@ -81,6 +82,7 @@ export function Sidebar({ section, onSelectSection, mobileOpen, onMobileClose }:
               onClick={toggle}
               aria-label={expanded ? "Свернуть меню" : "Развернуть меню"}
               aria-expanded={expanded}
+              data-tour="nav-toggle"
               className="flex h-[52px] shrink-0 items-center gap-[9px] overflow-hidden whitespace-nowrap border-b border-sidebar-border px-[15px] text-left"
             >
               <Logo />
@@ -129,6 +131,7 @@ export function Sidebar({ section, onSelectSection, mobileOpen, onMobileClose }:
             expanded
             section={section}
             onSelect={s => { onSelectSection(s); onMobileClose(); }}
+            onHelp={onMobileClose}
             head={
               <div className="flex h-[52px] shrink-0 items-center gap-[9px] border-b border-sidebar-border pl-[15px] pr-2">
                 <Logo />
@@ -158,13 +161,16 @@ function Logo() {
   );
 }
 
-function SidebarBody({ expanded, section, onSelect, head }: {
+function SidebarBody({ expanded, section, onSelect, head, onHelp }: {
   expanded: boolean;
   section:  Section;
   onSelect: (s: Section) => void;
   head:     React.ReactNode;
+  /** перед запуском тура (шторка на телефоне закрывается) */
+  onHelp?:  () => void;
 }) {
   const { user, canSee } = useAuth();
+  const tour = useTour();
   const { resolvedTheme, setTheme } = useTheme();
   const visible = SECTIONS.filter(s => s.id === "about" || canSee(s.id));
   const isDark  = resolvedTheme === "dark";
@@ -173,8 +179,8 @@ function SidebarBody({ expanded, section, onSelect, head }: {
     <>
       {head}
 
-      {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-px overflow-y-auto overflow-x-hidden py-2">
+      {/* Разделы. Без flex-1: высота — по пунктам, чтобы тур подсвечивал только их */}
+      <nav data-tour="nav" className="flex min-h-0 flex-col gap-px overflow-y-auto overflow-x-hidden py-2">
         {visible.map(({ id, label, icon: Icon }) => {
           const active = section === id;
           return (
@@ -185,6 +191,7 @@ function SidebarBody({ expanded, section, onSelect, head }: {
               title={expanded ? undefined : label}
               aria-label={label}
               aria-current={active ? "page" : undefined}
+              data-tour={`nav-${id}`}
               className={cn(
                 "mx-2.5 flex h-9 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[7px] px-2.5 text-left transition-colors duration-100",
                 active
@@ -203,12 +210,29 @@ function SidebarBody({ expanded, section, onSelect, head }: {
           );
         })}
       </nav>
+      <div className="flex-1" />
+
+      {/* Обучающий тур */}
+      <button
+        type="button"
+        onClick={() => { onHelp?.(); tour.start({}); }}
+        title={expanded ? undefined : "Как пользоваться"}
+        aria-label="Как пользоваться — обучающий тур"
+        data-tour="help"
+        className="mx-2.5 flex h-9 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[7px] px-2.5 text-text-3 transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <CircleHelp className="h-4 w-4 shrink-0" strokeWidth={1.6} />
+        <span className={cn("text-[13px] font-medium transition-opacity", expanded ? "opacity-100" : "opacity-0")}>
+          Как пользоваться
+        </span>
+      </button>
 
       {/* Theme */}
       <button
         type="button"
         onClick={() => setTheme(isDark ? "light" : "dark")}
         title={expanded ? undefined : (isDark ? "Светлая тема" : "Тёмная тема")}
+        data-tour="theme"
         className="mx-2.5 mb-2 flex h-9 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[7px] px-2.5 text-text-3 transition-colors hover:bg-accent hover:text-foreground"
       >
         {isDark ? <Sun className="h-4 w-4 shrink-0" strokeWidth={1.6} /> : <Moon className="h-4 w-4 shrink-0" strokeWidth={1.6} />}

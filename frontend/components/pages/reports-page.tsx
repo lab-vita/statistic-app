@@ -174,10 +174,12 @@ export function ReportsPage() {
             <span className="max-sm:sr-only">{current && current.can_edit ? (dirty ? "Сохранить изменения" : "Сохранено") : "Сохранить"}</span>
           </button>
           <HeaderDivider />
-          <ExportButton label="Excel" icon={FileSpreadsheet} busy={busy === "xlsx"} disabled={!result || !!busy}
-            onClick={() => exportAs("xlsx")} />
-          <ExportButton label="PDF" icon={FileText} busy={busy === "pdf"} disabled={!result || !!busy}
-            onClick={() => exportAs("pdf")} />
+          <div className="flex items-center gap-2.5 max-sm:gap-2" data-tour="reports-export">
+            <ExportButton label="Excel" icon={FileSpreadsheet} busy={busy === "xlsx"} disabled={!result || !!busy}
+              onClick={() => exportAs("xlsx")} />
+            <ExportButton label="PDF" icon={FileText} busy={busy === "pdf"} disabled={!result || !!busy}
+              onClick={() => exportAs("pdf")} />
+          </div>
         </HeaderControls>
       </PageHeader>
 
@@ -202,7 +204,7 @@ export function ReportsPage() {
           )
         ) : (
           <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="min-w-0">
+            <div className="min-w-0" data-tour="reports-builder">
               {/* На телефоне настройки свёрнуты в одну строку */}
               <button type="button" onClick={() => setPanelOpen(v => !v)} aria-expanded={panelOpen}
                 className="card-surface mb-3 flex w-full items-center gap-3 px-4 py-3 text-left lg:hidden">
@@ -218,7 +220,7 @@ export function ReportsPage() {
               </div>
             </div>
 
-            <div className={cn("min-w-0 space-y-4 transition-opacity", loading && result && "opacity-60")}>
+            <div className={cn("min-w-0 space-y-4 transition-opacity", loading && result && "opacity-60")} data-tour="reports-result">
               <div className="px-1">
                 <h2 className="text-[18px] font-extrabold leading-tight tracking-[-0.02em]">{title}</h2>
                 <p className="mt-1 text-[12px] text-text-3">
@@ -291,7 +293,7 @@ function TemplatesMenu({ templates, current, dirty, onOpen, onNew, onRemove, onS
   const close = () => { setOpen(false); setConfirm(null); };
 
   return (
-    <div className="relative max-sm:mr-auto" ref={ref}>
+    <div className="relative max-sm:mr-auto" ref={ref} data-tour="reports-templates">
       <button type="button" onClick={() => setOpen(v => !v)} aria-haspopup="menu" aria-expanded={open}
         className={cn(
           "inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-[7px] border px-2.5 text-[12px] font-semibold transition-colors",

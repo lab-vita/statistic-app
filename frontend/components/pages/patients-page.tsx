@@ -74,7 +74,7 @@ function NoshowSection({ data }: { data: NoshowsResponse }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-tour="patients-noshows">
         <MetricCard
           label="Неявки" value={pct(t.noshow_pct)}
           valueClass={noshowTone(t.noshow_pct) === "red" ? "text-red-600 dark:text-red-400" : noshowTone(t.noshow_pct) === "amber" ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}
@@ -184,7 +184,7 @@ function ReturnsSection({ data }: { data: ReturnsResponse }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-tour="patients-returns">
         <MetricCard label="Пациентов пришло" value={fmt(data.patients)} sub={`${fmt(data.new)} впервые`} />
         <MetricCard label="Уже бывали у нас" value={pct(data.returning_pct)} valueClass="text-emerald-600 dark:text-emerald-400"
           sub={`${fmt(data.returning)} ${plural(data.returning, "пациент", "пациента", "пациентов")}`} />

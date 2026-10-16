@@ -315,7 +315,7 @@ export function CallsPage() {
         ) : (
           <>
             {/* Row 1: 4 cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-tour="calls-kpi">
               <MetricCard
                 label="Принятые" value={fmt(s.incoming)} valueClass="text-emerald-600 dark:text-emerald-400"
                 sub={`из ${fmt(s.received)} поступивших`}
@@ -365,17 +365,19 @@ export function CallsPage() {
             </div>
 
             {/* Time chart */}
-            <CallsTimeChart
-              hourly={hourly?.slots}
-              daily={daily?.days}
-              isDay={isDay}
-              interval={interval}
-              onInterval={setInterval}
-            />
+            <div data-tour="calls-time">
+              <CallsTimeChart
+                hourly={hourly?.slots}
+                daily={daily?.days}
+                isDay={isDay}
+                interval={interval}
+                onInterval={setInterval}
+              />
+            </div>
 
             {/* Funnel + Conversion */}
             {!opId && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" data-tour="calls-funnel">
                 <CallsFunnel s={s} />
 
                 {conversion && conversion.operators.length > 0 && (
@@ -413,7 +415,7 @@ export function CallsPage() {
 
             {/* Heatmap */}
             {heatmap && heatmap.cells.length > 0 && (
-              <HeatmapChart cells={heatmap.cells} />
+              <div data-tour="calls-heatmap"><HeatmapChart cells={heatmap.cells} /></div>
             )}
 
             {/* Operator comparison chart (не для дня и не при фильтре по оператору) */}
@@ -446,7 +448,7 @@ export function CallsPage() {
 
             {/* Operators table */}
             {!opId && total && (
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="rounded-lg border border-border bg-card overflow-hidden" data-tour="calls-operators">
                 <div className="px-4 py-3 border-b border-border">
                   <h3 className="text-[13px] font-semibold">По операторам</h3>
                 </div>

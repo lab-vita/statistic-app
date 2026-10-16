@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { AuthGate, useAuth } from "@/components/auth-gate";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNavContext } from "@/components/mobile-nav";
+import { TourProvider } from "@/components/tour";
 import { useBitrixFrameFit } from "@/lib/bitrix-frame";
 import type { Section } from "@/lib/permissions";
 import { CallsPage }        from "@/components/pages/calls-page";
@@ -28,28 +29,33 @@ function App() {
   // Внутри Битрикс24 — подогнать высоту окна под видимую часть экрана
   useBitrixFrameFit();
 
-  function handleNav(s: Section) {
+  const handleNav = useCallback((s: Section) => {
     if (s === "about" || canSee(s)) setSection(s);
-  }
+  }, [canSee]);
+
+  // Тур сам открывает разделы, о которых рассказывает; шторка меню при этом закрывается
+  const tourNav = useCallback((s: Section) => { setMenuOpen(false); handleNav(s); }, [handleNav]);
 
   return (
     <MobileNavContext.Provider value={nav}>
-      <div className="flex h-dvh overflow-hidden bg-background">
-        <Sidebar section={section} onSelectSection={handleNav} mobileOpen={menuOpen} onMobileClose={closeMenu} />
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {section === "home"         && <HomePage />}
-          {section === "calls"        && <CallsPage />}
-          {section === "appointments" && <AppointmentsPage />}
-          {section === "patients"     && <PatientsPage />}
-          {section === "revenue"      && <RevenuePage />}
-          {section === "reports"      && <ReportsPage />}
-          {section === "funnel"       && <FunnelPage />}
-          {section === "plans"        && <PlansPage />}
-          {section === "doctors"      && <DoctorsPage />}
-          {section === "admin"        && <AdminPage />}
-          {section === "about"        && <AboutPage />}
+      <TourProvider section={section} onNavigate={tourNav}>
+        <div className="flex h-dvh overflow-hidden bg-background">
+          <Sidebar section={section} onSelectSection={handleNav} mobileOpen={menuOpen} onMobileClose={closeMenu} />
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            {section === "home"         && <HomePage />}
+            {section === "calls"        && <CallsPage />}
+            {section === "appointments" && <AppointmentsPage />}
+            {section === "patients"     && <PatientsPage />}
+            {section === "revenue"      && <RevenuePage />}
+            {section === "reports"      && <ReportsPage />}
+            {section === "funnel"       && <FunnelPage />}
+            {section === "plans"        && <PlansPage />}
+            {section === "doctors"      && <DoctorsPage />}
+            {section === "admin"        && <AdminPage />}
+            {section === "about"        && <AboutPage />}
+          </div>
         </div>
-      </div>
+      </TourProvider>
     </MobileNavContext.Provider>
   );
 }

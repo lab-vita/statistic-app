@@ -68,6 +68,7 @@ async def create_tables(engine) -> None:
                 await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} VARCHAR"))
         await conn.execute(text(
             "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS profile_synced_at TIMESTAMP WITH TIME ZONE"))
+        await conn.execute(text("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS tour_version INTEGER"))
 
     from app.db.database import async_session_factory
     async with async_session_factory() as db:

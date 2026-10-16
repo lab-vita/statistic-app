@@ -393,7 +393,7 @@ export function PageHeader({ title, children, className }: { title: string; chil
       className,
     )}>
       <MenuButton />
-      <h1 className="whitespace-nowrap text-[14px] font-bold tracking-[-0.02em]">{title}</h1>
+      <h1 data-tour="page-title" className="whitespace-nowrap text-[14px] font-bold tracking-[-0.02em]">{title}</h1>
       {children}
     </header>
   );
@@ -418,7 +418,7 @@ export function HeaderControls({ children, className }: { children: React.ReactN
 export function PeriodPill({ items, active, onChange }: { items: string[]; active: string; onChange: (v: string) => void }) {
   const { open, setOpen, ref } = usePopover();
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} data-tour="period">
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
@@ -449,7 +449,7 @@ export function DateNav({ label, onPrev, onNext, nextDisabled }: {
 }) {
   const btn = "flex h-7 w-7 items-center justify-center rounded-[5px] text-text-3 transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-35";
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5" data-tour="date-nav">
       <button type="button" onClick={onPrev} className={btn} aria-label="Предыдущий период">
         <ChevronLeft className="h-3 w-3" strokeWidth={2.2} />
       </button>
@@ -474,6 +474,7 @@ export function RefreshButton({ onClick, refreshing }: { onClick?: () => void; r
       onClick={onClick}
       disabled={refreshing}
       aria-label="Обновить данные"
+      data-tour="refresh"
       className="flex h-7 w-7 items-center justify-center rounded-[7px] border border-border bg-card text-text-3 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
     >
       <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} strokeWidth={1.8} />
@@ -485,7 +486,7 @@ export function RefreshButton({ onClick, refreshing }: { onClick?: () => void; r
 export function FilterButton({ label, children }: { label: string; children: (close: () => void) => React.ReactNode }) {
   const { open, setOpen, ref } = usePopover();
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} data-tour="filter">
       <button
         type="button"
         onClick={() => setOpen(v => !v)}

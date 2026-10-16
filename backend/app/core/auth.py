@@ -28,6 +28,8 @@ class CurrentUser:
     permissions: frozenset[str]
     role_label: str = ""
     avatar: str | None = None
+    # пройденная версия обучающего тура; None — ещё не видел
+    tour_version: int | None = None
 
     @property
     def is_owner(self) -> bool:
@@ -60,6 +62,7 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
                                           role.permissions if role else None),
         role_label=role.name if role else user.role,
         avatar=user.avatar_url,
+        tour_version=user.tour_version,
     )
 
 

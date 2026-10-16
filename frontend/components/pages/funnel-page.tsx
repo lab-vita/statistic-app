@@ -82,9 +82,9 @@ function ConvPct({ value, good, bad }: { value: number; good: number; bad: numbe
   );
 }
 
-function FunnelBlock({ title, note, children }: { title: string; note: string; children: ReactNode }) {
+function FunnelBlock({ title, note, tour, children }: { title: string; note: string; tour?: string; children: ReactNode }) {
   return (
-    <section className="space-y-2.5">
+    <section className="space-y-2.5" data-tour={tour}>
       <div>
         <p className="text-[14px] font-semibold">{title}</p>
         <p className="text-[12px] text-muted-foreground mt-0.5">{note}</p>
@@ -362,6 +362,7 @@ export function FunnelPage() {
             {/* Колл-центр */}
             <FunnelBlock
               title="Колл-центр"
+              tour="funnel-cc"
               note="Пациенты, которых записали операторы: записи по дню создания, пациент считается один раз"
             >
               <FunnelCard
@@ -398,6 +399,7 @@ export function FunnelPage() {
             {/* Вся клиника */}
             <FunnelBlock
               title="Вся клиника"
+              tour="funnel-clinic"
               note="Все записи на приём в этом периоде, кто бы их ни сделал: колл-центр, администраторы и другие сотрудники"
             >
               <FunnelCard
@@ -459,7 +461,7 @@ export function FunnelPage() {
 
             {/* Таблица по операторам */}
             {data.operators.length > 0 && (
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="rounded-xl border border-border bg-card overflow-hidden" data-tour="funnel-operators">
                 <div className="flex items-center gap-2 px-5 py-4 border-b border-border">
                   <Users className="h-4 w-4 text-muted-foreground/60" />
                   <p className="text-[14px] font-semibold">Разбивка по операторам</p>

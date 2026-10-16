@@ -45,6 +45,9 @@ class AppUser(Base):
     avatar_url:     Mapped[str | None] = mapped_column(String, nullable=True)
     position:       Mapped[str | None] = mapped_column(String, nullable=True)
     profile_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Какую версию обучающего тура сотрудник уже прошёл (или закрыл). NULL — ещё не видел:
+    # при первом входе тур запускается сам.
+    tour_version:   Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at:     Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

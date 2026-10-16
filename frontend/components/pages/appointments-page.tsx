@@ -243,7 +243,7 @@ export function AppointmentsPage() {
         ) : (
           <>
             {/* Cards row 1 */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-tour="appt-kpi">
               <MetricCard label="Всего записей"   value={fmt(s.total)}        sub="за период">
                 <PlanMeter info={planInfo} metric="appt_count" fact={s.total} />
               </MetricCard>
@@ -345,19 +345,21 @@ export function AppointmentsPage() {
 
             {/* Sources */}
             {stats?.by_group && Object.keys(stats.by_group).length > 0 && !adminId && (
-              <SectionCard title="Источники записей" right={`всего ${fmt(s.total)}`}>
-                {GROUP_ORDER.map(g => {
-                  const item = stats.by_group[g];
-                  if (!item) return null;
-                  const c = GROUP_COLORS[g];
-                  return (
-                    <SrcBar key={g}
-                      name={GROUP_LABELS[g]} nameColor={c.text}
-                      count={item.count} pct={item.pct} barColor={c.bar}
-                    />
-                  );
-                })}
-              </SectionCard>
+              <div data-tour="appt-sources">
+                <SectionCard title="Источники записей" right={`всего ${fmt(s.total)}`}>
+                  {GROUP_ORDER.map(g => {
+                    const item = stats.by_group[g];
+                    if (!item) return null;
+                    const c = GROUP_COLORS[g];
+                    return (
+                      <SrcBar key={g}
+                        name={GROUP_LABELS[g]} nameColor={c.text}
+                        count={item.count} pct={item.pct} barColor={c.bar}
+                      />
+                    );
+                  })}
+                </SectionCard>
+              </div>
             )}
 
             {/* Daily chart */}
@@ -393,7 +395,7 @@ export function AppointmentsPage() {
 
             {/* Admins table */}
             {!adminId && stats && Object.keys(stats.by_admin).length > 0 && (
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="rounded-lg border border-border bg-card overflow-hidden" data-tour="appt-staff">
                 <div className="px-4 py-3 border-b border-border">
                   <h3 className="text-[13px] font-semibold">По сотрудникам</h3>
                 </div>

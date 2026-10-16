@@ -1,11 +1,12 @@
 "use client";
 
-import { Activity, Monitor, Server, CheckCircle2, Sparkles, Wrench, Shield } from "lucide-react";
+import { Activity, Monitor, Server, CheckCircle2, Sparkles, Wrench, Shield, CircleHelp, ArrowRight } from "lucide-react";
 import { PageHeader, PageContent } from "@/components/ui/primitives";
+import { useTour } from "@/components/tour";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION_FRONTEND = "0.16.0";
-const APP_VERSION_BACKEND  = "0.17.0";
+const APP_VERSION_FRONTEND = "0.17.0";
+const APP_VERSION_BACKEND  = "0.18.0";
 const APP_UPDATED          = "16 октября 2026";
 
 // ─── Типы ────────────────────────────────────────────────────
@@ -29,6 +30,16 @@ interface Release {
 // исправлено, без технических подробностей.
 
 const FRONTEND_RELEASES: Release[] = [
+  {
+    version: "0.17.0",
+    date: "16 октября 2026",
+    title: "Обучающий тур",
+    changes: [
+      { kind: "new",     text: "Интерактивный тур по всему приложению: экран затемняется, нужная кнопка или блок подсвечиваются, рядом — объяснение" },
+      { kind: "new",     text: "Тур сам открывается при первом входе и показывает только разделы, доступные сотруднику" },
+      { kind: "new",     text: "Кнопка «Как пользоваться» в меню — пройти тур снова целиком или только по одному разделу" },
+    ],
+  },
   {
     version: "0.16.0",
     date: "16 октября 2026",
@@ -214,6 +225,14 @@ const FRONTEND_RELEASES: Release[] = [
 ];
 
 const BACKEND_RELEASES: Release[] = [
+  {
+    version: "0.18.0",
+    date: "16 октября 2026",
+    title: "Отметка об обучающем туре",
+    changes: [
+      { kind: "new",     text: "Сервер помнит, что сотрудник уже прошёл тур, — он не появится снова на другом компьютере или в другом браузере" },
+    ],
+  },
   {
     version: "0.17.0",
     date: "16 октября 2026",
@@ -479,6 +498,7 @@ function ReleaseColumn({
 // ─── Страница ────────────────────────────────────────────────
 
 export function AboutPage() {
+  const tour = useTour();
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <PageHeader title="О системе">
@@ -513,6 +533,23 @@ export function AboutPage() {
               </div>
             ))}
           </dl>
+        </div>
+
+        {/* Обучающий тур */}
+        <div className="card-surface flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-brand-soft text-brand">
+            <CircleHelp className="h-[18px] w-[18px]" strokeWidth={1.8} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-bold">Как пользоваться «Пульсом»</p>
+            <p className="mt-0.5 text-[12px] leading-snug text-text-2">
+              Короткий тур по приложению: где что находится и что означают цифры. Можно пройти целиком или выбрать один раздел.
+            </p>
+          </div>
+          <button type="button" onClick={() => tour.start({})}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-[7px] bg-brand px-3.5 text-[12px] font-semibold text-brand-foreground transition-colors hover:bg-brand-strong sm:self-center">
+            Пройти тур <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
         </div>
 
         {/* Обозначения */}

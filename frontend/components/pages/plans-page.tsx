@@ -183,7 +183,7 @@ export function PlansPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3" data-tour="plans-cards">
               {ov.metrics.map(m => (
                 <ProgressCard key={m.key} m={m} days={days} today={ov.today} active={m.key === metric?.key}
                   target={draft.targets[m.key] ?? null} plan={planDays[m.key]}
@@ -300,7 +300,7 @@ function TargetsEditor({ ov, draft, days, onDraft, onCopyPrev }: {
   }
 
   return (
-    <section className="card-surface">
+    <section className="card-surface" data-tour="plans-editor">
       <div className="flex items-center justify-between gap-2 border-b border-hairline px-5 pb-3 pt-4">
         <h3 className="section-title">План на {monthTitle(ov.year, ov.month).toLowerCase()}</h3>
         <button type="button" onClick={onCopyPrev} title="Взять цифры и рабочие дни из прошлого месяца"
@@ -378,7 +378,7 @@ function PlanCalendar({ ov, draft, metric, days, plan, canEdit, selected, onSele
   const factTotal = isPct ? metric.fact_total : days.reduce((s, d) => s + (metric.fact_days[d] ?? 0), 0);
 
   return (
-    <section className="card-surface min-w-0">
+    <section className="card-surface min-w-0" data-tour="plans-calendar">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-4 sm:px-5">
         <h3 className="section-title">По дням</h3>
         <div className="max-w-full overflow-x-auto">
