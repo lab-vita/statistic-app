@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bot, Check, Eye, Send, TriangleAlert } from "lucide-react";
 import { adminApi, digestApi, type AdminUser, type DigestResult, type DigestSettings } from "@/lib/admin-api";
 import { SectionCard, Skeleton } from "@/components/ui/primitives";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,8 +12,6 @@ import { cn } from "@/lib/utils";
  * личное сообщение в Битрикс24 с итогами вчерашнего дня. Каждый видит только
  * разделы, к которым у него есть доступ.
  */
-
-const ROLE_LABELS: Record<string, string> = { owner: "Владелец", admin: "Администратор", viewer: "Наблюдатель" };
 
 const fmtDay = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
@@ -203,11 +202,12 @@ export function DigestSettingsCard({ meId }: { meId?: string }) {
                     )}
                   >
                     <input type="checkbox" checked={on} onChange={() => toggleRecipient(u.id)} className="h-3.5 w-3.5 accent-[var(--color-brand)]" />
+                    <UserAvatar name={u.name || u.id} src={u.avatar} size={28} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-medium">
                         {u.name || `ID ${u.id}`}{meId === u.id && <span className="text-text-3"> · вы</span>}
                       </span>
-                      <span className="block text-[11px] text-text-3">{ROLE_LABELS[u.role] ?? u.role}</span>
+                      <span className="block text-[11px] text-text-3">{u.role_name}</span>
                     </span>
                   </label>
                 );
