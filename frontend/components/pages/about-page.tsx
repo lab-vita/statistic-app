@@ -5,8 +5,8 @@ import { PageHeader, PageContent } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
 const APP_VERSION_FRONTEND = "0.12.0";
-const APP_VERSION_BACKEND  = "0.13.0";
-const APP_UPDATED          = "15 октября 2026";
+const APP_VERSION_BACKEND  = "0.13.1";
+const APP_UPDATED          = "16 октября 2026";
 
 // ─── Типы ────────────────────────────────────────────────────
 
@@ -165,6 +165,14 @@ const FRONTEND_RELEASES: Release[] = [
 ];
 
 const BACKEND_RELEASES: Release[] = [
+  {
+    version: "0.13.1",
+    date: "16 октября 2026",
+    title: "Аватарка бота",
+    changes: [
+      { kind: "improve", text: "У бота «Пульс» в Битрикс24 появилась своя аватарка" },
+    ],
+  },
   {
     version: "0.13.0",
     date: "15 октября 2026",
