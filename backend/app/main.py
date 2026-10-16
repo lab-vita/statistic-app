@@ -28,6 +28,10 @@ async def lifespan(app: FastAPI):
         await report_builder.create_tables(engine)
     except Exception as exc:  # noqa: BLE001 — без шаблонов приложение всё равно работает
         logger.error("[main] таблица шаблонов отчётов не создана: %s", exc)
+    try:
+        await plans.create_tables(engine)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("[main] таблица планов на месяц не создана: %s", exc)
     logger.info("[main] Планировщик запущен")
     yield
     scheduler.shutdown(wait=False)
