@@ -12,3 +12,4 @@ from app.models.plan import Plan, PlanMonth          # noqa
 from app.models.app_user import AppUser, AccessRequest              # noqa
 from app.models.app_setting import AppSetting                       # noqa
 from app.models.report_template import ReportTemplate             # noqa
+from app.models.exchange_log import SyncRun, SyncRequest                 # noqa

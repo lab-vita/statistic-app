@@ -8,9 +8,9 @@ from app.core.config import settings
 from app.db.database import engine
 from app.api import calls, appointments, plans, revenue, sales, services, staff, payments, reports, patients
 from app.api import report_builder
-from app.api import admin as admin_api, auth as auth_api, bitrix_app
+from app.api import admin as admin_api, auth as auth_api, bitrix_app, system as system_api
 from app.core.auth import current_user, require_any
-from app.services import access
+from app.services import access, exchange_log
 from app.services.scheduler import create_scheduler, setup_digest
 
 logging.basicConfig(
@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    exchange_log.install()
+    try:
+        await exchange_log.create_tables(engine)
+    except Exception as exc:  # noqa: BLE001 — без журнала сбор данных всё равно работает
+        logger.error("[main] таблицы журнала обмена не созданы: %s", exc)
     scheduler = create_scheduler()
     scheduler.start()
     await setup_digest()
@@ -52,6 +57,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],   # имя файла при скачивании выгрузок
 )
 
 # Права на чтение данных. «Отчёты» строятся на данных звонков и записей,
@@ -73,6 +79,8 @@ app.include_router(reports.router,      prefix="/api/reports",      tags=["repor
 # Конструктор: доступ к разделу — view:reports, к каждому источнику — его собственное право (см. report_builder)
 app.include_router(report_builder.router, prefix="/api/reports",    tags=["reports"],      dependencies=_guard("view:reports"))
 app.include_router(admin_api.router,    prefix="/api/admin",        tags=["admin"],        dependencies=_guard("users:manage", "digest:manage"))  # точнее — в admin.py
+# Журнал обмена (logs:view) и выгрузка базы (data:export) — проверки внутри system.py
+app.include_router(system_api.router,   prefix="/api/system",       tags=["system"],       dependencies=_guard("logs:view", "data:export"))
 
 # Вход и служебное (без защиты токеном: auth/me сам проверяет, handler/install вызывает Битрикс24)
 app.include_router(auth_api.router,     prefix="/api/auth",         tags=["auth"])

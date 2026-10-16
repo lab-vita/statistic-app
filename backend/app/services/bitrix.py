@@ -1,7 +1,12 @@
-import httpx
 import asyncio
+import logging
+
+import httpx
 from datetime import date
 from app.core.config import settings
+from app.services import exchange_log
+
+logger = logging.getLogger(__name__)
 
 _PAGE_SIZE = 50   # Лимит Bitrix API
 _RETRY_ATTEMPTS = 5
@@ -60,7 +65,7 @@ async def fetch_calls_for_number(
 
 async def fetch_all_calls(date_from: date, date_to: date) -> list[dict]:
     """Загружает звонки по всем номерам клиники параллельно."""
-    async with httpx.AsyncClient() as client:
+    async with exchange_log.make_client("bitrix") as client:
         tasks = [
             fetch_calls_for_number(client, number, date_from, date_to)
             for number in settings.LABVITA_NUMBERS
@@ -69,8 +74,10 @@ async def fetch_all_calls(date_from: date, date_to: date) -> list[dict]:
 
     seen: set     = set()
     all_calls: list = []
-    for res in results:
+    for number, res in zip(settings.LABVITA_NUMBERS, results):
         if isinstance(res, Exception):
+            # звонки этого номера не загрузились — остальные номера сохраняем
+            logger.error("[calls] номер %s: звонки не загружены — %s", number, exchange_log.clean_text(str(res)))
             continue
         for c in res:
             cid = c.get("ID")
