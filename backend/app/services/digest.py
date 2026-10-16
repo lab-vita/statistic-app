@@ -53,7 +53,6 @@ BOT_CODE      = "pulse_digest"
 # Поменяли картинку — увеличьте AVATAR_VERSION, и при следующем старте она обновится в портале.
 AVATAR_FILE    = Path(__file__).resolve().parent.parent / "assets" / "bot_avatar.jpg.b64"
 AVATAR_VERSION = 2
-AVATAR_NAME    = "pulse_bot.jpg"
 MISSED_LIMIT  = 6.0      # % пропущенных — тот же порог, что в разделе «Планы»
 CONV_GOOD     = 30.0     # конверсия звонок → запись: хорошо от 30% (как на «Воронке»)
 VISIT_GOOD    = 80.0     # явка: хорошо от 80%
@@ -421,14 +420,12 @@ def explain_error(e: Exception) -> str:
     return str(e) or "Неизвестная ошибка Битрикс24"
 
 
-def _avatar() -> list[str] | None:
-    """Аватарка в формате файла Битрикс24: [имя файла, base64]. Голый base64 портал молча игнорирует."""
+def _avatar() -> str | None:
     try:
-        data = "".join(AVATAR_FILE.read_text().split())
+        return "".join(AVATAR_FILE.read_text().split()) or None
     except OSError:
         logger.warning("[digest] нет файла аватарки бота: %s", AVATAR_FILE)
         return None
-    return [AVATAR_NAME, data] if data else None
 
 
 async def sync_avatar(db: AsyncSession) -> None:
@@ -441,12 +438,14 @@ async def sync_avatar(db: AsyncSession) -> None:
         return
     bot_id = int(cfg["bot_id"])
     try:
-        await _call("imbot.update", {
-            "BOT_ID": bot_id,
-            "CLIENT_ID": _client_id(),
-            "FIELDS": {"PROPERTIES": {"PERSONAL_PHOTO": photo}},
+        # Старый imbot.update аватар через вебхук молча пропускает — ставим новым методом;
+        # botToken для бота, зарегистрированного по вебхуку, — это его CLIENT_ID
+        await _call("imbot.v2.Bot.update", {
+            "botId": bot_id,
+            "botToken": _client_id(),
+            "fields": {"properties": {"avatar": photo}},
         })
-        # Портал отвечает «ок», даже если картинку не сохранил, — проверяем по профилю бота
+        # Проверяем по профилю бота, что картинка действительно сохранилась
         user = await _call("im.user.get", {"ID": bot_id}) or {}
     except Exception as e:  # noqa: BLE001 — аватарка не критична
         logger.warning("[digest] не удалось обновить аватарку бота: %s", e)
@@ -486,9 +485,6 @@ async def ensure_bot(db: AsyncSession) -> int:
         "WORK_POSITION": "Утренняя сводка по клинике",
         "COLOR": "AZURE",
     }
-    photo = _avatar()
-    if photo:
-        props["PERSONAL_PHOTO"] = photo
     try:
         bot_id = await _call("imbot.register", {
             "CODE": BOT_CODE,
@@ -501,9 +497,9 @@ async def ensure_bot(db: AsyncSession) -> int:
     except BitrixError as e:
         await update_config(db, bot_error=explain_error(e))
         raise
-    # аватарку проверит sync_avatar при следующей отправке или старте сервера
     await update_config(db, bot_id=int(bot_id), bot_error=None, avatar_version=0)
     logger.info("[digest] зарегистрирован бот «Пульс», id=%s", bot_id)
+    await sync_avatar(db)
     return int(bot_id)
 
 
