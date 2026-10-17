@@ -66,11 +66,6 @@ export function DbExportPanel() {
       <SectionCard title="Скачать базу целиком"
                    right={info ? `${formatBytes(info.database_bytes)} · PostgreSQL ${info.server_version.split(" ")[0]}` : undefined}>
         <div className="space-y-3.5">
-          <p className="max-w-[720px] text-[12.5px] leading-relaxed text-text-2">
-            Выгрузка делается на текущую минуту: все звонки, записи, платежи, планы, роли, доступы и настройки.
-            В файле есть персональные данные пациентов и сотрудников — храните его так же бережно, как саму базу.
-          </p>
-
           {err && <ErrorBanner message={err} />}
           {info && !info.pg_dump && (
             <div className="rounded-[8px] bg-amber-500/10 px-3.5 py-2.5 text-[12px] text-amber-700 dark:text-amber-300">
@@ -96,22 +91,9 @@ export function DbExportPanel() {
           <label className="flex items-start gap-2 text-[12px] text-text-2">
             <input type="checkbox" className="mt-0.5 accent-brand" checked={withLog} onChange={e => setWithLog(e.target.checked)} />
             <span>
-              Включить журнал запросов к МедОДС и Битрикс24{info ? ` (${formatBytes(logBytes)})` : ""}.
-              <span className="block text-text-3">Обычно не нужен: это полные ответы внешних систем за последние недели, файл станет заметно больше. Сеансы обмена попадают в выгрузку всегда.</span>
+              Включить журнал запросов к МедОДС и Битрикс24{info ? ` (${formatBytes(logBytes)})` : ""}
             </span>
           </label>
-
-          <details className="text-[12px] text-text-2">
-            <summary className="cursor-pointer font-semibold text-text-2 hover:text-foreground">Как восстановить базу из копии</summary>
-            <div className="mt-2 space-y-1.5 text-text-3">
-              <p>Копия — обычный SQL-файл, сжатый gzip. На сервере создайте пустую базу и загрузите в неё файл:</p>
-              <pre className="overflow-x-auto rounded-[8px] bg-background px-3 py-2 font-mono text-[11px] text-foreground">
-{`docker exec stats-postgres createdb -U labvita labvita_restore
-gunzip -c pulse-db-ДАТА.sql.gz | docker exec -i stats-postgres psql -U labvita -d labvita_restore`}
-              </pre>
-              <p>Для проверки копию можно развернуть рядом в отдельную базу — рабочая база при этом не трогается.</p>
-            </div>
-          </details>
         </div>
       </SectionCard>
 
