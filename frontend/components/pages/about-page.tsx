@@ -5,9 +5,9 @@ import { PageHeader, PageContent } from "@/components/ui/primitives";
 import { useTour } from "@/components/tour";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION_FRONTEND = "0.17.0";
-const APP_VERSION_BACKEND  = "0.18.0";
-const APP_UPDATED          = "16 октября 2026";
+const APP_VERSION_FRONTEND = "0.18.0";
+const APP_VERSION_BACKEND  = "0.19.0";
+const APP_UPDATED          = "17 октября 2026";
 
 // ─── Типы ────────────────────────────────────────────────────
 
@@ -30,6 +30,15 @@ interface Release {
 // исправлено, без технических подробностей.
 
 const FRONTEND_RELEASES: Release[] = [
+  {
+    version: "0.18.0",
+    date: "17 октября 2026",
+    title: "Главная одинаковая везде",
+    changes: [
+      { kind: "improve", text: "Раскладка главной сохраняется на сервере — на любом компьютере, в браузере и в Битрикс24 она одна и та же" },
+      { kind: "new",     text: "По умолчанию на главной стоят все виджеты, а у «Одной метрики» и тепловой карты — каждый вариант; лишнее можно убрать в «Настроить»" },
+    ],
+  },
   {
     version: "0.17.0",
     date: "16 октября 2026",
@@ -225,6 +234,14 @@ const FRONTEND_RELEASES: Release[] = [
 ];
 
 const BACKEND_RELEASES: Release[] = [
+  {
+    version: "0.19.0",
+    date: "17 октября 2026",
+    title: "Раскладка главной на сервере",
+    changes: [
+      { kind: "new",     text: "Сервер хранит раскладку виджетов главной у каждого сотрудника" },
+    ],
+  },
   {
     version: "0.18.0",
     date: "16 октября 2026",
