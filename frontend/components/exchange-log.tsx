@@ -99,7 +99,7 @@ function Overview({ ov, job, onJob }: { ov: LogOverview; job: string; onJob: (j:
         За сутки: запросов {ov.day.requests.toLocaleString("ru-RU")}
         {ov.day.failed > 0 && <span className="font-semibold text-red-600 dark:text-red-400">, с ошибкой {ov.day.failed}</span>}
         , получено {formatBytes(ov.day.bytes)} · журнал занимает {formatBytes(ov.storage_bytes)}.
-        {" "}Запросы хранятся {ov.keep_request_days} дней, сеансы — {ov.keep_run_days}. Пароли, адрес вебхука и токены не записываются.
+        {" "}Запросы хранятся {ov.keep_request_days} дней, сеансы — {ov.keep_run_days}.
       </p>
     </div>
   );
