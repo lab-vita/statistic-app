@@ -7,11 +7,13 @@ import {
 } from "@dnd-kit/core";
 import { GripVertical, X, Settings2, Plus, RotateCcw, Check, LayoutGrid } from "lucide-react";
 import {
-  COLS, GAP, ROW_H, DEFAULT_LAYOUT, WIDGET_TYPES,
-  loadGrid, saveGrid, resetGrid, findFreeSlot, placeWidget, moveWidget, compactGrid, newId, widgetDef,
+  COLS, GAP, ROW_H, WIDGET_TYPES,
+  defaultLayout, sanitizeGrid, findFreeSlot, placeWidget, moveWidget, compactGrid, newId, widgetDef,
   type PlacedWidget, type WidgetTypeId, type WidgetPermission,
 } from "@/lib/grid";
 import type { HomeData } from "@/lib/home-data";
+import { cachedHomeLayout, fetchHomeLayout, saveHomeLayout } from "@/lib/home-layout";
+import { Skeleton } from "@/components/ui/primitives";
 import { WidgetContent, WIDGET_OPTIONS, widgetCaption } from "@/components/widgets/registry";
 import { WidgetCatalog, WidgetSettingsDialog } from "@/components/widget-catalog";
 import { cn } from "@/lib/utils";
@@ -36,7 +38,7 @@ const px = {
   height: (h: number) => h * ROW_H + (h - 1) * GAP,
 };
 
-// ─── Виджет на сетке ────────────────────────────────────────────────────────────────
+// ─── Виджет на сетке ────────────────────────────────────────────────────────────────────
 
 function GridItem({ pw, col, editMode, hidden, data, loading, onDelete, onSettings, onResizeStart }: {
   pw: PlacedWidget; col: number; editMode: boolean; hidden: boolean;
@@ -131,7 +133,7 @@ function Ghost({ x, y, w, h, col, label }: { x: number; y: number; w: number; h:
   );
 }
 
-// ─── Дашборд ──────────────────────────────────────────────────────────────────────
+// ─── Дашборд ──────────────────────────────────────────────────────────────────────────────
 
 interface Props {
   data:        HomeData;
@@ -143,17 +145,57 @@ interface Props {
   onLayout?:   (widgets: PlacedWidget[]) => void;
 }
 
-export function HomeDashboard({ data, loading, editMode, onEditMode, can, onLayout }: Props) {
+/**
+ * Раскладка хранится на сервере у сотрудника — одна на все компьютеры и браузеры.
+ * Пока она грузится, показываем заготовку сетки.
+ */
+export function HomeDashboard(props: Props) {
+  const { can } = props;
   const allowed = useCallback((pw: PlacedWidget) => {
     const def = widgetDef(pw.type);
     return !!def && can(def.permission);
   }, [can]);
 
-  const [widgets, setWidgets] = useState<PlacedWidget[]>(() => {
-    const saved = loadGrid();
-    return saved ? saved.filter(allowed) : compactGrid(DEFAULT_LAYOUT.filter(allowed));
-  });
-  const [isCustom, setIsCustom] = useState(() => loadGrid() !== null);
+  // undefined — ещё не загрузили; null — сотрудник не настраивал главную
+  const [saved, setSaved] = useState<PlacedWidget[] | null | undefined>(() => cachedHomeLayout());
+  useEffect(() => {
+    if (saved !== undefined) return;
+    let alive = true;
+    fetchHomeLayout()
+      .then(l => { if (alive) setSaved(l); })
+      .catch(() => { if (alive) setSaved(null); });   // нет связи — набор по умолчанию
+    return () => { alive = false; };
+  }, [saved]);
+
+  if (saved === undefined) return <LayoutSkeleton />;
+  return (
+    <Dashboard
+      {...props}
+      allowed={allowed}
+      initial={saved ? sanitizeGrid(saved).filter(allowed) : defaultLayout(allowed)}
+      initialCustom={saved !== null}
+    />
+  );
+}
+
+function LayoutSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4" aria-busy="true" aria-label="Загружаем главную">
+      {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[166px]" />)}
+      <Skeleton className="col-span-2 h-[166px] md:col-span-4" />
+      <Skeleton className="col-span-2 h-[256px] md:col-span-3" />
+      <Skeleton className="col-span-2 h-[256px] md:col-span-1" />
+    </div>
+  );
+}
+
+function Dashboard({ data, loading, editMode, onEditMode, can, onLayout, allowed, initial, initialCustom }: Props & {
+  allowed:       (pw: PlacedWidget) => boolean;
+  initial:       PlacedWidget[];
+  initialCustom: boolean;
+}) {
+  const [widgets, setWidgets] = useState<PlacedWidget[]>(initial);
+  const [isCustom, setIsCustom] = useState(initialCustom);
 
   const [showCatalog, setShowCatalog] = useState(false);
   const [settingsFor, setSettingsFor] = useState<PlacedWidget | null>(null);
@@ -178,14 +220,14 @@ export function HomeDashboard({ data, loading, editMode, onEditMode, can, onLayo
 
   function commit(next: PlacedWidget[]) {
     setWidgets(next);
-    saveGrid(next);
+    saveHomeLayout(next);
     setIsCustom(true);
   }
 
   function resetLayout() {
-    resetGrid();
+    saveHomeLayout(null);
     setIsCustom(false);
-    setWidgets(compactGrid(DEFAULT_LAYOUT.filter(allowed)));
+    setWidgets(defaultLayout(allowed));
   }
 
   function addWidget(type: WidgetTypeId, config?: Record<string, string>) {
