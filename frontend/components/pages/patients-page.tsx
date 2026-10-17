@@ -110,9 +110,6 @@ function NoshowSection({ data }: { data: NoshowsResponse }) {
                 <p className="mt-1 text-[11px] text-text-3">не пришли {fmt(c.noshow)} из {fmt(c.visits + c.noshow)}</p>
               </div>
             ))}
-            <p className="text-[11px] leading-relaxed text-text-3">
-              Если новые пациенты не приходят заметно чаще, им стоит звонить накануне приёма в первую очередь.
-            </p>
           </div>
         </SectionCard>
 
@@ -179,7 +176,6 @@ function MonthlyChart({ rows }: { rows: ReturnsResponse["monthly"] }) {
 function ReturnsSection({ data }: { data: ReturnsResponse }) {
   const since = data.data_since ? new Date(`${data.data_since}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }) : null;
   const cb30 = data.came_back.find(c => c.days === 30);
-  const cb90 = data.came_back.find(c => c.days === 90);
   const gapMax = Math.max(...data.gap_buckets.map(b => b.count), 1);
 
   return (
@@ -213,12 +209,6 @@ function ReturnsSection({ data }: { data: ReturnsResponse }) {
                   </div>
                 </div>
               ))}
-              {cb90 && cb90.eligible > 0 && (
-                <p className="pt-1 text-[11px] leading-relaxed text-text-3">
-                  За 90 дней после визита вернулись {pct(cb90.pct)} — {fmt(cb90.count)} из {fmt(cb90.eligible)} пациентов,
-                  у которых эти 90 дней уже прошли.
-                </p>
-              )}
             </div>
           </SectionCard>
         </div>
