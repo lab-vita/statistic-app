@@ -318,9 +318,7 @@ function Dashboard({ data, loading, editMode, onEditMode, can, onLayout, allowed
         <div className="card-surface flex flex-wrap items-center gap-2 px-4 py-2.5">
           <LayoutGrid className="h-4 w-4 shrink-0 text-brand" />
           <p className="mr-auto text-[12px] text-text-2">
-            {stacked
-              ? "Перемещать и менять размер виджетов можно на широком экране. Здесь — добавить или убрать."
-              : "Тяните виджет за заголовок, размер — за правый нижний угол. Изменения сохраняются сразу."}
+            {stacked && "Перемещать и менять размер виджетов можно на широком экране. Здесь — добавить или убрать."}
           </p>
           {isCustom && (
             <button type="button" onClick={resetLayout}
