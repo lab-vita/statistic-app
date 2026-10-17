@@ -136,12 +136,6 @@ export function DigestSettingsCard({ meId }: { meId?: string }) {
       right={cfg.last_result ? <ResultLine r={cfg.last_result} /> : "ещё не отправлялась"}
     >
       <div className="space-y-5">
-        <p className="max-w-[640px] text-[12px] leading-relaxed text-text-2">
-          Каждое утро бот «Пульс» присылает в личные сообщения Битрикс24 итоги вчерашнего дня: звонки,
-          приёмы, выручку, выполнение плана и что требует внимания. Перед отправкой вчерашний день
-          дособирается целиком. Каждый получатель видит только разделы, к которым у него есть доступ.
-        </p>
-
         {cfg.bot_error && (
           <div className="flex gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-3 text-[12px] leading-relaxed text-amber-700 dark:text-amber-300">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -159,7 +153,7 @@ export function DigestSettingsCard({ meId }: { meId?: string }) {
             <span className="text-[13px] font-semibold">Отправлять каждое утро</span>
           </label>
           <div>
-            <p className={labelCls}>Время, по Кемерово</p>
+            <p className={labelCls}>Время</p>
             <input
               type="time" step={300} value={draft.time}
               onChange={e => e.target.value && setDraft(d => d && ({ ...d, time: e.target.value }))}
@@ -177,9 +171,6 @@ export function DigestSettingsCard({ meId }: { meId?: string }) {
             />
           </div>
         </div>
-        <p className="-mt-3 text-[11px] text-text-3">
-          Ссылка нужна для кнопки «Открыть «Пульс»» под сводкой: откройте приложение в Битрикс24 и скопируйте адрес из строки браузера.
-        </p>
 
         {/* Получатели */}
         <div>
@@ -237,7 +228,7 @@ export function DigestSettingsCard({ meId }: { meId?: string }) {
             type="button" onClick={showPreview} disabled={busy === "preview"}
             className="inline-flex h-8 items-center gap-1.5 rounded-[7px] border border-border bg-card px-3 text-[12.5px] font-medium text-text-2 transition-colors hover:bg-accent disabled:opacity-60"
           >
-            <Eye className="h-3.5 w-3.5" />{preview ? "Скрыть пример" : busy === "preview" ? "Готовлю…" : "Как она выглядит"}
+            <Eye className="h-3.5 w-3.5" />{preview ? "Скрыть пример" : busy === "preview" ? "Готовлю…" : "Пример"}
           </button>
           <button
             type="button" onClick={sendTest} disabled={busy === "test"}
@@ -257,7 +248,7 @@ export function DigestSettingsCard({ meId }: { meId?: string }) {
           <div className="rounded-[10px] border border-border bg-background p-4">
             <div className="mb-3 flex items-center gap-2 text-[11px] text-text-3">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-brand-foreground"><Bot className="h-3.5 w-3.5" /></span>
-              <span><span className="font-semibold text-text-2">Пульс</span> · так сводка за {fmtDay(preview.for_day)} выглядит для вас</span>
+              <span className="font-semibold text-text-2">Пульс</span>
             </div>
             <div className="max-w-[560px] rounded-[10px] bg-card px-4 py-3 text-[13px] text-text-2 shadow-card">
               {renderBB(preview.text)}
