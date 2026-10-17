@@ -92,25 +92,25 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   {
     id: "calls_chart", group: "Звонки", permission: "view:calls", configurable: true, data: ["stats", "daily", "prevDaily"],
     name: "Динамика",
-    description: "Принято, поступило или потеряно по дням: линия этого периода и пунктир прошлого. Сразу виден тренд.",
+    description: "Принято, поступило или потеряно по дням: линия этого периода и пунктир прошлого.",
     defaultW: 8, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 5,
   },
   {
     id: "calls_heatmap", group: "Звонки", permission: "view:calls", configurable: true, data: ["heatmap"],
     name: "Нагрузка по часам",
-    description: "Тепловая карта: в какие дни недели и часы больше всего звонков или пропущенных. Помогает планировать смены.",
+    description: "Тепловая карта: в какие дни недели и часы больше всего звонков или пропущенных.",
     defaultW: 8, defaultH: 4, minW: 6, minH: 3, maxW: 12, maxH: 5,
   },
   {
     id: "calls_funnel", group: "Звонки", permission: "view:calls", data: ["stats"],
     name: "Судьба звонков",
-    description: "Сколько поступило и пропущено и что стало с пропущенными. Главная цифра — сколько клиентов потеряно.",
+    description: "Сколько поступило и пропущено и что стало с пропущенными.",
     defaultW: 6, defaultH: 5, minW: 4, minH: 4, maxW: 12, maxH: 6,
   },
   {
     id: "calls_plan", group: "Звонки", permission: "view:calls", data: ["daily", "plan"],
     name: "План и прогноз",
-    description: "Сколько плана по звонкам выполнено и чем закончится период при текущем темпе. План задаётся в разделе «Планы».",
+    description: "Сколько плана по звонкам выполнено и чем закончится период при текущем темпе.",
     defaultW: 6, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 4,
   },
   {
@@ -218,14 +218,14 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
   {
     id: "plans_progress", group: "Планы", permission: "view:plans", data: ["plan", "stats", "appointments", "payments", "conversion"],
     name: "Выполнение планов",
-    description: "Звонки, записи и выручка против плана на выбранный период, конверсия и явки — против цели. План задаётся в разделе «Планы».",
+    description: "Звонки, записи и выручка против плана на выбранный период, конверсия и явки — против цели.",
     defaultW: 4, defaultH: 4, minW: 3, minH: 3, maxW: 12, maxH: 5,
   },
   // ── Отчёты
   {
     id: "reports_months", group: "Отчёты", permission: "view:reports", configurable: true, data: ["reports"],
     name: "Последние полгода",
-    description: "Звонки или записи по месяцам за шесть месяцев — не зависит от выбранного периода, удобно сравнивать сезонность.",
+    description: "Звонки или записи по месяцам за шесть месяцев — не зависит от выбранного периода.",
     defaultW: 6, defaultH: 3, minW: 4, minH: 3, maxW: 12, maxH: 5,
   },
 ];

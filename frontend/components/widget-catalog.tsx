@@ -102,7 +102,7 @@ export function WidgetOptionsPicker({ type, value, onChange }: {
   );
 }
 
-// ─── Диалог ────────────────────────────────────────────────────────────────────────────
+// ─── Диалог ──────────────────────────────────────────────────────────────────────────────────
 
 function Dialog({ title, subtitle, onClose, children, back }: {
   title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; back?: () => void;
@@ -197,7 +197,7 @@ export function WidgetCatalog({ can, onAdd, onClose }: WidgetCatalogProps) {
   }
 
   return (
-    <Dialog title="Добавить виджет" subtitle="Превью показаны на примерных данных" onClose={onClose}>
+    <Dialog title="Добавить виджет" onClose={onClose}>
       <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border p-3 sm:w-48 sm:flex-col sm:border-b-0 sm:border-r" aria-label="Группы виджетов">
           {groups.map(g => {
