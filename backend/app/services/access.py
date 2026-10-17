@@ -38,7 +38,7 @@ SCOPE_HINT = ("Чтобы видеть весь список сотрудник�
               "Пока работает поиск по имени.")
 
 
-# ─── Роли ────────────────────────────────────────────────────────
+# ─── Роли ───────────────────────────────────────────────────────────────
 
 async def load_roles(db: AsyncSession) -> list[AppRole]:
     rows = (await db.execute(select(AppRole).order_by(AppRole.position, AppRole.created_at))).scalars().all()
@@ -69,6 +69,7 @@ async def create_tables(engine) -> None:
         await conn.execute(text(
             "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS profile_synced_at TIMESTAMP WITH TIME ZONE"))
         await conn.execute(text("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS tour_version INTEGER"))
+        await conn.execute(text("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS home_layout JSON"))
 
     from app.db.database import async_session_factory
     async with async_session_factory() as db:
@@ -118,7 +119,7 @@ async def _seed_and_migrate(db: AsyncSession) -> None:
     logger.info("[access] роли созданы; особых наборов прав перенесено: %s", len(custom))
 
 
-# ─── Битрикс24 ───────────────────────────────────────────────────
+# ─── Битрикс24 ───────────────────────────────────────────────────────────
 
 def _photo(value) -> str | None:
     return value if isinstance(value, str) and value.startswith("http") else None

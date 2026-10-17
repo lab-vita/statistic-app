@@ -3,7 +3,7 @@
 // Каждый виджет занимает w колонок × h строк. Ширина колонки считается
 // по ширине контейнера, высота строки фиксирована (ROW_H), поэтому
 // цифры и графики не растягиваются на широких экранах.
-// Раскладка хранится в localStorage как массив PlacedWidget.
+// Раскладка хранится на сервере у сотрудника (lib/home-layout.ts) как массив PlacedWidget.
 
 import type { DataKey } from "@/lib/home-data";
 
@@ -232,7 +232,7 @@ export const WIDGET_TYPES: WidgetTypeDef[] = [
 
 export const widgetDef = (type: WidgetTypeId) => WIDGET_TYPES.find(d => d.id === type);
 
-// ─── Размещённый виджет ──────────────────────────────────────────
+// ─── Размещённый виджет ──────────────────────────────────────────────
 
 export interface PlacedWidget {
   id:   string;
@@ -244,53 +244,80 @@ export interface PlacedWidget {
   config?: Record<string, string>; // произвольные настройки виджета
 }
 
-// ─── Раскладка по умолчанию — все виджеты, сверху сводка ─────
+// ─── Раскладка по умолчанию — все виджеты, какие есть ────────
 //
+// Сверху сводка, дальше по разделам в порядке меню. Виджеты с выбором метрики
+// стоят в каждом варианте (все «Одна метрика», все тепловые карты).
 // Без прав на раздел виджеты отфильтровываются, а сетка подтягивается вверх
 // (compactGrid), поэтому дыр не остаётся.
 
-export const DEFAULT_LAYOUT: PlacedWidget[] = [
-  // сводка: главные цифры и воронка
-  { id: "d-incoming",     type: "calls_single",     x: 0, y: 0,  w: 3,  h: 2, config: { metric: "incoming" } },
-  { id: "d-lost",         type: "calls_single",     x: 3, y: 0,  w: 3,  h: 2, config: { metric: "lost" } },
-  { id: "d-visits",       type: "appt_single",      x: 6, y: 0,  w: 3,  h: 2, config: { metric: "visits" } },
-  { id: "d-revenue",      type: "revenue_single",   x: 9, y: 0,  w: 3,  h: 2, config: { metric: "total_paid" } },
-  { id: "d-funnel-steps", type: "funnel_steps",     x: 0, y: 2,  w: 12, h: 2 },
-  { id: "d-chart",        type: "calls_chart",      x: 0, y: 4,  w: 8,  h: 3, config: { metric: "incoming" } },
-  { id: "d-plans",        type: "plans_progress",   x: 8, y: 4,  w: 4,  h: 3 },
+type Row = [WidgetTypeId, number, number, number, number, string?];
+
+const DEFAULT_ROWS: Row[] = [
+  // сводка: главные цифры, воронка, план
+  ["calls_single",        0,  0,  3, 2, "incoming"],
+  ["calls_single",        3,  0,  3, 2, "lost"],
+  ["appt_single",         6,  0,  3, 2, "visits"],
+  ["revenue_single",      9,  0,  3, 2, "total_paid"],
+  ["funnel_steps",        0,  2, 12, 2],
+  ["calls_chart",         0,  4,  8, 4, "incoming"],
+  ["plans_progress",      8,  4,  4, 4],
   // звонки
-  { id: "d-trio",         type: "calls_trio",       x: 0, y: 7,  w: 6,  h: 2 },
-  { id: "d-sources",      type: "appt_sources",     x: 6, y: 7,  w: 6,  h: 2 },
-  { id: "d-funnel",       type: "calls_funnel",     x: 0, y: 9,  w: 6,  h: 6 },
-  { id: "d-appts",        type: "appt_summary",     x: 6, y: 9,  w: 6,  h: 3 },
-  { id: "d-plan",         type: "calls_plan",       x: 6, y: 12, w: 6,  h: 3 },
-  { id: "d-heatmap",      type: "calls_heatmap",    x: 0, y: 15, w: 8,  h: 4, config: { metric: "total" } },
-  { id: "d-conversion",   type: "calls_conversion", x: 8, y: 15, w: 4,  h: 4 },
-  // воронка, записи, выручка по дням
-  { id: "d-funnel-trend", type: "funnel_trend",     x: 0, y: 19, w: 8,  h: 3 },
-  { id: "d-methods",      type: "revenue_methods",  x: 8, y: 19, w: 4,  h: 3 },
-  { id: "d-revenue-day",  type: "revenue_chart",    x: 0, y: 22, w: 6,  h: 3 },
-  { id: "d-appt-day",     type: "appt_chart",       x: 6, y: 22, w: 6,  h: 3 },
-  // рейтинги
-  { id: "d-doctors",      type: "doctors_top",      x: 0, y: 25, w: 4,  h: 4 },
-  { id: "d-services",     type: "revenue_services", x: 4, y: 25, w: 4,  h: 4 },
-  { id: "d-admins",       type: "appt_admins",      x: 8, y: 25, w: 4,  h: 4 },
-  // полгода и операторы
-  { id: "d-months-calls", type: "reports_months",   x: 0, y: 29, w: 6,  h: 3, config: { metric: "calls" } },
-  { id: "d-months-appts", type: "reports_months",   x: 6, y: 29, w: 6,  h: 3, config: { metric: "appts" } },
-  { id: "d-operators",    type: "calls_operators",  x: 0, y: 32, w: 12, h: 4 },
-  // пациенты и направления
-  { id: "d-noshows",      type: "patients_noshows",   x: 0, y: 36, w: 4,  h: 3 },
-  { id: "d-returns",      type: "patients_returns",   x: 4, y: 36, w: 4,  h: 3 },
-  { id: "d-categories",   type: "revenue_categories", x: 8, y: 36, w: 4,  h: 3 },
+  ["calls_single",        0,  8,  3, 2, "received"],
+  ["calls_single",        3,  8,  3, 2, "outgoing"],
+  ["calls_single",        6,  8,  3, 2, "missed"],
+  ["calls_single",        9,  8,  3, 2, "missed_pct"],
+  ["calls_single",        0, 10,  3, 2, "lost_pct"],
+  ["calls_single",        3, 10,  3, 2, "reaction"],
+  ["calls_single",        6, 10,  3, 2, "callback_count"],
+  ["calls_single",        9, 10,  3, 2, "callback_pct"],
+  ["calls_single",        0, 12,  3, 2, "avg_duration"],
+  ["calls_single",        3, 12,  3, 2, "conversion"],
+  ["calls_trio",          6, 12,  6, 2],
+  ["calls_funnel",        0, 14,  6, 6],
+  ["calls_plan",          6, 14,  6, 3],
+  ["calls_conversion",    6, 17,  6, 3],
+  ["calls_heatmap",       0, 20, 12, 4, "total"],
+  ["calls_heatmap",       0, 24,  6, 4, "incoming"],
+  ["calls_heatmap",       6, 24,  6, 4, "missed"],
+  ["calls_operators",     0, 28, 12, 4],
+  // записи
+  ["appt_single",         0, 32,  3, 2, "total"],
+  ["appt_single",         3, 32,  3, 2, "noshow"],
+  ["appt_sources",        6, 32,  6, 2],
+  ["appt_single",         0, 34,  4, 2, "new_patients"],
+  ["appt_single",         4, 34,  4, 2, "visit_pct"],
+  ["appt_single",         8, 34,  4, 2, "noshow_pct"],
+  ["appt_chart",          0, 36,  8, 3],
+  ["appt_summary",        8, 36,  4, 3],
+  ["appt_admins",         0, 39, 12, 4],
+  // пациенты
+  ["patients_noshows",    0, 43,  6, 3],
+  ["patients_returns",    6, 43,  6, 3],
+  // выручка
+  ["revenue_single",      0, 46,  6, 2, "count"],
+  ["revenue_single",      6, 46,  6, 2, "avg_check"],
+  ["revenue_chart",       0, 48,  8, 3],
+  ["revenue_methods",     8, 48,  4, 3],
+  ["revenue_services",    0, 51,  6, 4],
+  ["revenue_categories",  6, 51,  6, 4],
+  // врачи, воронка, отчёты
+  ["doctors_top",         0, 55, 12, 4],
+  ["funnel_trend",        0, 59, 12, 3],
+  ["reports_months",      0, 62,  6, 3, "calls"],
+  ["reports_months",      6, 62,  6, 3, "appts"],
 ];
 
-// ─── localStorage ──────────────────────────────────────────────
+export const DEFAULT_LAYOUT: PlacedWidget[] = DEFAULT_ROWS.map(([type, x, y, w, h, metric]) => ({
+  id: metric ? `d-${type}-${metric}` : `d-${type}`,
+  type, x, y, w, h,
+  ...(metric ? { config: { metric } } : {}),
+}));
 
-// v2: строки стали фиксированной высоты, размеры виджетов пересчитаны.
-// Старые раскладки (grid_layout_v1, квадратные ячейки) не переносим —
-// пользователь начинает с раскладки по умолчанию.
-const LS_KEY = "grid_layout_v2";
+/** Раскладка по умолчанию для сотрудника: только виджеты, на которые у него есть права. */
+export function defaultLayout(allowed: (pw: PlacedWidget) => boolean): PlacedWidget[] {
+  return compactGrid(DEFAULT_LAYOUT.filter(allowed));
+}
 
 /**
  * Приводит сохранённую раскладку к актуальным типам: неизвестные типы
@@ -322,26 +349,6 @@ function resolveOverlaps(items: PlacedWidget[]): PlacedWidget[] {
     settled.push(q);
   }
   return items.map(p => settled.find(s => s.id === p.id)!);
-}
-
-/** null — пользователь ещё ничего не настраивал (показываем раскладку по умолчанию). */
-export function loadGrid(): PlacedWidget[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw === null) return null;
-    return sanitizeGrid(JSON.parse(raw));
-  } catch { return null; }
-}
-
-export function saveGrid(widgets: PlacedWidget[]): void {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(LS_KEY, JSON.stringify(widgets)); } catch { /* хранилище недоступно */ }
-}
-
-export function resetGrid(): void {
-  if (typeof window === "undefined") return;
-  try { localStorage.removeItem(LS_KEY); } catch { /* noop */ }
 }
 
 // ─── Утилиты ─────────────────────────────────────────────────
