@@ -42,3 +42,50 @@ async def tour_seen(body: TourSeen, user: CurrentUser = Depends(current_user),
         row.tour_version = body.version
         await db.commit()
     return {"ok": True, "tour_version": body.version}
+
+
+# ─── Раскладка главной ───────────────────────────────────────────
+
+class PlacedWidget(BaseModel):
+    id:     str = Field(min_length=1, max_length=64)
+    type:   str = Field(min_length=1, max_length=40)
+    x:      int = Field(ge=0, le=11)
+    y:      int = Field(ge=0, le=1000)
+    w:      int = Field(ge=1, le=12)
+    h:      int = Field(ge=1, le=20)
+    config: dict[str, str] | None = None
+
+
+class HomeLayout(BaseModel):
+    # None — сбросить на раскладку по умолчанию
+    layout: list[PlacedWidget] | None = Field(default=None, max_length=200)
+
+
+# Без входа (AUTH_DISABLED, только локальная разработка) строки пользователя нет —
+# раскладка живёт в памяти до перезапуска.
+_dev_layout: dict[str, list | None] = {"layout": None}
+
+
+@router.get("/home-layout")
+async def get_home_layout(user: CurrentUser = Depends(current_user),
+                          db: AsyncSession = Depends(get_db)):
+    """Виджеты главной сотрудника. null — не настраивал, показывается раскладка по умолчанию."""
+    if settings.AUTH_DISABLED:
+        return {"layout": _dev_layout["layout"]}
+    row = await db.get(AppUser, user.id)
+    return {"layout": row.home_layout if row is not None else None}
+
+
+@router.put("/home-layout")
+async def put_home_layout(body: HomeLayout, user: CurrentUser = Depends(current_user),
+                          db: AsyncSession = Depends(get_db)):
+    """Сохранить раскладку главной — она будет одинаковой на любом компьютере и в любом браузере."""
+    layout = [w.model_dump(exclude_none=True) for w in body.layout] if body.layout is not None else None
+    if settings.AUTH_DISABLED:
+        _dev_layout["layout"] = layout
+        return {"ok": True}
+    row = await db.get(AppUser, user.id)
+    if row is not None:
+        row.home_layout = layout
+        await db.commit()
+    return {"ok": True}

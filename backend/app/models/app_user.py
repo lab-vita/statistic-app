@@ -48,6 +48,9 @@ class AppUser(Base):
     # Какую версию обучающего тура сотрудник уже прошёл (или закрыл). NULL — ещё не видел:
     # при первом входе тур запускается сам.
     tour_version:   Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Раскладка виджетов главной (список {id, type, x, y, w, h, config}). NULL — ещё не
+    # настраивал: показывается раскладка по умолчанию со всеми виджетами.
+    home_layout:    Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at:     Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
