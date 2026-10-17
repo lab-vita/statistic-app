@@ -82,13 +82,10 @@ function ConvPct({ value, good, bad }: { value: number; good: number; bad: numbe
   );
 }
 
-function FunnelBlock({ title, note, tour, children }: { title: string; note: string; tour?: string; children: ReactNode }) {
+function FunnelBlock({ title, tour, children }: { title: string; tour?: string; children: ReactNode }) {
   return (
     <section className="space-y-2.5" data-tour={tour}>
-      <div>
-        <p className="text-[14px] font-semibold">{title}</p>
-        <p className="text-[12px] text-muted-foreground mt-0.5">{note}</p>
-      </div>
+      <p className="text-[14px] font-semibold">{title}</p>
       {/* узко — шаги друг под другом, стрелки вниз; шире 44rem — в ряд */}
       <div className="@container">
         <div className="flex flex-col items-stretch gap-1.5 @[44rem]:flex-row @[44rem]:gap-2">{children}</div>
@@ -363,7 +360,6 @@ export function FunnelPage() {
             <FunnelBlock
               title="Колл-центр"
               tour="funnel-cc"
-              note="Пациенты, которых записали операторы: записи по дню создания, пациент считается один раз"
             >
               <FunnelCard
                 label="Звонков принято"
@@ -400,7 +396,6 @@ export function FunnelPage() {
             <FunnelBlock
               title="Вся клиника"
               tour="funnel-clinic"
-              note="Все записи на приём в этом периоде, кто бы их ни сделал: колл-центр, администраторы и другие сотрудники"
             >
               <FunnelCard
                 label="Записей на приём"
@@ -437,27 +432,6 @@ export function FunnelPage() {
 
             {/* График динамики */}
             {trend.length >= 2 && <TrendChart points={trend} />}
-
-            {/* Подсказка */}
-            <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Как читать воронку</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px]">
-                <div className="flex items-start gap-2">
-                  <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                  <div>
-                    <p className="font-medium">Звонки → Записи: хорошо от 30%</p>
-                    <p className="text-[12px] text-muted-foreground">Из 100 звонков должны получаться минимум 30 записей</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                  <div>
-                    <p className="font-medium">Записи → Явка: хорошо от 80%</p>
-                    <p className="text-[12px] text-muted-foreground">Из 100 пациентов, чей приём уже прошёл, должны прийти минимум 80. Те, кто ещё ждёт приёма, не учитываются</p>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Таблица по операторам */}
             {data.operators.length > 0 && (
